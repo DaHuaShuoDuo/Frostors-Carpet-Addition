@@ -1,0 +1,72 @@
+apply plugin: 'net.fabricmc.fabric-loom'
+apply plugin: 'maven-publish'
+
+version = project.mod_version
+group = project.maven_group
+
+base {
+	archivesName = "${project.archives_base_name}-fabric-${project.minecraft_version}"
+}
+
+sourceSets {
+	main {
+		java.srcDirs = [rootProject.file('src/main/java')]
+		resources.srcDirs = [rootProject.file('src/main/resources')]
+	}
+}
+
+dependencies {
+	minecraft "com.mojang:minecraft:${project.minecraft_version}"
+
+	implementation "net.fabricmc:fabric-loader:${project.loader_version}"
+	implementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
+
+	// Carpet is a required runtime dependency, only needed at compile time here
+	compileOnly files(rootProject.file("libs/fabric-carpet-${project.minecraft_version}.jar"))
+}
+
+loom {
+	mixin {
+		// minecraft 26.x is unobfuscated, so there is no need to generate remap refmaps
+		useLegacyMixinAp = false
+	}
+}
+
+processResources {
+	inputs.property "version", project.version
+	inputs.property "minecraft_dependency", project.minecraft_dependency
+	inputs.property "fabricloader_dependency", project.fabricloader_dependency
+
+	filesMatching("fabric.mod.json") {
+		expand "version": project.version,
+				"minecraft_dependency": project.minecraft_dependency,
+				"fabricloader_dependency": project.fabricloader_dependency
+	}
+}
+
+tasks.withType(JavaCompile).configureEach {
+	options.release = 25
+	options.encoding = "UTF-8"
+}
+
+java {
+	sourceCompatibility = JavaVersion.VERSION_25
+	targetCompatibility = JavaVersion.VERSION_25
+
+	withSourcesJar()
+}
+
+jar {
+	from(rootProject.file('LICENSE')) {
+		rename { "${it}_${project.base.archivesName.get()}" }
+	}
+}
+
+publishing {
+	publications {
+		create("mavenJava", MavenPublication) {
+			artifactId = project.archives_base_name
+			from components.java
+		}
+	}
+}

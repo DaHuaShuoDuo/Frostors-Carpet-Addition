@@ -1,0 +1,27 @@
+{
+	"schemaVersion": 1,
+	"id": "frostors-carpet-addition",
+	"version": "${version}",
+	"name": "Frostor's Carpet Addition",
+	"description": "A Carpet addition by Frostor, including a port of Player Ladder.",
+	"authors": [
+		"Frostor"
+	],
+	"license": "MIT",
+	"environment": "*",
+	"entrypoints": {
+		"main": [
+			"top.frostor.carpet.FrostorsCarpetAddition"
+		]
+	},
+	"mixins": [
+		"frostors-carpet-addition.mixins.json"
+	],
+	"depends": {
+		"fabricloader": "${fabricloader_dependency}",
+		"minecraft": "${minecraft_dependency}",
+		"java": ">=25",
+		"fabric-api": "*",
+		"carpet": "*"
+	}
+}

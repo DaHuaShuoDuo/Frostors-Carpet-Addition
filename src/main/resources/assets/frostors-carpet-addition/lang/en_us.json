@@ -1,0 +1,22 @@
+{
+  "carpet.rule.playerLadder.name": "Player Ladder",
+  "carpet.rule.playerLadder.desc": "Master switch for the Player Ladder feature. When off, right-clicking an entity does nothing.",
+  "carpet.rule.playerLadderClickMode.name": "Player Ladder Click Mode",
+  "carpet.rule.playerLadderClickMode.desc": "What a right click on an entity does: ride it, pick it up, or do nothing. Values: ride, pick_up, do_nothing.",
+  "carpet.rule.playerLadderPickUpLimit.name": "Player Ladder Pick Up Limit",
+  "carpet.rule.playerLadderPickUpLimit.desc": "Maximum number of stacked passengers considered when picking up an entity.",
+  "carpet.rule.playerLadderStepUpLimit.name": "Player Ladder Step Up Limit",
+  "carpet.rule.playerLadderStepUpLimit.desc": "Maximum stack height climbed when riding an entity.",
+  "carpet.rule.playerLadderInteractWithAnyLiving.name": "Player Ladder Interact With Any Living",
+  "carpet.rule.playerLadderInteractWithAnyLiving.desc": "Whether non-player living entities can also be ridden or picked up.",
+  "carpet.rule.playerLadderExcludedEntities.name": "Player Ladder Excluded Entities",
+  "carpet.rule.playerLadderExcludedEntities.desc": "Comma separated entity ids or tags (prefix with #) that can never be ridden or picked up.",
+  "carpet.rule.playerLadderDismountOnGameModeChange.name": "Player Ladder Dismount On Game Mode Change",
+  "carpet.rule.playerLadderDismountOnGameModeChange.desc": "Whether passengers are dismounted when the carrier changes game mode.",
+  "carpet.rule.playerLadderRideExtension.name": "Player Ladder Ride Extension",
+  "carpet.rule.playerLadderRideExtension.desc": "Whether stacks of 3 or more players are allowed. When false, only two players may ride each other.",
+  "carpet.rule.playerLadderRideFakePlayer.name": "Player Ladder Ride Fake Player",
+  "carpet.rule.playerLadderRideFakePlayer.desc": "Whether Carpet fake players can be ridden or picked up.",
+  "carpet.rule.playerLadderClientInteractions.name": "Player Ladder Client Interactions",
+  "carpet.rule.playerLadderClientInteractions.desc": "Client side aiming fix that keeps riders selectable while stacked. Client only."
+}

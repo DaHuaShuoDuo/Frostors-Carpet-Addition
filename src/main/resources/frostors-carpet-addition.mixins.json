@@ -1,0 +1,16 @@
+{
+  "required": true,
+  "package": "top.frostor.carpet.playerladder.mixin",
+  "compatibilityLevel": "JAVA_25",
+  "mixins": [
+    "PlayerMixin",
+    "ServerPlayerMixin",
+    "shared.EntityMixin"
+  ],
+  "client": [
+    "shared.ProjectileUtilMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}
