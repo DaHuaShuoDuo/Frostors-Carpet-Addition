@@ -98,6 +98,10 @@ Java 枚举常量改成小写，否则 Carpet 无法解析。
 
 - 该功能只由一个总开关 `easyPlaceProtocolExtra` 控制，不要添加客户端编码、配置界面或
   子规则。
+- 服务端方块状态语义以 Servux 的精准放置行为为兼容基线，并在 FCA 内直接实现；不要
+  根据服务端是否安装 Servux 动态切换实现。这样同一规则不会因模组组合、加载顺序或
+  Servux 版本产生不同结果。合成器锁槽以及现有红石点状状态和拉杆通电映射是 FCA 的
+  既定例外。
 - 服务端握手使用与 EarlyCompat 兼容的 `earlycompat:network` 通道，并在玩家断线时清理
   状态；如果 EarlyCompat 自身已加载，不要重复注册该通道。
 - 单人/集成服务器会同时加载 FCA 和 TriWasa。检测到 TriWasa 时，FCA 必须复用
@@ -107,6 +111,22 @@ Java 枚举常量改成小写，否则 Carpet 无法解析。
   校验，不能信任客户端直接写入任意方块状态。
 - 方块状态映射集中在 `easyplace` 包，避免为每种原版方块复制独立 Mixin。新增适配时同时
   更新 `EasyPlaceGameTest`，覆盖对应属性。
+- `MultifaceBlock` 的面状态必须从目标位置当前世界状态合并，不能继续使用原始放置状态；
+  否则目标状态已含同一面时原版会返回 `null`，在附着方块周围有密集完整方块时表现为
+  挂墙/多面方块漏放。必须保留密集图案 GameTest。
+- 箱子必须按原版配对关系恢复：孤立半箱保持 `SINGLE`，放置另一侧后立即归一化为互配的
+  `LEFT/RIGHT`。不要照搬 Servux 将 `CHEST_TYPE` 当普通终态属性强写；必须保留非连续
+  放置后 `ChestBlock.getContainer()` 为 54 格的测试。
+- 箱子协议使用 `bit6` 表示显式类型存在、`bit4-5` 表示 `SINGLE/LEFT/RIGHT`。旧客户端
+  没有显式位时只能走保守的可用邻居推断。箱子同步使用
+  `Block.UPDATE_CLIENTS | Block.UPDATE_KNOWN_SHAPE` 做受控状态写入，不要直接复用铁轨
+  的全局或定时位置抑制标签。
+- 命中位置中的 V2-Extra 编码会超出原版对方块中心的距离校验。仅对规则已开启且完成
+  V2-Extra 握手的玩家放宽该校验，同时保留玩家触及范围和最终 `canPlace` 校验。该
+  放宽必须独立生效，不能依赖 `antiCheatDisabled`。
+- HELLO 应答和规则开启时的能力广播必须携带 `protocol_version`、显式能力布尔值以及
+  `capabilities` 列表。客户端可把缺少新字段的 ACK 视为旧版兼容，但服务端不得退化为
+  只发送 `mod_version`。
 - 该服务端实现改编自 EarlyCompat，来源为 CC0-1.0；修改协议或状态表时同步维护
   `THIRD_PARTY_NOTICES.md`。不要移植 Litematica、MaliLib、Fanetlib 或客户端服务。
 
@@ -128,8 +148,8 @@ Java 枚举常量改成小写，否则 Carpet 无法解析。
 
   | Minecraft | Fabric Loader | Fabric API | Carpet |
   | --- | --- | --- | --- |
-  | 26.2 | >= 0.19.3 | >= 0.152.1 < 0.153.0 | >= 26.2 < 26.3 |
-  | 26.3 | >= 0.19.5 | >= 0.160.5 < 0.161.0 | >= 26.3 < 26.4 |
+  | 26.2 | >= 0.19.3 | >= 0.152.1 | >= 26.2 < 26.3 |
+  | 26.3 | >= 0.19.5 | >= 0.160.5 | >= 26.3 < 26.4 |
 
 - 根 `gradle.properties` 管共享属性（模组版本、group、产物前缀、Loom 版本）；
   Minecraft、Loader、Fabric API 和兼容范围由各版本属性文件定义。

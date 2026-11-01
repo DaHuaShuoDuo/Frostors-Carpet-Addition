@@ -40,6 +40,7 @@ public final class EasyPlaceItemStackSync {
         if(PLACE_DEPTH.get() <= 0
                 || !(block instanceof CrafterBlock)
                 || stack.getItem() != Items.CRAFTER
+                || disabledMask < 0
                 || (disabledMask & 0x1ff) == 0) return;
 
         @SuppressWarnings("unchecked")

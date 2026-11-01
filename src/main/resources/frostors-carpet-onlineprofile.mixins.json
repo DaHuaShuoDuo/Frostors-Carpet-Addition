@@ -1,0 +1,11 @@
+{
+  "required": true,
+  "package": "top.frostor.carpet.onlineprofile.mixin",
+  "compatibilityLevel": "JAVA_25",
+  "server": [
+    "ServerLoginPacketListenerMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

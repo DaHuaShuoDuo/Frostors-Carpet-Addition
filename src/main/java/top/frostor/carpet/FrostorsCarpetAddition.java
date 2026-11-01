@@ -9,6 +9,7 @@ import net.fabricmc.loader.api.FabricLoader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import top.frostor.carpet.easyplace.EasyPlaceExtraServer;
+import top.frostor.carpet.onlineprofile.OnlineProfileFallback;
 import top.frostor.carpet.playerladder.PlayerLadder;
 
 import java.io.IOException;
@@ -29,12 +30,19 @@ import java.util.Map;
 public class FrostorsCarpetAddition implements ModInitializer, CarpetExtension {
     public static final String MOD_ID = "frostors-carpet-addition";
     public static final Logger LOGGER = LoggerFactory.getLogger(MOD_ID);
+    public static final String VERSION = FabricLoader.getInstance()
+            .getModContainer(MOD_ID)
+            .orElseThrow()
+            .getMetadata()
+            .getVersion()
+            .getFriendlyString();
 
     @Override
     public void onInitialize() {
         CarpetServer.manageExtension(this);
         EasyPlaceExtraServer.register();
         PlayerLadder.register();
+        OnlineProfileFallback.initialize();
     }
 
     @Override
@@ -44,8 +52,7 @@ public class FrostorsCarpetAddition implements ModInitializer, CarpetExtension {
 
     @Override
     public String version() {
-        return FabricLoader.getInstance().getModContainer(MOD_ID).orElseThrow()
-                .getMetadata().getVersion().getFriendlyString();
+        return VERSION;
     }
 
     @Override

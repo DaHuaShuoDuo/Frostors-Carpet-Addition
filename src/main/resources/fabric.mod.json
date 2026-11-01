@@ -16,7 +16,8 @@
 	},
 	"mixins": [
 		"frostors-carpet-addition.mixins.json",
-		"frostors-carpet-easyplace.mixins.json"
+		"frostors-carpet-easyplace.mixins.json",
+		"frostors-carpet-onlineprofile.mixins.json"
 	],
 	"depends": {
 		"fabricloader": "${fabricloader_dependency}",

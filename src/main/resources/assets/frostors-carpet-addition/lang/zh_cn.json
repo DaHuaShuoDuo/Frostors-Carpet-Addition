@@ -1,6 +1,8 @@
 {
   "carpet.rule.easyPlaceProtocolExtra.name": "轻松放置协议 V2-Extra",
   "carpet.rule.easyPlaceProtocolExtra.desc": "启用服务端 V2-Extra 轻松放置握手与方块状态同步。本模组不包含对应客户端功能。",
+  "carpet.rule.onlineProfileFallback.name": "在线资料回退",
+  "carpet.rule.onlineProfileFallback.desc": "在正版模式下解析玩家请求的用户名与签名皮肤/披风属性，仅当对应正版 UUID 已在本服务器拥有玩家档案时才跳过 Mojang 会话验证。该方式不验证账号归属，仅适用于私人服务器。",
   "carpet.rule.playerLadder.name": "人梯（Player Ladder）",
   "carpet.rule.playerLadder.desc": "人梯功能总开关。关闭后右键实体不会有任何效果。",
   "carpet.rule.playerLadderClickMode.name": "人梯：右键模式",

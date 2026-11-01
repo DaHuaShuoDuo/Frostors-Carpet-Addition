@@ -15,6 +15,7 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 import top.frostor.carpet.easyplace.EasyPlaceExtraProtocol;
 import top.frostor.carpet.easyplace.EasyPlaceExtraServer;
+import top.frostor.carpet.easyplace.EasyPlaceChestSync;
 import top.frostor.carpet.easyplace.EasyPlaceItemStackSync;
 import top.frostor.carpet.easyplace.EasyPlaceRailUpdateGuard;
 import top.frostor.carpet.easyplace.EasyPlaceStateSync;
@@ -40,6 +41,17 @@ public abstract class BlockItemMixin {
     ) {
         EasyPlaceItemStackSync.endPlacement();
         EasyPlaceRailUpdateGuard.endPlacement();
+        if(cir.getReturnValue().consumesAction()
+                && !context.getLevel().isClientSide()
+                && context.getPlayer() instanceof ServerPlayer player
+                && EasyPlaceExtraServer.isSupported(player)
+                && context.getLevel().getBlockState(context.getClickedPos()).getBlock()
+                instanceof net.minecraft.world.level.block.ChestBlock) {
+            EasyPlaceChestSync.reconcileAfterPlacement(
+                    context.getLevel(),
+                    context.getClickedPos()
+            );
+        }
     }
 
     @WrapOperation(

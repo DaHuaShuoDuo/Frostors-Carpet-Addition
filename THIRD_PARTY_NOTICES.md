@@ -18,6 +18,18 @@ is provided for source attribution and provenance.
 No client-side Litematica, MaliLib, Fanetlib integration, client configuration, or client
 protocol encoding code is included in this port.
 
+## Servux
+
+The Easy Place server-side compatibility behavior was checked against:
+
+- Project: Servux
+- Author: masa
+- Source: https://github.com/maruohon/servux
+- License: LGPL-3.0
+
+Servux is used as a behavioral compatibility reference only. No Servux source code or
+binary is bundled with this project, and Servux is not a runtime dependency.
+
 ## PlayerLadder
 
 The Player Ladder feature is adapted from:

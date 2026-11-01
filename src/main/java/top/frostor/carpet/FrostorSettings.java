@@ -21,6 +21,16 @@ public class FrostorSettings {
     @Rule(categories = RuleCategory.FEATURE)
     public static boolean easyPlaceProtocolExtra = false;
 
+    /* ---------- Online Profile Fallback ---------- */
+
+    /**
+     * Trusts usernames during online-mode login and resolves their Mojang UUID and textures.
+     *
+     * <p>This does not verify account ownership and must only be used on private servers.</p>
+     */
+    @Rule(categories = RuleCategory.FEATURE)
+    public static boolean onlineProfileFallback = false;
+
     /* ---------- Player Ladder ---------- */
 
     /**

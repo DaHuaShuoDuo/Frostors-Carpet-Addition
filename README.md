@@ -9,8 +9,8 @@ group 为 `top.frostor`。
 
 | Minecraft | Fabric Loader | Carpet | Fabric API |
 | --- | --- | --- | --- |
-| 26.2 | >= 0.19.3 | >= 26.2 < 26.3 | >= 0.152.1 < 0.153.0 |
-| 26.3 | >= 0.19.5 | >= 26.3 < 26.4 | >= 0.160.5 < 0.161.0 |
+| 26.2 | >= 0.19.3 | >= 26.2 < 26.3 | >= 0.152.1 |
+| 26.3 | >= 0.19.5 | >= 26.3 < 26.4 | >= 0.160.5 |
 
 对应产物名为 `frostors-carpet-addition-fabric-<Minecraft 版本>`。
 
@@ -78,6 +78,17 @@ minecraft:wither,minecraft:ender_dragon,minecraft:warden,minecraft:minecart,#min
 ### 轻松放置协议 V2-Extra
 
 `easyPlaceProtocolExtra` 仅实现服务端部分：兼容使用 EarlyCompat 通道的客户端握手、解析命中位置中的 V2-Extra 状态值，并在方块放置后恢复方向、朝向、开关、堆叠数量等原版方块状态。只要规则开启且客户端完成 V2-Extra 握手，服务端就会保持普通轨、充能轨和探测轨的投影形状，不依赖客户端额外的“铁轨不更新”子配置；客户端编码、Litematica 集成和三项“移植”配置由 TriWasa 提供。
+
+服务端状态语义直接对齐 Servux 的精准放置行为，不根据服务端是否安装 Servux 切换实现。
+因此同一套规则不会因 Servux 的安装状态、加载顺序或版本产生不同结果。合成器锁槽、
+现有的红石点状状态和拉杆通电映射保持 FCA 的既定行为。新增的兼容状态包括床首位占用
+校验、蛋糕咬数、铜傀儡姿态、铜灯开关和通电状态，以及门上下半状态。双箱子使用原版
+配对语义并在每次放置后归一化，连续或间隔放置都会形成 54 格组合容器。
+多面方块会基于目标位置的世界状态合并附着面，避免密集方块图案中因重复面而漏放。
+命中点放宽由 FCA 自身完成，不要求开启 Carpet 的 `antiCheatDisabled`。
+
+服务端 HELLO 应答和能力广播会携带 V2-Extra 协议版本、显式能力布尔值以及能力列表；
+TriWasa 会校验该能力。旧版仅含 `mod_version` 的应答仍按兼容模式接受。
 
 在单人游戏或集成服务器中，FCA 检测到 TriWasa 时会复用 TriWasa 的协议
 Payload/Codec；TriWasa 负责客户端编码，FCA 负责同一进程内的服务端处理。TriWasa

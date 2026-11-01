@@ -6,6 +6,7 @@
     "BaseRailBlockMixin",
     "BlockItemMixin",
     "RailStateMixin",
+    "ServerGamePacketListenerImplMixin",
     "StandingAndWallBlockItemMixin"
   ],
   "injectors": {

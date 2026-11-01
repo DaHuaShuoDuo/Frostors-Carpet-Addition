@@ -6,6 +6,8 @@ import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.StringTag;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.server.level.ServerPlayer;
 import top.frostor.carpet.FrostorSettings;
@@ -16,6 +18,11 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 public final class EasyPlaceExtraServer {
+    public static final int PROTOCOL_VERSION = 1;
+    public static final String NBT_PROTOCOL_VERSION = "protocol_version";
+    public static final String NBT_CAPABILITIES = "capabilities";
+    public static final String CAPABILITY_EASY_PLACE_V2_EXTRA = "easy_place_v2_extra";
+    public static final String CAPABILITY_HIT_POSITION_RELAXATION = "hit_position_relaxation";
     private static final Set<UUID> SUPPORTED_PLAYERS = ConcurrentHashMap.newKeySet();
     private static boolean lastRuleState;
 
@@ -42,10 +49,9 @@ public final class EasyPlaceExtraServer {
                 SUPPORTED_PLAYERS.remove(handler.player.getUUID()));
         ServerTickEvents.END_SERVER_TICK.register(server -> {
             boolean enabled = FrostorSettings.easyPlaceProtocolExtra;
-            if(enabled && !lastRuleState) {
-                broadcastCapability(server);
-            } else if(!enabled) {
-                SUPPORTED_PLAYERS.clear();
+            if(enabled != lastRuleState) {
+                broadcastCapability(server, enabled);
+                if(!enabled) SUPPORTED_PLAYERS.clear();
             }
             lastRuleState = enabled;
         });
@@ -70,10 +76,21 @@ public final class EasyPlaceExtraServer {
     static void acceptHello(ServerPlayer player) {
         SUPPORTED_PLAYERS.add(player.getUUID());
         if(player.connection == null || !ServerPlayNetworking.canSend(player, EasyPlacePayloadBridge.type())) return;
-        sendAck(player);
+        sendAck(player, true);
     }
 
-    private static void sendAck(ServerPlayer player) {
+    private static void sendAck(ServerPlayer player, boolean enabled) {
+        ServerPlayNetworking.send(
+                player,
+                EasyPlacePayloadBridge.create(EasyPlaceExtraPayload.HELLO_ACK, capabilityData(enabled))
+        );
+    }
+
+    static CompoundTag capabilityData() {
+        return capabilityData(true);
+    }
+
+    static CompoundTag capabilityData(boolean enabled) {
         CompoundTag data = new CompoundTag();
         String version = FabricLoader.getInstance().getModContainer(FrostorsCarpetAddition.MOD_ID)
                 .orElseThrow()
@@ -81,23 +98,33 @@ public final class EasyPlaceExtraServer {
                 .getVersion()
                 .getFriendlyString();
         data.putString("mod_version", version);
-        ServerPlayNetworking.send(player, EasyPlacePayloadBridge.create(EasyPlaceExtraPayload.HELLO_ACK, data));
+        data.putInt(NBT_PROTOCOL_VERSION, PROTOCOL_VERSION);
+        data.putBoolean(CAPABILITY_EASY_PLACE_V2_EXTRA, enabled);
+        ListTag capabilities = new ListTag();
+        capabilities.add(StringTag.valueOf(CAPABILITY_EASY_PLACE_V2_EXTRA));
+        capabilities.add(StringTag.valueOf(CAPABILITY_HIT_POSITION_RELAXATION));
+        data.put(NBT_CAPABILITIES, capabilities);
+        return data;
     }
 
     static void forget(ServerPlayer player) {
         SUPPORTED_PLAYERS.remove(player.getUUID());
     }
 
-    private static void broadcastCapability(net.minecraft.server.MinecraftServer server) {
+    private static void broadcastCapability(
+            net.minecraft.server.MinecraftServer server,
+            boolean enabled
+    ) {
         int count = 0;
         for(ServerPlayer player : server.getPlayerList().getPlayers()) {
             if(!ServerPlayNetworking.canSend(player, EasyPlacePayloadBridge.type())) continue;
-            SUPPORTED_PLAYERS.add(player.getUUID());
-            sendAck(player);
+            if(enabled) SUPPORTED_PLAYERS.add(player.getUUID());
+            sendAck(player, enabled);
             count++;
         }
         FrostorsCarpetAddition.LOGGER.info(
-                "[EasyPlace] Enabled V2-Extra capability for {} online client(s)",
+                "[EasyPlace] Broadcast V2-Extra capability={} to {} online client(s)",
+                enabled,
                 count
         );
     }

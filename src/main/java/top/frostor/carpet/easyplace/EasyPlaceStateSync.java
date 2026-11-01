@@ -1,16 +1,22 @@
 package top.frostor.carpet.easyplace;
 
+import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.FrontAndTop;
 import net.minecraft.world.item.context.BlockPlaceContext;
 import net.minecraft.world.level.block.AbstractBannerBlock;
+import net.minecraft.world.level.block.BedBlock;
 import net.minecraft.world.level.block.BellBlock;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.CakeBlock;
 import net.minecraft.world.level.block.CampfireBlock;
 import net.minecraft.world.level.block.CandleBlock;
+import net.minecraft.world.level.block.ChestBlock;
 import net.minecraft.world.level.block.CommandBlock;
 import net.minecraft.world.level.block.ComparatorBlock;
+import net.minecraft.world.level.block.CopperGolemStatueBlock;
+import net.minecraft.world.level.block.CopperBulbBlock;
 import net.minecraft.world.level.block.CrafterBlock;
 import net.minecraft.world.level.block.DaylightDetectorBlock;
 import net.minecraft.world.level.block.DetectorRailBlock;
@@ -46,6 +52,7 @@ import net.minecraft.world.level.block.state.properties.AttachFace;
 import net.minecraft.world.level.block.state.properties.BellAttachType;
 import net.minecraft.world.level.block.state.properties.ComparatorMode;
 import net.minecraft.world.level.block.state.properties.DoorHingeSide;
+import net.minecraft.world.level.block.state.properties.DoubleBlockHalf;
 import net.minecraft.world.level.block.state.properties.Half;
 import net.minecraft.world.level.block.state.properties.Property;
 import net.minecraft.world.level.block.state.properties.RailShape;
@@ -60,6 +67,8 @@ import java.util.List;
 
 import static net.minecraft.world.level.block.state.properties.BlockStateProperties.ATTACHED;
 import static net.minecraft.world.level.block.state.properties.BlockStateProperties.AXIS;
+import static net.minecraft.world.level.block.state.properties.BlockStateProperties.BITES;
+import static net.minecraft.world.level.block.state.properties.BlockStateProperties.COPPER_GOLEM_POSE;
 import static net.minecraft.world.level.block.state.properties.BlockStateProperties.HALF;
 import static net.minecraft.world.level.block.state.properties.BlockStateProperties.HORIZONTAL_FACING;
 import static net.minecraft.world.level.block.state.properties.BlockStateProperties.NORTH;
@@ -94,6 +103,12 @@ public final class EasyPlaceStateSync {
         if(block instanceof AbstractBannerBlock) {
             return state.hasProperty(ROTATION_16) ? replaceSlot(state, ROTATION_16, rawValue & 0xf) : state;
         }
+        if(block instanceof BedBlock) {
+            Direction facing = directionFromProtocol(state, rawValue, context);
+            BlockPos headPos = context.getClickedPos().relative(facing);
+            if(!context.getLevel().getBlockState(headPos).canBeReplaced(context)) return null;
+            return state.setValue(HORIZONTAL_FACING, facing);
+        }
         if(block instanceof BellBlock) {
             BlockState generic = applyGeneric(state, rawValue, context);
             return replaceSlot(
@@ -105,11 +120,33 @@ public final class EasyPlaceStateSync {
         if(block instanceof CampfireBlock) {
             return replaceSlot(applyGeneric(state, rawValue, context), CampfireBlock.LIT, (rawValue & 0x10) != 0);
         }
+        if(block instanceof CakeBlock) {
+            return replaceSlot(state, BITES, rawValue & 0x7);
+        }
         if(block instanceof CandleBlock) {
             return validateIncremental(state, CandleBlock.CANDLES, (rawValue & 0x3) + 1);
         }
+        if(block instanceof ChestBlock) {
+            return EasyPlaceChestSync.applyFacing(
+                    context.getLevel(),
+                    context.getClickedPos(),
+                    state,
+                    directionFromProtocol(state, rawValue, context),
+                    rawValue
+            );
+        }
         if(block instanceof CommandBlock) {
             return replaceSlot(applyGeneric(state, rawValue, context), CommandBlock.CONDITIONAL, (rawValue & 0x10) != 0);
+        }
+        if(block instanceof CopperBulbBlock) {
+            return state
+                    .setValue(CopperBulbBlock.LIT, (rawValue & 0x1) != 0)
+                    .setValue(CopperBulbBlock.POWERED, (rawValue & 0x2) != 0);
+        }
+        if(block instanceof CopperGolemStatueBlock) {
+            BlockState generic = applyGeneric(state, rawValue, context);
+            CopperGolemStatueBlock.Pose[] poses = CopperGolemStatueBlock.Pose.values();
+            return replaceSlot(generic, COPPER_GOLEM_POSE, poses[(rawValue >>> 4) & 0x3]);
         }
         if(block instanceof CrafterBlock) {
             FrontAndTop[] values = FrontAndTop.values();
@@ -125,7 +162,10 @@ public final class EasyPlaceStateSync {
         if(block instanceof DoorBlock) {
             BlockState result = state
                     .setValue(HORIZONTAL_FACING, VERTICAL_DIRECTIONS[rawValue & 0x3])
-                    .setValue(DoorBlock.HINGE, DoorHingeSide.values()[(rawValue & 0x4) >>> 2]);
+                    .setValue(DoorBlock.HINGE, DoorHingeSide.values()[(rawValue & 0x4) >>> 2])
+                    .setValue(DoorBlock.HALF, (rawValue & 0x10) != 0
+                            ? DoubleBlockHalf.UPPER
+                            : DoubleBlockHalf.LOWER);
             if(!block.equals(Blocks.IRON_DOOR)) result = result.setValue(DoorBlock.OPEN, (rawValue & 0x8) != 0);
             return result;
         }
@@ -169,7 +209,7 @@ public final class EasyPlaceStateSync {
         if(block instanceof MultifaceBlock multifaceBlock) {
             Direction direction = VINE_DIRECTIONS[(rawValue & 0x7) % VINE_DIRECTIONS.length];
             return multifaceBlock.getStateForPlacement(
-                    state,
+                    context.getLevel().getBlockState(context.getClickedPos()),
                     context.getLevel(),
                     context.getClickedPos(),
                     direction
@@ -266,7 +306,8 @@ public final class EasyPlaceStateSync {
         Direction facing = VERTICAL_DIRECTIONS[(rawValue >>> 1) & 0x3];
         int stateValue = rawValue >>> 3;
         Block block = wall ? wallBlock : standingBlock;
-        BlockState state = wall ? wallBlock.getStateForPlacement(context) : standingState;
+        BlockState state = wall ? wallBlock.getStateForPlacement(context) : standingBlock.getStateForPlacement(context);
+        if(state == null && !wall && standingState.is(standingBlock)) state = standingState;
         if(state == null) return null;
         state = setFirstDirection(state, facing);
         return apply(block, state, context, stateValue);
@@ -278,6 +319,14 @@ public final class EasyPlaceStateSync {
             result = result.setValue(AXIS, Direction.Axis.values()[Math.floorMod(protocolValue, 3)]);
         }
 
+        if(result.hasProperty(SLAB_TYPE) && result.getValue(SLAB_TYPE) != SlabType.DOUBLE) {
+            SlabType targetType = (protocolValue & 0x10) != 0 ? SlabType.TOP : SlabType.BOTTOM;
+            result = result.setValue(SLAB_TYPE, targetType);
+        }
+        if(result.hasProperty(HALF)) {
+            result = result.setValue(HALF, (protocolValue & 0x10) != 0 ? Half.TOP : Half.BOTTOM);
+        }
+
         int highBits = protocolValue & ~0xf;
         if(result.hasProperty(RepeaterBlock.DELAY) && highBits >= 0x10) {
             int delay = highBits >>> 4;
@@ -286,10 +335,6 @@ public final class EasyPlaceStateSync {
             if(result.hasProperty(ComparatorBlock.MODE)
                     && result.getValue(ComparatorBlock.MODE) == ComparatorMode.COMPARE) {
                 result = result.setValue(ComparatorBlock.MODE, ComparatorMode.SUBTRACT);
-            } else if(result.hasProperty(HALF) && result.getValue(HALF) == Half.BOTTOM) {
-                result = result.setValue(HALF, Half.TOP);
-            } else if(result.hasProperty(SLAB_TYPE) && result.getValue(SLAB_TYPE) == SlabType.BOTTOM) {
-                result = result.setValue(SLAB_TYPE, SlabType.TOP);
             }
         }
         return result;

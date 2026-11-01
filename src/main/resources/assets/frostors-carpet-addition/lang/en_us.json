@@ -1,6 +1,8 @@
 {
   "carpet.rule.easyPlaceProtocolExtra.name": "Easy Place Protocol V2-Extra",
   "carpet.rule.easyPlaceProtocolExtra.desc": "Enables the server-side V2-Extra easy-place handshake and block-state synchronization. Client functionality is not included.",
+  "carpet.rule.onlineProfileFallback.name": "Online Profile Fallback",
+  "carpet.rule.onlineProfileFallback.desc": "In online mode, resolves the requested username and signed skin/cape textures, but only skips Mojang session authentication when the resolved UUID already has player data on this server. This does not verify account ownership and is intended only for private servers.",
   "carpet.rule.playerLadder.name": "Player Ladder",
   "carpet.rule.playerLadder.desc": "Master switch for the Player Ladder feature. When off, right-clicking an entity does nothing.",
   "carpet.rule.playerLadderClickMode.name": "Player Ladder Click Mode",
