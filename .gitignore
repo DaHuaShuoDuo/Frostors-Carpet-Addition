@@ -1,16 +1,69 @@
+# Gradle, Fabric Loom and build outputs
 .gradle/
+.kotlin/
 build/
-run/
 out/
+run/
+.cache/
+*.class
 
+# Runtime logs, crash reports and profiling data
+logs/
+crash-reports/
+*.log
+*.log.*
+*.jfr
+*.hprof
+*.pid
+hs_err_pid*
+replay_pid*
+
+# Local server files that may contain private player data or credentials
+eula.txt
+server.properties
+ops.json
+whitelist.json
+banned-ips.json
+banned-players.json
+usercache.json
+usernamecache.json
+/mods/
+/world/
+/world_nether/
+/world_the_end/
+
+# IDE and editor files
 .idea/
+.vs/
+.vscode/
+.settings/
 *.iml
 *.ipr
 *.iws
-
-.vscode/
-.settings/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+*.code-workspace
 .classpath
 .project
 
-*.log
+# Local configuration and secrets
+.env
+.env.*
+!.env.example
+local.properties
+*.jks
+*.p12
+
+# OS and temporary files
+.DS_Store
+Thumbs.db
+desktop.ini
+*.swp
+*.swo
+*.tmp
+*.bak
+*.orig
+*.rej
+*~

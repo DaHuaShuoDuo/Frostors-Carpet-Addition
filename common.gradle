@@ -13,6 +13,17 @@ sourceSets {
 		java.srcDirs = [rootProject.file('src/main/java')]
 		resources.srcDirs = [rootProject.file('src/main/resources')]
 	}
+	test {
+		java.srcDirs = [rootProject.file('src/test/java')]
+		resources.srcDirs = [rootProject.file('src/test/resources')]
+	}
+}
+
+configurations {
+	developmentOnly
+	runtimeClasspath {
+		extendsFrom developmentOnly
+	}
 }
 
 dependencies {
@@ -20,8 +31,9 @@ dependencies {
 
 	implementation "net.fabricmc:fabric-loader:${project.loader_version}"
 	implementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
+	developmentOnly files(rootProject.file("libs/fabric-carpet-${project.minecraft_version}.jar"))
 
-	// Carpet is a required runtime dependency, only needed at compile time here
+	// Carpet is supplied by the player at runtime; the local JAR is only for compilation and dev runs.
 	compileOnly files(rootProject.file("libs/fabric-carpet-${project.minecraft_version}.jar"))
 }
 
@@ -32,21 +44,52 @@ loom {
 	}
 }
 
+def acceptMinecraftEula = providers.gradleProperty("acceptMinecraftEula")
+		.map { it.toBoolean() }
+		.orElse(false)
+
+fabricApi {
+	configureTests {
+		createSourceSet = true
+		modId = "frostors-carpet-addition-gametest"
+		enableGameTests = acceptMinecraftEula
+		enableClientGameTests = acceptMinecraftEula
+		eula = acceptMinecraftEula
+		clearRunDirectory = true
+	}
+}
+
+sourceSets.named("gametest") {
+	java.srcDirs = [rootProject.file('src/gametest/java')]
+	resources.srcDirs = [rootProject.file('src/gametest/resources')]
+}
+
+def processedVersion = project.version.toString()
+def minecraftDependency = project.minecraft_dependency
+def fabricLoaderDependency = project.fabricloader_dependency
+def fabricApiDependency = project.fabric_api_dependency
+def carpetDependency = project.carpet_dependency
+
 processResources {
-	inputs.property "version", project.version
-	inputs.property "minecraft_dependency", project.minecraft_dependency
-	inputs.property "fabricloader_dependency", project.fabricloader_dependency
+	inputs.property "version", processedVersion
+	inputs.property "minecraft_dependency", minecraftDependency
+	inputs.property "fabricloader_dependency", fabricLoaderDependency
+	inputs.property "fabric_api_dependency", fabricApiDependency
+	inputs.property "carpet_dependency", carpetDependency
 
 	filesMatching("fabric.mod.json") {
-		expand "version": project.version,
-				"minecraft_dependency": project.minecraft_dependency,
-				"fabricloader_dependency": project.fabricloader_dependency
+		expand "version": processedVersion,
+				"minecraft_dependency": minecraftDependency,
+				"fabricloader_dependency": fabricLoaderDependency,
+				"fabric_api_dependency": fabricApiDependency,
+				"carpet_dependency": carpetDependency
 	}
 }
 
 tasks.withType(JavaCompile).configureEach {
 	options.release = 25
 	options.encoding = "UTF-8"
+	options.compilerArgs += ["-Xlint:deprecation"]
 }
 
 java {
@@ -56,10 +99,39 @@ java {
 	withSourcesJar()
 }
 
+def archiveBaseName = project.base.archivesName.get()
 jar {
 	from(rootProject.file('LICENSE')) {
-		rename { "${it}_${project.base.archivesName.get()}" }
+		rename { "${it}_${archiveBaseName}" }
 	}
+	from(rootProject.file('THIRD_PARTY_NOTICES.md')) {
+		rename { "THIRD_PARTY_NOTICES_${archiveBaseName}.md" }
+	}
+}
+
+def testRuntimeClasspath = sourceSets.test.runtimeClasspath
+tasks.register("logicTest", JavaExec) {
+	group = "verification"
+	description = "Runs dependency-free tests for the player stack policy."
+	dependsOn testClasses
+	classpath = testRuntimeClasspath
+	mainClass = "top.frostor.carpet.playerladder.PlayerStackTest"
+}
+
+tasks.register("easyPlaceProtocolTest", JavaExec) {
+	group = "verification"
+	description = "Runs dependency-free tests for the V2-Extra protocol bit layout."
+	dependsOn testClasses
+	classpath = testRuntimeClasspath
+	mainClass = "top.frostor.carpet.easyplace.EasyPlaceExtraProtocolTest"
+}
+
+tasks.named("test").configure {
+	failOnNoDiscoveredTests = false
+}
+
+tasks.named("check").configure {
+	dependsOn "logicTest", "easyPlaceProtocolTest", "compileGametestJava"
 }
 
 publishing {

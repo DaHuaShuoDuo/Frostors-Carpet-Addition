@@ -15,13 +15,14 @@
 		]
 	},
 	"mixins": [
-		"frostors-carpet-addition.mixins.json"
+		"frostors-carpet-addition.mixins.json",
+		"frostors-carpet-easyplace.mixins.json"
 	],
 	"depends": {
 		"fabricloader": "${fabricloader_dependency}",
 		"minecraft": "${minecraft_dependency}",
 		"java": ">=25",
-		"fabric-api": "*",
-		"carpet": "*"
+		"fabric-api": "${fabric_api_dependency}",
+		"carpet": "${carpet_dependency}"
 	}
 }

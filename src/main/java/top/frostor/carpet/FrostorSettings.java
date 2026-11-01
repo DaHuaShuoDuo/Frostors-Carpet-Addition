@@ -13,6 +13,14 @@ import top.frostor.carpet.playerladder.ClickMode;
  * otherwise Carpet refuses to register it.</p>
  */
 public class FrostorSettings {
+    /* ---------- Easy Place V2-Extra ---------- */
+
+    /**
+     * Server-side V2-Extra easy-place handshake and block-state restoration.
+     */
+    @Rule(categories = RuleCategory.FEATURE)
+    public static boolean easyPlaceProtocolExtra = false;
+
     /* ---------- Player Ladder ---------- */
 
     /**
@@ -31,25 +39,25 @@ public class FrostorSettings {
      * Maximum number of stacked passengers considered when picking up an entity.
      */
     @Rule(categories = RuleCategory.FEATURE)
-    public static int playerLadderPickUpLimit = 16;
+    public static int playerLadderPickupDepthLimit = 16;
 
     /**
      * Maximum stack height climbed when riding an entity.
      */
     @Rule(categories = RuleCategory.FEATURE)
-    public static int playerLadderStepUpLimit = 16;
+    public static int playerLadderRideDepthLimit = 16;
 
     /**
-     * Whether non-player living entities can also be ridden or picked up.
+     * Whether entities other than players can also be ridden or picked up.
      */
     @Rule(categories = RuleCategory.FEATURE)
-    public static boolean playerLadderInteractWithAnyLiving = false;
+    public static boolean playerLadderAllowNonPlayers = false;
 
     /**
      * Comma separated entity ids / tags (prefix with {@code #}) that can never be ridden or picked up.
      */
     @Rule(categories = RuleCategory.FEATURE)
-    public static String playerLadderExcludedEntities =
+    public static String playerLadderIgnoredEntities =
             "minecraft:wither,minecraft:ender_dragon,minecraft:warden,minecraft:minecart,#minecraft:boat,#minecraft:dismounts_underwater";
 
     /**
@@ -62,17 +70,17 @@ public class FrostorSettings {
      * Whether 3 or more players may be stacked. When disabled only two players may ride each other.
      */
     @Rule(categories = RuleCategory.FEATURE)
-    public static boolean playerLadderRideExtension = true;
+    public static boolean playerLadderAllowRiderStacking = true;
 
     /**
      * Whether Carpet fake players can be ridden or picked up.
      */
     @Rule(categories = RuleCategory.FEATURE)
-    public static boolean playerLadderRideFakePlayer = false;
+    public static boolean playerLadderAllowFakePlayers = false;
 
     /**
      * Client side aiming fix that keeps riders selectable while stacked. Client only.
      */
     @Rule(categories = {RuleCategory.FEATURE, RuleCategory.CLIENT})
-    public static boolean playerLadderClientInteractions = true;
+    public static boolean playerLadderClientAimingFix = true;
 }

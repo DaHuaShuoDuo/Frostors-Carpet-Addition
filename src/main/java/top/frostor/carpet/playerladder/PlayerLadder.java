@@ -23,7 +23,7 @@ public final class PlayerLadder {
             return switch (FrostorSettings.playerLadderClickMode) {
                 case RIDE -> SharedHandler.rideEntity(player, entity, level, hand);
                 case PICK_UP -> SharedHandler.pickUpEntity(player, entity, level, hand);
-                case DO_NOTHING -> InteractionResult.PASS;
+                case NONE -> InteractionResult.PASS;
             };
         });
     }

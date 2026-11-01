@@ -8,6 +8,7 @@ import net.fabricmc.api.ModInitializer;
 import net.fabricmc.loader.api.FabricLoader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import top.frostor.carpet.easyplace.EasyPlaceExtraServer;
 import top.frostor.carpet.playerladder.PlayerLadder;
 
 import java.io.IOException;
@@ -32,6 +33,7 @@ public class FrostorsCarpetAddition implements ModInitializer, CarpetExtension {
     @Override
     public void onInitialize() {
         CarpetServer.manageExtension(this);
+        EasyPlaceExtraServer.register();
         PlayerLadder.register();
     }
 

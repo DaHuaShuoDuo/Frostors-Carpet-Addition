@@ -1,0 +1,14 @@
+{
+  "required": true,
+  "package": "top.frostor.carpet.easyplace.mixin",
+  "compatibilityLevel": "JAVA_25",
+  "mixins": [
+    "BaseRailBlockMixin",
+    "BlockItemMixin",
+    "RailStateMixin",
+    "StandingAndWallBlockItemMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

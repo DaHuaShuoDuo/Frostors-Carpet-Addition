@@ -27,21 +27,31 @@ public class SharedHandler {
     public static InteractionResult rideEntity(Player player, Entity newVehicle, Level level, InteractionHand hand) {
         if(!canInteract(player, newVehicle, level, hand)) return InteractionResult.PASS;
 
-        Entity vehicle = getHighestOrSelf(newVehicle, player, FrostorSettings.playerLadderStepUpLimit);
+        Entity vehicle = PlayerStack.highestOrSelf(
+                newVehicle,
+                player,
+                FrostorSettings.playerLadderRideDepthLimit,
+                Entity::isVehicle,
+                Entity::getFirstPassenger
+        );
         if(vehicle == null || !isPlayerStackAllowed(vehicle, player)) return InteractionResult.FAIL;
 
-        player.startRiding(vehicle);
-        return InteractionResult.SUCCESS;
+        return player.startRiding(vehicle) ? InteractionResult.SUCCESS : InteractionResult.FAIL;
     }
 
     public static InteractionResult pickUpEntity(Player player, Entity newPassenger, Level level, InteractionHand hand) {
         if(!canInteract(player, newPassenger, level, hand)) return InteractionResult.PASS;
 
-        Entity vehicle = getHighestOrSelf(player, newPassenger, FrostorSettings.playerLadderPickUpLimit);
+        Entity vehicle = PlayerStack.highestOrSelf(
+                player,
+                newPassenger,
+                FrostorSettings.playerLadderPickupDepthLimit,
+                Entity::isVehicle,
+                Entity::getFirstPassenger
+        );
         if(vehicle == null || !isPlayerStackAllowed(vehicle, newPassenger)) return InteractionResult.FAIL;
 
-        newPassenger.startRiding(vehicle);
-        return InteractionResult.SUCCESS;
+        return newPassenger.startRiding(vehicle) ? InteractionResult.SUCCESS : InteractionResult.FAIL;
     }
 
     private static boolean canInteract(Player player, Entity target, Level level, InteractionHand hand) {
@@ -49,39 +59,29 @@ public class SharedHandler {
                 && player.getItemInHand(hand).isEmpty() && canPickUpOrRideLiving(target);
     }
 
-    private static Entity getHighestOrSelf(Entity vehicle, Entity newPassenger, int limit) {
-        int count = -1;
-        while (vehicle.isVehicle()) {
-            count++;
-            vehicle = vehicle.getFirstPassenger();
-            if(vehicle == newPassenger || count >= limit) return null;
-        }
-        return vehicle;
-    }
-
     /**
      * Whether the resulting ride chain may contain 3 or more players.
-     * When {@code playerLadderRideExtension} is disabled only two players may ride each other.
+     * When {@code playerLadderAllowRiderStacking} is disabled only two players may ride each other.
      */
     private static boolean isPlayerStackAllowed(Entity vehicle, Entity newPassenger) {
-        if(FrostorSettings.playerLadderRideExtension) return true;
-
-        int players = newPassenger instanceof Player ? 1 : 0;
-        for(Entity entity = vehicle; entity != null; entity = entity.getVehicle()) {
-            if(entity instanceof Player && ++players >= 3) return false;
-        }
-        return true;
+        return PlayerStack.allowsRideChain(
+                FrostorSettings.playerLadderAllowRiderStacking,
+                vehicle,
+                newPassenger,
+                Player.class::isInstance,
+                Entity::getVehicle
+        );
     }
 
     private static boolean canPickUpOrRideLiving(Entity entity) {
         if(entity instanceof Player)
-            return FrostorSettings.playerLadderRideFakePlayer || !isCarpetFakePlayer(entity);
+            return FrostorSettings.playerLadderAllowFakePlayers || !isCarpetFakePlayer(entity);
 
-        if(!FrostorSettings.playerLadderInteractWithAnyLiving) return false;
+        if(!FrostorSettings.playerLadderAllowNonPlayers) return false;
 
         ensureExcludedEntries();
         return !entityTypesToExclude.contains(entity.getType()) &&
-                entityTagsToExclude.stream().noneMatch(tag -> entity.getType().builtInRegistryHolder().is(tag));
+                entityTagsToExclude.stream().noneMatch(tag -> entity.typeHolder().is(tag));
     }
 
     /**
@@ -100,8 +100,10 @@ public class SharedHandler {
     }
 
     private static void syncPassengers(Entity vehicle) {
-        if(!vehicle.level().isClientSide() && vehicle instanceof Player player)
-            ((ServerPlayer) player).connection.send(new ClientboundSetPassengersPacket(vehicle));
+        if(!vehicle.level().isClientSide()
+                && vehicle instanceof ServerPlayer player
+                && player.connection != null)
+            player.connection.send(new ClientboundSetPassengersPacket(vehicle));
     }
 
     public static void onPlayerTick(Player player) {
@@ -139,7 +141,7 @@ public class SharedHandler {
      * re-parsed whenever the rule value differs from the last applied one.
      */
     private static void ensureExcludedEntries() {
-        String entries = FrostorSettings.playerLadderExcludedEntities;
+        String entries = FrostorSettings.playerLadderIgnoredEntities;
         if(entries.equals(appliedExcludedEntries)) return;
         appliedExcludedEntries = entries;
 
