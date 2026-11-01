@@ -33,9 +33,20 @@ $env:JAVA_HOME = 'C:\Program Files\Zulu\zulu-25'
   构建 `26.2` 和 `26.3` 两个版本。
 - 构建产物位于 `versions/<版本>/build/libs/`。不要手工编辑 `.gradle/`、`build/` 或
   `versions/*/build/`；这些目录均为生成内容。
-- 项目当前没有自动化测试（Gradle 会显示 `test NO-SOURCE`）。构建成功不等于运行期
-  行为正确；涉及游戏逻辑、事件或 Mixin 时，需尽可能在带 Carpet 和 Fabric API 的
-  客户端/服务器中验证，并明确说明哪些手测已做、哪些未做。
+- `:26.2:build` / `:26.3:build` 会运行 `logicTest` 中的无外部依赖规则测试，并编译
+  `src/gametest` 中的 Fabric GameTest。修改骑乘链、层数限制或玩家堆叠逻辑时，必须
+  同步维护这些测试。
+- 运行期 GameTest 需要 Minecraft EULA。只有用户明确同意后才能使用
+  `-PacceptMinecraftEula=true` 执行：
+
+  ```powershell
+  .\gradlew.bat :26.2:runGameTest :26.3:runGameTest -PacceptMinecraftEula=true
+  .\gradlew.bat :26.2:runClientGameTest :26.3:runClientGameTest -PacceptMinecraftEula=true
+  ```
+
+  不要默认传入该参数，也不要把 `eula=true` 写入版本控制。GameTest 编译成功不等于
+  已执行运行期测试；最终说明必须区分编译、自动逻辑测试和已运行的 GameTest/手测。
+  客户端 GameTest 只确认客户端类和 Mixin 能加载，真实准星交互仍需手测。
 - 新增编译警告应视为回归；现有警告也不要复制到新代码。需要排查 Gradle 弃用时可使用
   `--warning-mode all`。
 
@@ -61,6 +72,15 @@ $env:JAVA_HOME = 'C:\Program Files\Zulu\zulu-25'
 3. 在业务代码中读取该字段，并补充必要的值校验和运行期切换处理。
 4. 更新 README，并重新构建两个版本。
 
+规则字段使用 lowerCamelCase，并以所属功能（如 `playerLadder`、`easyPlace`）作为前缀。布尔开关优先使用
+`Allow...` 或明确的语义名称，数量上限使用 `...Limit` / `...DepthLimit`，枚举模式使用
+`...Mode`，忽略列表使用 `...IgnoredEntities`，客户端修正使用 `...Fix`。避免同时使用
+`Extension`、`InteractWith...`、`RideFakePlayer` 等含义不统一的命名轴。
+
+Carpet 会把枚举候选显示为小写，并在解析输入时先转为大写再调用 `Enum.valueOf`。因此 Java
+枚举常量应保持 `UPPER_SNAKE_CASE`；README、翻译和实际 `/carpet` 取值使用全小写，不要把
+Java 枚举常量改成小写，否则 Carpet 无法解析。
+
 ## 功能实现边界
 
 - `PlayerLadder` 负责 Fabric 事件注册；交互语义集中在 `SharedHandler`；Mixin 只做
@@ -73,6 +93,22 @@ $env:JAVA_HOME = 'C:\Program Files\Zulu\zulu-25'
 - 骑乘链遍历、层数上限、第三人堆叠开关、假人开关、断线和游戏模式变化处理之间存在
   关联。修改其中一项时要回归相关分支，避免出现循环骑乘、残留乘客或客户端不同步。
 - 客户端准星修正只应存在于客户端 Mixin 中；服务端和人梯状态同步逻辑不得依赖它。
+
+## Easy Place V2-Extra 边界
+
+- 该功能只由一个总开关 `easyPlaceProtocolExtra` 控制，不要添加客户端编码、配置界面或
+  子规则。
+- 服务端握手使用与 EarlyCompat 兼容的 `earlycompat:network` 通道，并在玩家断线时清理
+  状态；如果 EarlyCompat 自身已加载，不要重复注册该通道。
+- 单人/集成服务器会同时加载 FCA 和 TriWasa。检测到 TriWasa 时，FCA 必须复用
+  TriWasa 的 Payload 类型与 Codec，并在 ACK 中构造 TriWasa Payload；不要在同一个
+  通道中注册两个不同 Payload 类。
+- 协议值只从服务端方块放置上下文中的命中位置解码，最终状态仍须通过 `BlockItem.canPlace`
+  校验，不能信任客户端直接写入任意方块状态。
+- 方块状态映射集中在 `easyplace` 包，避免为每种原版方块复制独立 Mixin。新增适配时同时
+  更新 `EasyPlaceGameTest`，覆盖对应属性。
+- 该服务端实现改编自 EarlyCompat，来源为 CC0-1.0；修改协议或状态表时同步维护
+  `THIRD_PARTY_NOTICES.md`。不要移植 Litematica、MaliLib、Fanetlib 或客户端服务。
 
 ## Mixin 规则
 
@@ -90,10 +126,10 @@ $env:JAVA_HOME = 'C:\Program Files\Zulu\zulu-25'
 
 - 当前版本矩阵：
 
-  | Minecraft | Fabric Loader | Fabric API |
-  | --- | --- | --- |
-  | 26.2 | >= 0.19.3 | 0.152.1+26.2 |
-  | 26.3 | >= 0.19.5 | 0.160.5+26.3 |
+  | Minecraft | Fabric Loader | Fabric API | Carpet |
+  | --- | --- | --- | --- |
+  | 26.2 | >= 0.19.3 | >= 0.152.1 < 0.153.0 | >= 26.2 < 26.3 |
+  | 26.3 | >= 0.19.5 | >= 0.160.5 < 0.161.0 | >= 26.3 < 26.4 |
 
 - 根 `gradle.properties` 管共享属性（模组版本、group、产物前缀、Loom 版本）；
   Minecraft、Loader、Fabric API 和兼容范围由各版本属性文件定义。
@@ -101,6 +137,8 @@ $env:JAVA_HOME = 'C:\Program Files\Zulu\zulu-25'
   必须是运行期 `depends`，但绝不能被打进模组 JAR，也不要复制或反编译其源码到项目。
 - 增加或移除支持版本时，要同时处理 `settings.gradle`、版本属性、对应 Carpet 编译依赖、
   README 版本表和双版本构建验证，不能只改一个文件。
+- 运行时依赖版本范围由各版本的 `fabric_api_dependency` 和 `carpet_dependency` 管理，
+  并会展开进 `fabric.mod.json`。修改范围时必须双版本构建并检查产物元数据。
 
 ## 代码与交付习惯
 
@@ -108,5 +146,5 @@ $env:JAVA_HOME = 'C:\Program Files\Zulu\zulu-25'
 - 优先使用 Minecraft/Fabric/Carpet 已有 API，新增依赖前说明必要性并确认不会改变
   JAR 的运行时依赖边界。
 - 保留 MIT 许可证、项目声明以及模组元数据中的作者和依赖信息。
-- 任务完成前至少确认：两个版本构建通过；Carpet 规则翻译完整；README 与行为一致；
-  Carpet 未被误打包；涉及运行期逻辑时记录手测结果。
+- 任务完成前至少确认：两个版本的 `logicTest` 与 GameTest 编译通过；Carpet 规则翻译
+  完整；README 与行为一致；Carpet 未被误打包；涉及运行期逻辑时记录 GameTest/手测结果。
