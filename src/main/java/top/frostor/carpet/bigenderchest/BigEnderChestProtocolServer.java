@@ -9,6 +9,7 @@ import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.NbtIo;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.item.ItemStack;
@@ -32,6 +33,7 @@ import top.frostor.carpet.bigenderchest.index.ItemTemplateKey;
 import top.frostor.carpet.bigenderchest.index.StorageEntry;
 import top.frostor.carpet.bigenderchest.index.StorageLocation;
 import top.frostor.carpet.bigenderchest.menu.BigEnderChestMenu;
+import top.frostor.carpet.bigenderchest.menu.BigEnderChestTerminalMenu;
 
 import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;
@@ -47,11 +49,15 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.zip.CRC32;
 
 public final class BigEnderChestProtocolServer {
     private static final int MAX_ACTIONS_PER_TICK = 8;
     private static final int RECENT_RESULT_LIMIT = 64;
+    private static final int RESYNC_COOLDOWN_TICKS = 20;
+    private static final int SNAPSHOT_ACK_TIMEOUT_TICKS = 100;
+    private static final AtomicLong SNAPSHOT_IDS = new AtomicLong();
     private static final Map<UUID, ClientState> CLIENTS = new ConcurrentHashMap<>();
     private static final ExecutorService SNAPSHOT_EXECUTOR = Executors.newSingleThreadExecutor(
             runnable -> {
@@ -132,7 +138,12 @@ public final class BigEnderChestProtocolServer {
                 continue;
             }
             if(!state.snapshotChunks.isEmpty()) {
-                sendNextSnapshotChunk(session, state);
+                if(state.awaitingSnapshotAck
+                        && ++state.snapshotAckTicks >= SNAPSHOT_ACK_TIMEOUT_TICKS) {
+                    startSnapshot(session, state);
+                }else {
+                    sendNextSnapshotChunk(session, state);
+                }
                 continue;
             }
             if(session.service().revision() != state.sentRevision) {
@@ -228,6 +239,7 @@ public final class BigEnderChestProtocolServer {
         state.clearSnapshot();
         state.recentResults.clear();
         state.lastActionSequence = 0;
+        state.lastResyncTick = Long.MIN_VALUE;
         sendPayload(
                 session.owner(),
                 BigEnderChestProtocol.SESSION_OPEN,
@@ -285,6 +297,11 @@ public final class BigEnderChestProtocolServer {
             BigEnderChestSessions.Session session,
             ClientState state
     ) {
+        if(state.snapshotBuilding) {
+            state.snapshotPending = true;
+            return;
+        }
+        state.clearSnapshot();
         session.service().takePendingDelta();
         state.snapshotPending = false;
         Map<ItemTemplateKey, Long> templates = new HashMap<>();
@@ -302,7 +319,7 @@ public final class BigEnderChestProtocolServer {
             ));
         }
 
-        long snapshotId = session.owner().getRandom().nextLong();
+        long snapshotId = SNAPSHOT_IDS.incrementAndGet();
         state.serials.clear();
         state.serials.putAll(templates);
         state.keysBySerial.clear();
@@ -319,6 +336,8 @@ public final class BigEnderChestProtocolServer {
         state.snapshotBuilding = true;
         List<BigEnderChestProtocol.EntryRecord> snapshotEntries = List.copyOf(entryRecords);
         HolderLookup.Provider registries = session.owner().registryAccess();
+        MinecraftServer server = session.owner().level().getServer();
+        String ownerName = session.owner().getScoreboardName();
         int chunkByteLimit = state.chunkByteLimit;
         SNAPSHOT_EXECUTOR.execute(() -> {
             List<byte[]> chunks;
@@ -327,16 +346,16 @@ public final class BigEnderChestProtocolServer {
             }catch(RuntimeException exception) {
                 FrostorsCarpetAddition.LOGGER.error(
                         "Failed to build big ender chest snapshot for {}",
-                        session.owner().getScoreboardName(),
+                        ownerName,
                         exception
                 );
-                session.owner().level().getServer().execute(() -> {
+                server.execute(() -> {
                     state.snapshotBuilding = false;
                     state.clearSnapshot();
                 });
                 return;
             }
-            session.owner().level().getServer().execute(() -> {
+            server.execute(() -> {
                 if(state.snapshotId != snapshotId || state.snapshotRevision < 0) return;
                 state.snapshotChunks.addAll(chunks);
                 state.snapshotBuilding = false;
@@ -424,6 +443,7 @@ public final class BigEnderChestProtocolServer {
             completeSnapshot(session, state);
         }else {
             state.awaitingSnapshotAck = true;
+            state.snapshotAckTicks = 0;
         }
     }
 
@@ -501,6 +521,10 @@ public final class BigEnderChestProtocolServer {
                 .map(state.serials::get)
                 .filter(java.util.Objects::nonNull)
                 .toList();
+        for(long serial : removed) {
+            ItemTemplateKey removedKey = state.keysBySerial.remove(serial);
+            if(removedKey != null) state.serials.remove(removedKey);
+        }
         List<BigEnderChestProtocol.PageInfo> pageChanges = session.service()
                 .pageCatalog()
                 .stream()
@@ -524,7 +548,18 @@ public final class BigEnderChestProtocolServer {
                 session.service().pageRevision(),
                 session.service().isReadOnly()
         );
-        CompoundTag data = delta.toTag(session.owner().registryAccess());
+        CompoundTag data;
+        try {
+            data = delta.toTag(session.owner().registryAccess());
+        }catch(RuntimeException exception) {
+            FrostorsCarpetAddition.LOGGER.warn(
+                    "Failed to encode big ender chest delta for {}, sending a snapshot",
+                    session.owner().getScoreboardName(),
+                    exception
+            );
+            startSnapshot(session, state);
+            return;
+        }
         if(data.sizeInBytes() > state.chunkByteLimit) {
             startSnapshot(session, state);
             return;
@@ -545,6 +580,11 @@ public final class BigEnderChestProtocolServer {
         if(ack.sessionId() != session.sessionId()
                 || ack.snapshotId() != state.snapshotId
                 || !state.snapshotEndSent) {
+            return;
+        }
+        state.snapshotAckTicks = 0;
+        if(ack.missingChunks().size() > state.snapshotChunks.size()) {
+            startSnapshot(session, state);
             return;
         }
         if(ack.missingChunks().isEmpty()) {
@@ -574,6 +614,12 @@ public final class BigEnderChestProtocolServer {
                 || request.sessionId() != session.sessionId()) {
             return;
         }
+        long now = player.level().getGameTime();
+        if(state.lastResyncTick != Long.MIN_VALUE
+                && now - state.lastResyncTick < RESYNC_COOLDOWN_TICKS) {
+            return;
+        }
+        state.lastResyncTick = now;
         startSnapshot(session, state);
     }
 
@@ -587,6 +633,8 @@ public final class BigEnderChestProtocolServer {
                 || !state.accepted
                 || session == null
                 || request.sessionId() != session.sessionId()
+                || player.containerMenu != session.menu()
+                || !session.isWithinSourceRange()
                 || (state.capabilities
                 & BigEnderChestProtocol.CAPABILITY_TERMINAL_MENU) == 0) {
             sendActionResult(
@@ -594,6 +642,15 @@ public final class BigEnderChestProtocolServer {
                     request.requestId(),
                     BigEnderChestProtocol.RESULT_PERMISSION_DENIED,
                     session == null ? -1 : session.service().revision()
+            );
+            return;
+        }
+        if(session.menu() instanceof BigEnderChestTerminalMenu) {
+            sendActionResult(
+                    player,
+                    request.requestId(),
+                    BigEnderChestProtocol.RESULT_OK,
+                    session.service().revision()
             );
             return;
         }
@@ -613,7 +670,10 @@ public final class BigEnderChestProtocolServer {
             sendActionFailure(player, request, BigEnderChestProtocol.RESULT_SESSION_EXPIRED, session);
             return;
         }
-        ActionResult cached = state.recentResults.get(request.requestId());
+        boolean idempotent = request.requestId() != 0;
+        ActionResult cached = idempotent
+                ? state.recentResults.get(request.requestId())
+                : null;
         if(cached != null
                 && session != null
                 && cached.sessionId() == session.sessionId()) {
@@ -624,7 +684,7 @@ public final class BigEnderChestProtocolServer {
             );
             return;
         }
-        state.recentResults.remove(request.requestId());
+        if(idempotent) state.recentResults.remove(request.requestId());
         int status;
         if(state.actionsThisTick >= MAX_ACTIONS_PER_TICK) {
             status = BigEnderChestProtocol.RESULT_RATE_LIMITED;
@@ -725,6 +785,11 @@ public final class BigEnderChestProtocolServer {
                     ? BigEnderChestProtocol.RESULT_PAGE_LOAD_FAILED
                     : BigEnderChestProtocol.RESULT_FEATURE_READ_ONLY;
         }
+        int requiredCapabilities = requiredActionCapabilities(request.action());
+        if(requiredCapabilities < 0
+                || (state.capabilities & requiredCapabilities) != requiredCapabilities) {
+            return BigEnderChestProtocol.RESULT_PROTOCOL_REJECTED;
+        }
         boolean sequenced = request.actionSequence() > 0;
         if(sequenced
                 && (state.capabilities
@@ -734,7 +799,8 @@ public final class BigEnderChestProtocolServer {
         if(sequenced && request.actionSequence() <= state.lastActionSequence) {
             return BigEnderChestProtocol.RESULT_DUPLICATE_REQUEST;
         }
-        if((!sequenced && request.knownRevision() != session.service().revision())
+        if(request.knownRevision() < 0
+                || (!sequenced && request.knownRevision() != session.service().revision())
                 || request.knownRevision() > session.service().revision()) {
             return BigEnderChestProtocol.RESULT_REVISION_STALE;
         }
@@ -755,13 +821,37 @@ public final class BigEnderChestProtocolServer {
                 ItemTemplateKey target = session.service().keyAt(
                         new StorageLocation(request.storagePage(), request.slot())
                 );
-                long expected = target == null ? 0 : serialFor(session, target);
-                if(request.expectedTemplateSerial() != expected) {
+                if(target == null) {
                     return BigEnderChestProtocol.RESULT_SLOT_MISMATCH;
                 }
             }
         }
         return BigEnderChestProtocol.RESULT_OK;
+    }
+
+    private static int requiredActionCapabilities(int action) {
+        return switch(action) {
+            case BigEnderChestProtocol.ACTION_TAKE_ONE,
+                    BigEnderChestProtocol.ACTION_TAKE_STACK,
+                    BigEnderChestProtocol.ACTION_PUT_ONE,
+                    BigEnderChestProtocol.ACTION_PUT_STACK,
+                    BigEnderChestProtocol.ACTION_QUICK_MOVE_TO_PLAYER,
+                    BigEnderChestProtocol.ACTION_QUICK_MOVE_FROM_PLAYER,
+                    BigEnderChestProtocol.ACTION_TAKE_AMOUNT ->
+                    BigEnderChestProtocol.CAPABILITY_ACTIONS;
+            case BigEnderChestProtocol.ACTION_DROP_ONE,
+                    BigEnderChestProtocol.ACTION_DROP_STACK ->
+                    BigEnderChestProtocol.CAPABILITY_ACTIONS
+                            | BigEnderChestProtocol.CAPABILITY_DROP_ACTIONS;
+            case BigEnderChestProtocol.ACTION_BATCH_PUT_PLAYER_SLOTS ->
+                    BigEnderChestProtocol.CAPABILITY_ACTIONS
+                            | BigEnderChestProtocol.CAPABILITY_BATCH_ACTIONS
+                            | BigEnderChestProtocol.CAPABILITY_REGION_ACTIONS;
+            case BigEnderChestProtocol.ACTION_BATCH_STORAGE_TO_PLAYER ->
+                    BigEnderChestProtocol.CAPABILITY_ACTIONS
+                            | BigEnderChestProtocol.CAPABILITY_BATCH_ACTIONS;
+            default -> -1;
+        };
     }
 
     private static boolean requiresStorageTarget(int action) {
@@ -785,14 +875,6 @@ public final class BigEnderChestProtocolServer {
         return service.keyAt(new StorageLocation(request.storagePage(), request.slot()));
     }
 
-    private static long serialFor(
-            BigEnderChestSessions.Session session,
-            ItemTemplateKey key
-    ) {
-        ClientState state = CLIENTS.get(session.owner().getUUID());
-        return state == null ? Long.MIN_VALUE : state.serials.getOrDefault(key, Long.MIN_VALUE);
-    }
-
     private static int takeToCarried(
             AbstractContainerMenu menu,
             BigEnderChestService service,
@@ -802,7 +884,7 @@ public final class BigEnderChestProtocolServer {
         if(key == null || !menu.getCarried().isEmpty()) {
             return BigEnderChestProtocol.RESULT_SLOT_MISMATCH;
         }
-        ItemStack taken = service.take(key, amount);
+        ItemStack taken = service.take(key, Math.min(amount, maxStack(key)));
         if(taken.isEmpty()) return BigEnderChestProtocol.RESULT_CAPACITY_FULL;
         menu.setCarried(taken);
         return BigEnderChestProtocol.RESULT_OK;
@@ -834,15 +916,67 @@ public final class BigEnderChestProtocolServer {
         if(key == null) {
             return BigEnderChestProtocol.RESULT_SLOT_MISMATCH;
         }
-        ItemStack taken = service.take(key, amount);
-        if(taken.isEmpty()) return BigEnderChestProtocol.RESULT_CAPACITY_FULL;
-        service.owner().getInventory().add(taken);
-        if(!taken.isEmpty() && !service.insert(taken)) {
+        int movable = Math.min(
+                Math.max(1, amount),
+                playerInventoryCapacity(service.owner(), key)
+        );
+        if(movable <= 0) {
             return BigEnderChestProtocol.RESULT_INVENTORY_FULL;
         }
-        return taken.isEmpty()
-                ? BigEnderChestProtocol.RESULT_OK
-                : BigEnderChestProtocol.RESULT_INVENTORY_FULL;
+        ItemStack taken = service.take(key, movable);
+        if(taken.isEmpty()) return BigEnderChestProtocol.RESULT_CAPACITY_FULL;
+        if(!insertIntoPlayerInventory(service.owner(), key, taken)) {
+            if(!service.insert(taken)) {
+                dropAtPlayer(service.owner(), taken);
+            }
+            return BigEnderChestProtocol.RESULT_INVENTORY_FULL;
+        }
+        return BigEnderChestProtocol.RESULT_OK;
+    }
+
+    private static int playerInventoryCapacity(
+            ServerPlayer player,
+            ItemTemplateKey key
+    ) {
+        Inventory inventory = player.getInventory();
+        int maxStack = maxStack(key);
+        long capacity = 0;
+        for(int slot = 0; slot < Inventory.INVENTORY_SIZE; slot++) {
+            ItemStack current = inventory.getItem(slot);
+            if(current.isEmpty()) {
+                capacity += maxStack;
+            }else if(key.matches(current)) {
+                capacity += Math.max(0, current.getMaxStackSize() - current.getCount());
+            }
+        }
+        return (int) Math.min(Integer.MAX_VALUE, capacity);
+    }
+
+    private static boolean insertIntoPlayerInventory(
+            ServerPlayer player,
+            ItemTemplateKey key,
+            ItemStack source
+    ) {
+        Inventory inventory = player.getInventory();
+        for(int slot = 0; slot < Inventory.INVENTORY_SIZE && !source.isEmpty(); slot++) {
+            ItemStack current = inventory.getItem(slot);
+            if(current.isEmpty() || !key.matches(current)) continue;
+            int room = current.getMaxStackSize() - current.getCount();
+            if(room <= 0) continue;
+            int moved = Math.min(room, source.getCount());
+            ItemStack updated = current.copy();
+            updated.grow(moved);
+            inventory.setItem(slot, updated);
+            source.shrink(moved);
+        }
+        for(int slot = 0; slot < Inventory.INVENTORY_SIZE && !source.isEmpty(); slot++) {
+            if(!inventory.getItem(slot).isEmpty()) continue;
+            int moved = Math.min(key.template().getMaxStackSize(), source.getCount());
+            inventory.setItem(slot, source.copyWithCount(moved));
+            source.shrink(moved);
+        }
+        inventory.setChanged();
+        return source.isEmpty();
     }
 
     private static int quickMoveFromPlayer(
@@ -906,20 +1040,23 @@ public final class BigEnderChestProtocolServer {
         if(key == null) return BigEnderChestProtocol.RESULT_SLOT_MISMATCH;
         ItemStack dropped = service.take(key, amount);
         if(dropped.isEmpty()) return BigEnderChestProtocol.RESULT_CAPACITY_FULL;
-        ServerPlayer player = service.owner();
+        dropAtPlayer(service.owner(), dropped);
+        return BigEnderChestProtocol.RESULT_OK;
+    }
+
+    private static void dropAtPlayer(ServerPlayer player, ItemStack stack) {
         ItemEntity itemEntity = new ItemEntity(
                 player.level(),
                 player.getX(),
                 player.getEyeY() - 0.3,
                 player.getZ(),
-                dropped
+                stack
         );
         Vec3 look = player.getLookAngle();
         itemEntity.setDeltaMovement(look.x * 0.3, 0.1, look.z * 0.3);
         itemEntity.setThrower(player);
         itemEntity.setDefaultPickUpDelay();
         player.level().addFreshEntity(itemEntity);
-        return BigEnderChestProtocol.RESULT_OK;
     }
 
     private static int maxStack(ItemTemplateKey key) {
@@ -971,9 +1108,11 @@ public final class BigEnderChestProtocolServer {
                 status,
                 revision
         );
-        state.recentResults.put(request.requestId(), result);
-        while(state.recentResults.size() > RECENT_RESULT_LIMIT) {
-            state.recentResults.remove(state.recentResults.keySet().iterator().next());
+        if(request.requestId() != 0) {
+            state.recentResults.put(request.requestId(), result);
+            while(state.recentResults.size() > RECENT_RESULT_LIMIT) {
+                state.recentResults.remove(state.recentResults.keySet().iterator().next());
+            }
         }
         sendPayload(
                 player,
@@ -1025,7 +1164,9 @@ public final class BigEnderChestProtocolServer {
         private boolean awaitingSnapshotAck;
         private boolean snapshotBuilding;
         private boolean snapshotPending;
+        private int snapshotAckTicks;
         private long lastActionSequence;
+        private long lastResyncTick = Long.MIN_VALUE;
         private long closedSessionId;
         private int actionsThisTick;
 
@@ -1039,6 +1180,7 @@ public final class BigEnderChestProtocolServer {
             awaitingSnapshotAck = false;
             snapshotBuilding = false;
             snapshotPending = false;
+            snapshotAckTicks = 0;
             snapshotAmounts.clear();
         }
     }

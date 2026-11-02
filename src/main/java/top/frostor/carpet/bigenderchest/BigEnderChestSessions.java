@@ -1,12 +1,15 @@
 package top.frostor.carpet.bigenderchest;
 
-import net.minecraft.network.chat.Component;
+import net.fabricmc.fabric.api.menu.v1.ExtendedMenuProvider;
 import net.minecraft.core.BlockPos;
+import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.util.Unit;
 import net.minecraft.world.SimpleMenuProvider;
 import net.minecraft.world.entity.player.Inventory;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
 import top.frostor.carpet.FrostorSettings;
 import top.frostor.carpet.bigenderchest.menu.BigEnderChestMenu;
@@ -39,7 +42,14 @@ public final class BigEnderChestSessions {
     }
 
     public static boolean open(ServerPlayer player) {
-        return open(player, null, null);
+        Session current = session(player);
+        return current == null
+                ? open(player, null, null)
+                : open(
+                        player,
+                        current.sourceLevel(),
+                        current.sourcePosition()
+                );
     }
 
     public static boolean open(ServerPlayer player, ServerLevel level, BlockPos pos) {
@@ -48,21 +58,9 @@ public final class BigEnderChestSessions {
         }
         Session session = beginSession(player);
         boolean terminal = BigEnderChestProtocolServer.isTerminalClient(player);
-        OptionalInt menuId = player.openMenu(new SimpleMenuProvider(
-                (syncId, inventory, ignored) -> terminal
-                        ? new BigEnderChestTerminalMenu(
-                                syncId,
-                                inventory,
-                                session.service()
-                        )
-                        : new BigEnderChestMenu(
-                                syncId,
-                                inventory,
-                                session.service(),
-                                new BigEnderChestView(session.service())
-                        ),
-                Component.translatable("big_ender_chest.menu.title")
-        ));
+        OptionalInt menuId = player.openMenu(terminal
+                ? terminalMenuProvider(session.service())
+                : vanillaMenuProvider(session.service()));
         if(menuId.isEmpty() || session.menu == null) {
             close(player);
             return false;
@@ -71,6 +69,41 @@ public final class BigEnderChestSessions {
         session.startBlockAnimation(level, pos);
         announceSession(session);
         return true;
+    }
+
+    static ExtendedMenuProvider<Unit> terminalMenuProvider(BigEnderChestService service) {
+        return new ExtendedMenuProvider<>() {
+            @Override
+            public Unit getScreenOpeningData(ServerPlayer player) {
+                return Unit.INSTANCE;
+            }
+
+            @Override
+            public Component getDisplayName() {
+                return Component.translatable("big_ender_chest.menu.title");
+            }
+
+            @Override
+            public BigEnderChestTerminalMenu createMenu(
+                    int syncId,
+                    Inventory inventory,
+                    Player player
+            ) {
+                return new BigEnderChestTerminalMenu(syncId, inventory, service);
+            }
+        };
+    }
+
+    private static SimpleMenuProvider vanillaMenuProvider(BigEnderChestService service) {
+        return new SimpleMenuProvider(
+                (syncId, inventory, ignored) -> new BigEnderChestMenu(
+                        syncId,
+                        inventory,
+                        service,
+                        new BigEnderChestView(service)
+                ),
+                Component.translatable("big_ender_chest.menu.title")
+        );
     }
 
     /**
@@ -239,6 +272,18 @@ public final class BigEnderChestSessions {
 
         public BigEnderChestMenu vanillaMenu() {
             return menu instanceof BigEnderChestMenu vanillaMenu ? vanillaMenu : null;
+        }
+
+        public boolean isWithinSourceRange() {
+            return blockAnimation.isWithinRange();
+        }
+
+        private ServerLevel sourceLevel() {
+            return blockAnimation.sourceLevel();
+        }
+
+        private BlockPos sourcePosition() {
+            return blockAnimation.sourcePosition();
         }
 
         public void closeContainer() {

@@ -187,6 +187,46 @@ public final class BigEnderChestCoreTest {
                 "snapshot ACKs must retain missing chunks"
         );
 
+        BigEnderChestProtocol.SnapshotBegin snapshotBegin =
+                new BigEnderChestProtocol.SnapshotBegin(42, 9, 8, 2, 0, 2);
+        check(
+                BigEnderChestProtocol.SnapshotBegin.fromTag(snapshotBegin.toTag())
+                        .equals(snapshotBegin),
+                "snapshot begin metadata must round trip"
+        );
+        BigEnderChestProtocol.SnapshotEnd snapshotEnd =
+                new BigEnderChestProtocol.SnapshotEnd(42, 9, 8, 2, 2);
+        check(
+                BigEnderChestProtocol.SnapshotEnd.fromTag(snapshotEnd.toTag())
+                        .equals(snapshotEnd),
+                "snapshot end metadata must round trip"
+        );
+
+        BigEnderChestProtocol.EntryRecord entryRecord =
+                new BigEnderChestProtocol.EntryRecord(
+                        3,
+                        new ItemStack(Items.DIRT),
+                        64,
+                        List.of(new BigEnderChestProtocol.SlotRecord(1, 2, 3, 64))
+                );
+        BigEnderChestProtocol.EntryRecord decodedEntry =
+                BigEnderChestProtocol.EntryRecord.fromTag(
+                        entryRecord.toTag(MinecraftServerContext.registries()),
+                        MinecraftServerContext.registries()
+                );
+        check(
+                decodedEntry.templateSerial() == entryRecord.templateSerial()
+                        && decodedEntry.totalAmount() == entryRecord.totalAmount()
+                        && decodedEntry.locations().equals(entryRecord.locations()),
+                "aggregate entry records must retain serial, total, and locations"
+        );
+        check(
+                ItemTemplateKey.of(decodedEntry.item()).equals(
+                        ItemTemplateKey.of(entryRecord.item())
+                ),
+                "aggregate entry records must round trip item templates"
+        );
+
         BigEnderChestProtocol.ActionRequest request =
                 new BigEnderChestProtocol.ActionRequest(
                         42,
@@ -229,6 +269,32 @@ public final class BigEnderChestCoreTest {
                 "aggregate deltas must retain 64-bit quantities"
         );
         check(delta.capacityChanged(), "page additions must be visible in delta DTOs");
+        BigEnderChestProtocol.Delta decodedDelta = BigEnderChestProtocol.Delta.fromTag(
+                delta.toTag(MinecraftServerContext.registries()),
+                MinecraftServerContext.registries()
+        );
+        check(
+                decodedDelta.sessionId() == delta.sessionId()
+                        && decodedDelta.baseRevision() == delta.baseRevision()
+                        && decodedDelta.revision() == delta.revision()
+                        && decodedDelta.removedTemplateSerials()
+                        .equals(delta.removedTemplateSerials())
+                        && decodedDelta.pageChanges().equals(delta.pageChanges())
+                        && decodedDelta.pageAdded().equals(delta.pageAdded())
+                        && decodedDelta.capacityChanged() == delta.capacityChanged()
+                        && decodedDelta.pageRevision() == delta.pageRevision()
+                        && decodedDelta.readOnly() == delta.readOnly()
+                        && decodedDelta.entryChanges().size() == delta.entryChanges().size(),
+                "aggregate deltas must round trip metadata"
+        );
+        check(
+                ItemTemplateKey.of(decodedDelta.entryChanges().getFirst().item()).equals(
+                        ItemTemplateKey.of(delta.entryChanges().getFirst().item())
+                )
+                        && decodedDelta.entryChanges().getFirst().totalAmount()
+                        == delta.entryChanges().getFirst().totalAmount(),
+                "aggregate deltas must round trip item templates and totals"
+        );
 
         FriendlyByteBuf buffer = new FriendlyByteBuf(Unpooled.buffer());
         ByteBufCodecs.VAR_INT.encode(buffer, Integer.MAX_VALUE);
@@ -255,5 +321,13 @@ public final class BigEnderChestCoreTest {
                 .set(DataComponents.MAX_STACK_SIZE, 64)
                 .set(DataComponents.ITEM_NAME, Component.literal(name))
                 .build());
+    }
+
+    private static final class MinecraftServerContext {
+        private static net.minecraft.core.HolderLookup.Provider registries() {
+            return net.minecraft.core.RegistryAccess.fromRegistryOfRegistries(
+                    net.minecraft.core.registries.BuiltInRegistries.REGISTRY
+            );
+        }
     }
 }
