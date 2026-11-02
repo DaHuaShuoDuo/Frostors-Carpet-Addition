@@ -22,6 +22,7 @@ public abstract class AbstractContainerMenuMixin {
     ) {
         AbstractContainerMenu menu = (AbstractContainerMenu) (Object) this;
         if(slotIndex < 0
+                || slotIndex < BigEnderChestView.ENTRY_SLOTS
                 || slotIndex >= BigEnderChestView.MENU_SLOTS
                 || !BigEnderChestView.isVirtualMenu(menu)) {
             return;
