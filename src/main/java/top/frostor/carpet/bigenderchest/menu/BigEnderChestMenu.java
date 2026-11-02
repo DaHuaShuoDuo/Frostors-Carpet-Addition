@@ -22,6 +22,7 @@ public final class BigEnderChestMenu extends ChestMenu {
     private final BigEnderChestView view;
     private VirtualAction pendingVirtualAction;
     private int pendingVirtualActionCount;
+    private int acceptedVirtualActionCount;
     private int rejectedVirtualActionCount;
 
     public BigEnderChestMenu(
@@ -47,6 +48,10 @@ public final class BigEnderChestMenu extends ChestMenu {
 
     public int rejectedVirtualActionCount() {
         return rejectedVirtualActionCount;
+    }
+
+    public int acceptedVirtualActionCount() {
+        return acceptedVirtualActionCount;
     }
 
     public ItemStack moveToPlayerInventory(ItemStack stack) {
@@ -99,8 +104,10 @@ public final class BigEnderChestMenu extends ChestMenu {
     }
 
     private void handleViewClick(int slotId, int button, ContainerInput input) {
-        boolean allowed = (input == ContainerInput.PICKUP && button == 0)
-                || (input == ContainerInput.QUICK_MOVE && getCarried().isEmpty())
+        boolean emptyCarried = getCarried().isEmpty();
+        boolean allowed = (input == ContainerInput.PICKUP
+                && (button == 0 || button == 1 && emptyCarried))
+                || input == ContainerInput.QUICK_MOVE
                 || (input == ContainerInput.THROW && (button == 0 || button == 1));
         if(allowed) {
             queueVirtualAction(slotId, button, input);
@@ -113,6 +120,7 @@ public final class BigEnderChestMenu extends ChestMenu {
         pendingVirtualActionCount++;
         if(pendingVirtualActionCount == 1) {
             pendingVirtualAction = new VirtualAction(slotId, button, input);
+            acceptedVirtualActionCount++;
         }else {
             pendingVirtualAction = null;
         }
@@ -135,6 +143,8 @@ public final class BigEnderChestMenu extends ChestMenu {
             dropFromView(action.slotId(), action.button());
         }else if(action.input() == ContainerInput.QUICK_MOVE) {
             quickMoveStack(service.owner(), action.slotId());
+        }else if(action.button() == 1) {
+            takeHalfIntoCarried(action.slotId());
         }else if(getCarried().isEmpty()) {
             takeIntoCarried(action.slotId());
         }else {
@@ -211,6 +221,22 @@ public final class BigEnderChestMenu extends ChestMenu {
         StorageEntry entry = view.entryAtDisplaySlot(slotId);
         if(entry == null) return;
         ItemStack taken = service.takeStack(entry.template());
+        if(taken.isEmpty()) return;
+        setCarried(taken);
+        view.refresh();
+        broadcastChanges();
+    }
+
+    private void takeHalfIntoCarried(int slotId) {
+        if(!getCarried().isEmpty()) return;
+        StorageEntry entry = view.entryAtDisplaySlot(slotId);
+        if(entry == null) return;
+        int stackSize = Math.min(
+                entry.template().template().getMaxStackSize(),
+                Math.toIntExact(Math.min(Integer.MAX_VALUE, entry.totalAmount()))
+        );
+        int amount = Math.max(1, Math.ceilDiv(stackSize, 2));
+        ItemStack taken = service.take(entry.template(), amount);
         if(taken.isEmpty()) return;
         setCarried(taken);
         view.refresh();
