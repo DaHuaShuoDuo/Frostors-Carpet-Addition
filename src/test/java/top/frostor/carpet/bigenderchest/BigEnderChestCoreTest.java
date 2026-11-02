@@ -88,6 +88,24 @@ public final class BigEnderChestCoreTest {
 
         index.rebuild(Map.of(0, page0, 1, page1));
         check(index.entry(dirt).totalAmount() == 32, "rebuild must recover the source of truth");
+
+        page1.setItem(5, new ItemStack(Items.DIRT, 8));
+        index.replacePage(1, page1);
+        check(
+                index.entry(dirt).totalAmount() == 40,
+                "replacing one page must update that page without rebuilding others"
+        );
+        check(
+                index.entry(ItemTemplateKey.of(new ItemStack(Items.STONE))).totalAmount() == 64,
+                "incremental page replacement must preserve other pages"
+        );
+        check(
+                index.aggregates().stream()
+                        .filter(entry -> entry.template().equals(dirt))
+                        .mapToLong(BigEnderChestIndex.AggregateEntry::totalAmount)
+                        .sum() == 40,
+                "lightweight aggregate snapshots must retain total amounts"
+        );
     }
 
     private static void testCapacityMath() {

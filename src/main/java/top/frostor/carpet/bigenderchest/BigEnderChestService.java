@@ -159,6 +159,10 @@ public final class BigEnderChestService {
         return index.entries();
     }
 
+    public List<BigEnderChestIndex.AggregateEntry> aggregateEntries() {
+        return index.aggregates();
+    }
+
     public int templateCount() {
         return index.templateCount();
     }
@@ -371,13 +375,15 @@ public final class BigEnderChestService {
             dataStore.loadAsync(
                     metadata,
                     loaded -> {
+                        if(closed) return;
                         copyItems(loaded, container);
                         page.setState(StoragePageState.READY);
+                        index.replacePage(metadata.storagePage(), container);
                         pageRevision++;
                         revision++;
-                        rebuildIndex();
                     },
                     exception -> {
+                        if(closed) return;
                         page.setState(StoragePageState.ERROR);
                         pageRevision++;
                         FrostorsCarpetAddition.LOGGER.error(

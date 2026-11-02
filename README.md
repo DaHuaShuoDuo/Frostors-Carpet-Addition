@@ -137,6 +137,10 @@ carried item。Hello/Ack 返回双方能力交集，不支持 Delta 的客户端
 槽位，并支持批量存入、批量移动到玩家背包、丢弃、动作序号、请求幂等以及每 tick 限流。
 菜单关闭、断线、规则关闭或会话失效时发送 `SessionClose`。
 
+`ActionRequest.playerSlots` 和 `QUICK_MOVE_FROM_PLAYER.button` 统一使用玩家
+`Inventory` 索引 `0..35`：`0..26` 为主背包，`27..35` 为快捷栏；两者都不是菜单槽位
+索引。终端打开后若来源末影箱超过 8 格或切换维度，服务端会关闭会话并拒绝后续动作。
+
 要求 ACK 的快照若 5 秒内未确认会重新生成，客户端主动重同步最多每秒接受一次，避免异常
 客户端堆积后台快照任务。`OpenTerminalRequest` 只接受当前玩家的既有会话、当前 `containerId`
 和原箱子 8 格范围内的请求；QuickShulker 等无方块来源的外部会话沿用其自身打开校验。

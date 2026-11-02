@@ -4,6 +4,7 @@ import net.fabricmc.fabric.api.menu.v1.ExtendedMenuType;
 import net.minecraft.core.Registry;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.util.Unit;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
@@ -75,6 +76,9 @@ public final class BigEnderChestTerminalMenu extends AbstractContainerMenu {
 
     @Override
     public boolean stillValid(Player player) {
-        return player == owner && (service == null || service.isOpen());
+        return player == owner
+                && (service == null || service.isOpen())
+                && (!(player instanceof ServerPlayer serverPlayer)
+                || BigEnderChestSessions.isWithinSourceRange(serverPlayer));
     }
 }

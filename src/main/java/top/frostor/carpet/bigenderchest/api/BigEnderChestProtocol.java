@@ -106,6 +106,7 @@ public final class BigEnderChestProtocol {
     public static final int RESULT_RESYNC_REQUIRED = 14;
     public static final int RESULT_RATE_LIMITED = 15;
     public static final int RESULT_DUPLICATE_REQUEST = 16;
+    public static final int RESULT_ENTRY_EMPTY = 17;
 
     private BigEnderChestProtocol() {
     }
@@ -620,6 +621,10 @@ public final class BigEnderChestProtocol {
         }
     }
 
+    /**
+     * {@code playerSlots} and {@code button} always use the player's Inventory indices 0..35:
+     * 0..26 are main inventory and 27..35 are the hotbar. They are never menu slot indices.
+     */
     public record ActionRequest(
             long sessionId,
             long requestId,

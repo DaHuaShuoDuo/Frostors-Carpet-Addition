@@ -186,6 +186,10 @@ public final class BigEnderChestSessions {
                 close(session.owner);
                 continue;
             }
+            if(!session.isWithinSourceRange()) {
+                close(session.owner);
+                continue;
+            }
             session.service.tick();
             if(session.menu instanceof BigEnderChestMenu vanillaMenu) {
                 vanillaMenu.tickVirtualActions();
@@ -227,6 +231,11 @@ public final class BigEnderChestSessions {
 
     public static Map<UUID, Session> sessions() {
         return Collections.unmodifiableMap(SESSIONS);
+    }
+
+    public static boolean isWithinSourceRange(ServerPlayer player) {
+        Session session = session(player);
+        return session != null && session.isWithinSourceRange();
     }
 
     public static PageRegistry pageRegistry() {

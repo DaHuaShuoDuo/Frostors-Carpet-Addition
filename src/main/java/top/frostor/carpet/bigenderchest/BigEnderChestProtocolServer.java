@@ -29,6 +29,7 @@ import top.frostor.carpet.bigenderchest.api.BigEnderChestProtocol.SlotRecord;
 import top.frostor.carpet.bigenderchest.api.BigEnderChestProtocol.SnapshotBegin;
 import top.frostor.carpet.bigenderchest.api.BigEnderChestProtocol.SnapshotChunk;
 import top.frostor.carpet.bigenderchest.api.BigEnderChestProtocol.TemplateRecord;
+import top.frostor.carpet.bigenderchest.index.BigEnderChestIndex.AggregateEntry;
 import top.frostor.carpet.bigenderchest.index.ItemTemplateKey;
 import top.frostor.carpet.bigenderchest.index.StorageEntry;
 import top.frostor.carpet.bigenderchest.index.StorageLocation;
@@ -49,6 +50,7 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.zip.CRC32;
 
@@ -57,11 +59,18 @@ public final class BigEnderChestProtocolServer {
     private static final int RECENT_RESULT_LIMIT = 64;
     private static final int RESYNC_COOLDOWN_TICKS = 20;
     private static final int SNAPSHOT_ACK_TIMEOUT_TICKS = 100;
+    private static final int SNAPSHOT_WORKER_COUNT = 2;
     private static final AtomicLong SNAPSHOT_IDS = new AtomicLong();
+    private static final AtomicInteger SNAPSHOT_THREAD_IDS = new AtomicInteger();
     private static final Map<UUID, ClientState> CLIENTS = new ConcurrentHashMap<>();
-    private static final ExecutorService SNAPSHOT_EXECUTOR = Executors.newSingleThreadExecutor(
+    private static final ExecutorService SNAPSHOT_EXECUTOR = Executors.newFixedThreadPool(
+            SNAPSHOT_WORKER_COUNT,
             runnable -> {
-                Thread thread = new Thread(runnable, "Frostors-BigEnderChest-Snapshot");
+                Thread thread = new Thread(
+                        runnable,
+                        "Frostors-BigEnderChest-Snapshot-"
+                                + SNAPSHOT_THREAD_IDS.incrementAndGet()
+                );
                 thread.setDaemon(true);
                 return thread;
             }
@@ -268,6 +277,7 @@ public final class BigEnderChestProtocolServer {
             BigEnderChestSessions.Session session,
             ClientState state
     ) {
+        long pageRevision = session.service().pageRevision();
         List<BigEnderChestProtocol.PageInfo> pages = session.service().pageCatalog().stream()
                 .map(page -> new BigEnderChestProtocol.PageInfo(
                         page.pageId(),
@@ -282,7 +292,7 @@ public final class BigEnderChestProtocolServer {
                 BigEnderChestProtocol.PAGE_CATALOG,
                 new BigEnderChestProtocol.PageCatalog(
                         session.sessionId(),
-                        session.service().pageRevision(),
+                        pageRevision,
                         session.service().pageCount() * StorageLocation.SLOTS_PER_PAGE,
                         pages.stream()
                                 .mapToInt(BigEnderChestProtocol.PageInfo::occupiedSlots)
@@ -291,6 +301,7 @@ public final class BigEnderChestProtocolServer {
                         pages
                 ).toTag()
         );
+        state.sentPageRevision = pageRevision;
     }
 
     private static void startSnapshot(
@@ -304,45 +315,21 @@ public final class BigEnderChestProtocolServer {
         state.clearSnapshot();
         session.service().takePendingDelta();
         state.snapshotPending = false;
-        Map<ItemTemplateKey, Long> templates = new HashMap<>();
-        List<BigEnderChestProtocol.EntryRecord> entryRecords = new ArrayList<>();
-        long nextSerial = 1;
-
-        for(StorageEntry entry : session.service().entries()) {
-            long serial = nextSerial++;
-            templates.put(entry.template(), serial);
-            entryRecords.add(new BigEnderChestProtocol.EntryRecord(
-                    serial,
-                    entry.template().template(),
-                    entry.totalAmount(),
-                    List.of()
-            ));
-        }
-
+        List<AggregateEntry> aggregates = session.service().aggregateEntries();
+        long snapshotRevision = session.service().revision();
         long snapshotId = SNAPSHOT_IDS.incrementAndGet();
-        state.serials.clear();
-        state.serials.putAll(templates);
-        state.keysBySerial.clear();
-        templates.forEach((key, serial) -> state.keysBySerial.put(serial, key));
-        state.snapshotAmounts.clear();
-        for(StorageEntry entry : session.service().entries()) {
-            Long serial = templates.get(entry.template());
-            if(serial != null) state.snapshotAmounts.put(entry.template(), entry.totalAmount());
-        }
-        state.nextSerial = nextSerial;
         state.snapshotId = snapshotId;
-        state.snapshotRevision = session.service().revision();
+        state.snapshotRevision = snapshotRevision;
         state.nextChunk = 0;
         state.snapshotBuilding = true;
-        List<BigEnderChestProtocol.EntryRecord> snapshotEntries = List.copyOf(entryRecords);
         HolderLookup.Provider registries = session.owner().registryAccess();
         MinecraftServer server = session.owner().level().getServer();
         String ownerName = session.owner().getScoreboardName();
         int chunkByteLimit = state.chunkByteLimit;
         SNAPSHOT_EXECUTOR.execute(() -> {
-            List<byte[]> chunks;
+            SnapshotBuild build;
             try {
-                chunks = buildSnapshotChunks(registries, snapshotEntries, chunkByteLimit);
+                build = buildSnapshot(registries, aggregates, chunkByteLimit);
             }catch(RuntimeException exception) {
                 FrostorsCarpetAddition.LOGGER.error(
                         "Failed to build big ender chest snapshot for {}",
@@ -357,7 +344,14 @@ public final class BigEnderChestProtocolServer {
             }
             server.execute(() -> {
                 if(state.snapshotId != snapshotId || state.snapshotRevision < 0) return;
-                state.snapshotChunks.addAll(chunks);
+                state.serials.clear();
+                state.serials.putAll(build.serials());
+                state.keysBySerial.clear();
+                state.keysBySerial.putAll(build.keysBySerial());
+                state.snapshotAmounts.clear();
+                state.snapshotAmounts.putAll(build.amounts());
+                state.nextSerial = build.nextSerial();
+                state.snapshotChunks.addAll(build.chunks());
                 state.snapshotBuilding = false;
                 sendPayload(
                         session.owner(),
@@ -366,20 +360,38 @@ public final class BigEnderChestProtocolServer {
                                 session.sessionId(),
                                 snapshotId,
                                 state.snapshotRevision,
-                                snapshotEntries.size(),
+                                build.entryCount(),
                                 0,
-                                chunks.size()
+                                build.chunks().size()
                         ).toTag()
                 );
             });
         });
     }
 
-    private static List<byte[]> buildSnapshotChunks(
+    private static SnapshotBuild buildSnapshot(
             HolderLookup.Provider registries,
-            List<BigEnderChestProtocol.EntryRecord> entries,
+            List<AggregateEntry> aggregates,
             int chunkByteLimit
     ) {
+        Map<ItemTemplateKey, Long> serials = new HashMap<>();
+        Map<Long, ItemTemplateKey> keysBySerial = new HashMap<>();
+        Map<ItemTemplateKey, Long> amounts = new HashMap<>();
+        List<BigEnderChestProtocol.EntryRecord> entries =
+                new ArrayList<>(aggregates.size());
+        long nextSerial = 1;
+        for(AggregateEntry aggregate : aggregates) {
+            long serial = nextSerial++;
+            serials.put(aggregate.template(), serial);
+            keysBySerial.put(serial, aggregate.template());
+            amounts.put(aggregate.template(), aggregate.totalAmount());
+            entries.add(new BigEnderChestProtocol.EntryRecord(
+                    serial,
+                    aggregate.template().template(),
+                    aggregate.totalAmount(),
+                    List.of()
+            ));
+        }
         List<byte[]> chunks = new ArrayList<>();
         ListTag currentEntries = new ListTag();
         for(BigEnderChestProtocol.EntryRecord record : entries) {
@@ -395,7 +407,24 @@ public final class BigEnderChestProtocolServer {
         if(!currentEntries.isEmpty() || chunks.isEmpty()) {
             chunks.add(encodeChunk(currentEntries));
         }
-        return chunks;
+        return new SnapshotBuild(
+                List.copyOf(chunks),
+                Map.copyOf(serials),
+                Map.copyOf(keysBySerial),
+                Map.copyOf(amounts),
+                entries.size(),
+                nextSerial
+        );
+    }
+
+    private record SnapshotBuild(
+            List<byte[]> chunks,
+            Map<ItemTemplateKey, Long> serials,
+            Map<Long, ItemTemplateKey> keysBySerial,
+            Map<ItemTemplateKey, Long> amounts,
+            int entryCount,
+            long nextSerial
+    ) {
     }
 
     private static byte[] encodeChunk(ListTag entries) {
@@ -732,7 +761,7 @@ public final class BigEnderChestProtocolServer {
                 case BigEnderChestProtocol.ACTION_DROP_STACK ->
                         dropFromStorage(service, targetKey, maxStack(targetKey));
                 case BigEnderChestProtocol.ACTION_BATCH_PUT_PLAYER_SLOTS ->
-                        batchPutPlayerSlots(menu, service, request.playerSlots());
+                        batchPutPlayerSlots(service, request.playerSlots());
                 case BigEnderChestProtocol.ACTION_BATCH_STORAGE_TO_PLAYER ->
                         quickMoveToPlayer(service, targetKey, requestedAmount);
                 default -> BigEnderChestProtocol.RESULT_PERMISSION_DENIED;
@@ -779,6 +808,9 @@ public final class BigEnderChestProtocolServer {
                 || request.containerId() != session.containerId()
                 || player.containerMenu != session.menu()) {
             return BigEnderChestProtocol.RESULT_SESSION_EXPIRED;
+        }
+        if(!session.isWithinSourceRange()) {
+            return BigEnderChestProtocol.RESULT_PERMISSION_DENIED;
         }
         if(session.service().isReadOnly()) {
             return session.service().hasPageErrors()
@@ -858,6 +890,7 @@ public final class BigEnderChestProtocolServer {
         return switch(action) {
             case BigEnderChestProtocol.ACTION_PUT_ONE,
                     BigEnderChestProtocol.ACTION_PUT_STACK,
+                    BigEnderChestProtocol.ACTION_QUICK_MOVE_FROM_PLAYER,
                     BigEnderChestProtocol.ACTION_BATCH_PUT_PLAYER_SLOTS -> false;
             default -> true;
         };
@@ -885,7 +918,7 @@ public final class BigEnderChestProtocolServer {
             return BigEnderChestProtocol.RESULT_SLOT_MISMATCH;
         }
         ItemStack taken = service.take(key, Math.min(amount, maxStack(key)));
-        if(taken.isEmpty()) return BigEnderChestProtocol.RESULT_CAPACITY_FULL;
+        if(taken.isEmpty()) return takeFailure(service, key);
         menu.setCarried(taken);
         return BigEnderChestProtocol.RESULT_OK;
     }
@@ -924,7 +957,7 @@ public final class BigEnderChestProtocolServer {
             return BigEnderChestProtocol.RESULT_INVENTORY_FULL;
         }
         ItemStack taken = service.take(key, movable);
-        if(taken.isEmpty()) return BigEnderChestProtocol.RESULT_CAPACITY_FULL;
+        if(taken.isEmpty()) return takeFailure(service, key);
         if(!insertIntoPlayerInventory(service.owner(), key, taken)) {
             if(!service.insert(taken)) {
                 dropAtPlayer(service.owner(), taken);
@@ -984,7 +1017,7 @@ public final class BigEnderChestProtocolServer {
             byte button
     ) {
         int inventorySlot = Byte.toUnsignedInt(button);
-        if(inventorySlot >= service.owner().getInventory().getContainerSize()) {
+        if(inventorySlot >= Inventory.INVENTORY_SIZE) {
             return BigEnderChestProtocol.RESULT_SLOT_MISMATCH;
         }
         ItemStack stack = service.owner().getInventory().getItem(inventorySlot);
@@ -998,7 +1031,6 @@ public final class BigEnderChestProtocolServer {
     }
 
     private static int batchPutPlayerSlots(
-            AbstractContainerMenu menu,
             BigEnderChestService service,
             List<Integer> playerSlots
     ) {
@@ -1012,14 +1044,10 @@ public final class BigEnderChestProtocolServer {
         }
         List<ItemStack> copies = new ArrayList<>(uniqueSlots.size());
         for(int slot : uniqueSlots) {
-            if(slot < 0 || slot >= menu.slots.size()) {
+            if(slot < 0 || slot >= Inventory.INVENTORY_SIZE) {
                 return BigEnderChestProtocol.RESULT_SLOT_MISMATCH;
             }
-            var menuSlot = menu.getSlot(slot);
-            if(menuSlot.container != service.owner().getInventory()) {
-                return BigEnderChestProtocol.RESULT_SLOT_MISMATCH;
-            }
-            ItemStack stack = menuSlot.getItem();
+            ItemStack stack = service.owner().getInventory().getItem(slot);
             if(stack.isEmpty()) return BigEnderChestProtocol.RESULT_SLOT_MISMATCH;
             copies.add(stack.copy());
         }
@@ -1027,8 +1055,9 @@ public final class BigEnderChestProtocolServer {
             return BigEnderChestProtocol.RESULT_CAPACITY_FULL;
         }
         for(int slot : uniqueSlots) {
-            menu.getSlot(slot).setByPlayer(ItemStack.EMPTY);
+            service.owner().getInventory().setItem(slot, ItemStack.EMPTY);
         }
+        service.owner().getInventory().setChanged();
         return BigEnderChestProtocol.RESULT_OK;
     }
 
@@ -1039,9 +1068,15 @@ public final class BigEnderChestProtocolServer {
     ) {
         if(key == null) return BigEnderChestProtocol.RESULT_SLOT_MISMATCH;
         ItemStack dropped = service.take(key, amount);
-        if(dropped.isEmpty()) return BigEnderChestProtocol.RESULT_CAPACITY_FULL;
+        if(dropped.isEmpty()) return takeFailure(service, key);
         dropAtPlayer(service.owner(), dropped);
         return BigEnderChestProtocol.RESULT_OK;
+    }
+
+    private static int takeFailure(BigEnderChestService service, ItemTemplateKey key) {
+        return key != null && service.amount(key) == 0
+                ? BigEnderChestProtocol.RESULT_ENTRY_EMPTY
+                : BigEnderChestProtocol.RESULT_CAPACITY_FULL;
     }
 
     private static void dropAtPlayer(ServerPlayer player, ItemStack stack) {
