@@ -215,7 +215,8 @@ public final class BigEnderChestService {
      * Atomically inserts into all supplied stacks. Capacity is checked before any source is changed.
      */
     public boolean insertAll(List<ItemStack> stacks) {
-        if(!isOpen() || isReadOnly()) return false;
+        // The terminal protocol gates loading pages; the vanilla menu may use already loaded pages.
+        if(!isOpen()) return false;
         List<ItemStack> nonEmpty = stacks.stream()
                 .filter(stack -> !stack.isEmpty())
                 .toList();
@@ -236,9 +237,8 @@ public final class BigEnderChestService {
     }
 
     public ItemStack take(ItemTemplateKey key, int requestedAmount) {
-        if(!isOpen() || isReadOnly() || key == null || requestedAmount <= 0) {
-            return ItemStack.EMPTY;
-        }
+        // The terminal protocol gates loading pages; the vanilla menu may use already loaded pages.
+        if(!isOpen() || key == null || requestedAmount <= 0) return ItemStack.EMPTY;
         List<LocatedStack> candidates = findMatchingStacks(key);
         if(candidates.isEmpty()) return ItemStack.EMPTY;
 
