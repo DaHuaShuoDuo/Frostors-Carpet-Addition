@@ -3,7 +3,7 @@
 	"id": "frostors-carpet-addition",
 	"version": "${version}",
 	"name": "Frostor's Carpet Addition",
-	"description": "A Carpet addition by Frostor, including a port of Player Ladder.",
+	"description": "A Carpet addition by Frostor with a server-side big ender chest, Player Ladder, and other utilities.",
 	"authors": [
 		"Frostor"
 	],
@@ -16,6 +16,7 @@
 	},
 	"mixins": [
 		"frostors-carpet-addition.mixins.json",
+		"frostors-carpet-bigenderchest.mixins.json",
 		"frostors-carpet-easyplace.mixins.json",
 		"frostors-carpet-onlineprofile.mixins.json"
 	],

@@ -60,3 +60,16 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+## Gugle's Carpet Addition
+
+The virtual menu button and client-side click-prediction guard were informed by the fake-player
+inventory menu behavior in:
+
+- Project: Gugle's Carpet Addition (GCA)
+- Author: Gugle
+- Source: https://github.com/Gu-ZT/gugle-carpet-addition
+- License: MIT
+
+No GCA binary is bundled and GCA is not a runtime dependency. The FCA implementation is
+adapted for its server-authoritative aggregate ender chest view.

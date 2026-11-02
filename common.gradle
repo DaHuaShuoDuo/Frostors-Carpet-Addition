@@ -112,10 +112,10 @@ jar {
 def testRuntimeClasspath = sourceSets.test.runtimeClasspath
 tasks.register("logicTest", JavaExec) {
 	group = "verification"
-	description = "Runs dependency-free tests for the player stack policy."
+    description = "Runs dependency-free tests for player stack and big ender chest logic."
 	dependsOn testClasses
 	classpath = testRuntimeClasspath
-	mainClass = "top.frostor.carpet.playerladder.PlayerStackTest"
+    mainClass = "top.frostor.carpet.LogicTestSuite"
 }
 
 tasks.register("easyPlaceProtocolTest", JavaExec) {
