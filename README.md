@@ -206,6 +206,10 @@ $env:JAVA_HOME = '<Java 25 installation>'
 $env:GRADLE_USER_HOME = Join-Path $env:USERPROFILE '.gradle'
 ```
 
+FCA 不会把开发依赖 JAR 提交到版本库。构建前请按
+[`libs/README.md`](libs/README.md) 中的文件名，将对应版本的 Carpet 编译依赖放入
+`libs/`。依赖文件和构建产物都不会被打包或发布。
+
 共享源码、资源或 Mixin 修改后必须同时构建 26.2 和 26.3。构建会运行不启动游戏的逻辑和
 协议测试，并验证两个版本均可打包。
 

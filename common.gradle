@@ -19,19 +19,11 @@ sourceSets {
 	}
 }
 
-configurations {
-	developmentOnly
-	runtimeClasspath {
-		extendsFrom developmentOnly
-	}
-}
-
 dependencies {
 	minecraft "com.mojang:minecraft:${project.minecraft_version}"
 
 	implementation "net.fabricmc:fabric-loader:${project.loader_version}"
 	implementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
-	developmentOnly files(rootProject.file("libs/fabric-carpet-${project.minecraft_version}.jar"))
 
 	// Carpet is supplied by the player at runtime; the local JAR is only for compilation and dev runs.
 	compileOnly files(rootProject.file("libs/fabric-carpet-${project.minecraft_version}.jar"))
