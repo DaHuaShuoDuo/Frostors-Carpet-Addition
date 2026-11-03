@@ -61,7 +61,8 @@ minecraft:wither,minecraft:ender_dragon,minecraft:warden,minecraft:minecart,#min
 
 ## 大末影箱
 
-启用 `bigEnderChest` 后，玩家空手使用末影箱会打开一个原版 `GENERIC_9x6` 菜单。
+启用 `bigEnderChest` 后，玩家使用末影箱会打开一个原版 `GENERIC_9x6` 菜单，无论手中
+是否持有物品。手持物品不会阻止大末影箱打开，也不会在该交互中被消耗或写入存储。
 未安装客户端工具的玩家仍可使用完整的聚合查看、取放、排序、翻页和丢弃功能。
 
 ### 原版 6×9 菜单
@@ -205,23 +206,8 @@ $env:JAVA_HOME = '<Java 25 installation>'
 $env:GRADLE_USER_HOME = Join-Path $env:USERPROFILE '.gradle'
 ```
 
-共享源码、资源或 Mixin 修改后必须同时构建 26.2 和 26.3。构建会编译测试和 GameTest，
-运行无需启动游戏的规则测试，并验证两个版本均可打包。
-
-## 运行期测试
-
-运行 GameTest 会启动 Minecraft 测试服务器。只有在你明确同意 Minecraft EULA
-后才能传入 `-PacceptMinecraftEula=true`：
-
-```powershell
-.\gradlew.bat :26.2:runGameTest :26.3:runGameTest -PacceptMinecraftEula=true
-.\gradlew.bat :26.2:runClientGameTest :26.3:runClientGameTest -PacceptMinecraftEula=true
-```
-
-该参数会让测试运行目录写入 EULA 接受标记。普通构建不会启动游戏，也不会默认接受 EULA。
-
-客户端 GameTest 主要验证客户端类、Mixin、菜单和协议加载。真实准星、拖拽和界面手感仍需
-在开发客户端中人工验证。
+共享源码、资源或 Mixin 修改后必须同时构建 26.2 和 26.3。构建会运行不启动游戏的逻辑和
+协议测试，并验证两个版本均可打包。
 
 ## 数据与兼容性
 
@@ -244,7 +230,6 @@ src/main/java/top/frostor/carpet
 
 src/main/resources      元数据、Mixin 配置和翻译
 src/test/java           无游戏运行期的逻辑与协议测试
-src/gametest             Fabric GameTest
 versions/26.2           26.2 版本属性
 versions/26.3           26.3 版本属性
 ```

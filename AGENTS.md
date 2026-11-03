@@ -33,20 +33,11 @@ $env:JAVA_HOME = 'C:\Program Files\Zulu\zulu-25'
   构建 `26.2` 和 `26.3` 两个版本。
 - 构建产物位于 `versions/<版本>/build/libs/`。不要手工编辑 `.gradle/`、`build/` 或
   `versions/*/build/`；这些目录均为生成内容。
-- `:26.2:build` / `:26.3:build` 会运行 `logicTest` 中的无外部依赖规则测试，并编译
-  `src/gametest` 中的 Fabric GameTest。修改骑乘链、层数限制或玩家堆叠逻辑时，必须
-  同步维护这些测试。
-- 运行期 GameTest 需要 Minecraft EULA。只有用户明确同意后才能使用
-  `-PacceptMinecraftEula=true` 执行：
-
-  ```powershell
-  .\gradlew.bat :26.2:runGameTest :26.3:runGameTest -PacceptMinecraftEula=true
-  .\gradlew.bat :26.2:runClientGameTest :26.3:runClientGameTest -PacceptMinecraftEula=true
-  ```
-
-  不要默认传入该参数，也不要把 `eula=true` 写入版本控制。GameTest 编译成功不等于
-  已执行运行期测试；最终说明必须区分编译、自动逻辑测试和已运行的 GameTest/手测。
-  客户端 GameTest 只确认客户端类和 Mixin 能加载，真实准星交互仍需手测。
+- `:26.2:build` / `:26.3:build` 会运行 `logicTest` 和 `easyPlaceProtocolTest` 中的
+  无外部依赖测试。`src/gametest` 属于本机开发验证，不纳入版本控制，也不作为构建或
+  发布产物的一部分。
+- 涉及运行期逻辑时，必须在开发客户端或测试服务器中完成必要手测，并在交付说明中
+  明确区分自动逻辑测试与手动运行期验证。
 - 新增编译警告应视为回归；现有警告也不要复制到新代码。需要排查 Gradle 弃用时可使用
   `--warning-mode all`。
 
@@ -109,8 +100,8 @@ Java 枚举常量改成小写，否则 Carpet 无法解析。
   通道中注册两个不同 Payload 类。
 - 协议值只从服务端方块放置上下文中的命中位置解码，最终状态仍须通过 `BlockItem.canPlace`
   校验，不能信任客户端直接写入任意方块状态。
-- 方块状态映射集中在 `easyplace` 包，避免为每种原版方块复制独立 Mixin。新增适配时同时
-  更新 `EasyPlaceGameTest`，覆盖对应属性。
+- 方块状态映射集中在 `easyplace` 包，避免为每种原版方块复制独立 Mixin。新增适配时
+  应补充可离线运行的协议/状态测试，并完成对应手测。
 - `MultifaceBlock` 的面状态必须从目标位置当前世界状态合并，不能继续使用原始放置状态；
   否则目标状态已含同一面时原版会返回 `null`，在附着方块周围有密集完整方块时表现为
   挂墙/多面方块漏放。必须保留密集图案 GameTest。
@@ -166,5 +157,6 @@ Java 枚举常量改成小写，否则 Carpet 无法解析。
 - 优先使用 Minecraft/Fabric/Carpet 已有 API，新增依赖前说明必要性并确认不会改变
   JAR 的运行时依赖边界。
 - 保留 MIT 许可证、项目声明以及模组元数据中的作者和依赖信息。
-- 任务完成前至少确认：两个版本的 `logicTest` 与 GameTest 编译通过；Carpet 规则翻译
-  完整；README 与行为一致；Carpet 未被误打包；涉及运行期逻辑时记录 GameTest/手测结果。
+- 任务完成前至少确认：两个版本的 `logicTest` 与 `easyPlaceProtocolTest` 通过；
+  Carpet 规则翻译完整；README 与行为一致；Carpet 未被误打包；涉及运行期逻辑时记录
+  手动验证结果。

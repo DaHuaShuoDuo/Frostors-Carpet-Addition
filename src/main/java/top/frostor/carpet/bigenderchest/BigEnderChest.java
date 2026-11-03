@@ -7,8 +7,12 @@ import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.phys.BlockHitResult;
 import top.frostor.carpet.FrostorSettings;
 import top.frostor.carpet.bigenderchest.menu.BigEnderChestTerminalMenu;
 
@@ -24,21 +28,7 @@ public final class BigEnderChest {
 
         BigEnderChestTerminalMenu.menuType();
         BigEnderChestProtocolServer.register();
-        UseBlockCallback.EVENT.register((player, level, hand, hitResult) -> {
-            if(!(level instanceof ServerLevel serverLevel)
-                    || !(player instanceof ServerPlayer serverPlayer)
-                    || !FrostorSettings.bigEnderChest
-                    || !player.getItemInHand(hand).isEmpty()) {
-                return InteractionResult.PASS;
-            }
-            if(!level.getBlockState(hitResult.getBlockPos()).is(Blocks.ENDER_CHEST)) {
-                return InteractionResult.PASS;
-            }
-            BlockPos pos = hitResult.getBlockPos();
-            return BigEnderChestSessions.open(serverPlayer, serverLevel, pos)
-                    ? InteractionResult.SUCCESS
-                    : InteractionResult.PASS;
-        });
+        UseBlockCallback.EVENT.register(BigEnderChest::useBlock);
         ServerLifecycleEvents.SERVER_STARTED.register(BigEnderChestSessions::initialize);
         ServerLifecycleEvents.SERVER_STOPPING.register(ignored -> BigEnderChestSessions.shutdown());
         ServerPlayConnectionEvents.DISCONNECT.register((handler, ignored) ->
@@ -47,5 +37,33 @@ public final class BigEnderChest {
             BigEnderChestSessions.tick(server);
             BigEnderChestProtocolServer.tick(server);
         });
+    }
+
+    static InteractionResult useBlock(
+            Player player,
+            Level level,
+            InteractionHand hand,
+            BlockHitResult hitResult
+    ) {
+        if(!(level instanceof ServerLevel serverLevel)
+                || !(player instanceof ServerPlayer serverPlayer)
+                || !canOpenBigEnderChest(player, level, hitResult)) {
+            return InteractionResult.PASS;
+        }
+        BlockPos pos = hitResult.getBlockPos();
+        return BigEnderChestSessions.open(serverPlayer, serverLevel, pos)
+                ? InteractionResult.SUCCESS
+                : InteractionResult.PASS;
+    }
+
+    static boolean canOpenBigEnderChest(
+            Player player,
+            Level level,
+            BlockHitResult hitResult
+    ) {
+        return FrostorSettings.bigEnderChest
+                && level instanceof ServerLevel
+                && player instanceof ServerPlayer
+                && level.getBlockState(hitResult.getBlockPos()).is(Blocks.ENDER_CHEST);
     }
 }

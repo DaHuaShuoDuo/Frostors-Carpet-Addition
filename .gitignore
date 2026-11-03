@@ -6,6 +6,7 @@ out/
 run/
 .cache/
 *.class
+/src/gametest/
 
 # Runtime logs, crash reports and profiling data
 logs/

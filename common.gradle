@@ -44,26 +44,6 @@ loom {
 	}
 }
 
-def acceptMinecraftEula = providers.gradleProperty("acceptMinecraftEula")
-		.map { it.toBoolean() }
-		.orElse(false)
-
-fabricApi {
-	configureTests {
-		createSourceSet = true
-		modId = "frostors-carpet-addition-gametest"
-		enableGameTests = acceptMinecraftEula
-		enableClientGameTests = acceptMinecraftEula
-		eula = acceptMinecraftEula
-		clearRunDirectory = true
-	}
-}
-
-sourceSets.named("gametest") {
-	java.srcDirs = [rootProject.file('src/gametest/java')]
-	resources.srcDirs = [rootProject.file('src/gametest/resources')]
-}
-
 def processedVersion = project.version.toString()
 def minecraftDependency = project.minecraft_dependency
 def fabricLoaderDependency = project.fabricloader_dependency
@@ -131,7 +111,7 @@ tasks.named("test").configure {
 }
 
 tasks.named("check").configure {
-	dependsOn "logicTest", "easyPlaceProtocolTest", "compileGametestJava"
+	dependsOn "logicTest", "easyPlaceProtocolTest"
 }
 
 publishing {
