@@ -25,20 +25,18 @@ public final class BigEnderChestIndex {
         amountsByLocation.clear();
         pages.entrySet().stream()
                 .sorted(Map.Entry.comparingByKey())
-                .forEach(page -> rebuildPage(page.getKey(), page.getValue()));
+                .forEach(page -> replacePage(page.getKey(), page.getValue()));
     }
 
-    private void rebuildPage(int storagePage, Container container) {
+    /**
+     * Replaces only one page in the aggregate index.
+     */
+    public void replacePage(int storagePage, Container container) {
         for(int slot = 0; slot < StorageLocation.SLOTS_PER_PAGE; slot++) {
-            ItemTemplateKey key = ItemTemplateKey.of(container.getItem(slot));
-            if(key == null) continue;
-            StorageLocation location = new StorageLocation(storagePage, slot);
-            entries.computeIfAbsent(key, MutableEntry::new)
-                    .locations.add(location);
-            keysByLocation.put(location, key);
-            long amount = container.getItem(slot).getCount();
-            amountsByLocation.put(location, amount);
-            entries.get(key).totalAmount += amount;
+            update(
+                    new StorageLocation(storagePage, slot),
+                    container.getItem(slot)
+            );
         }
     }
 
@@ -86,6 +84,24 @@ public final class BigEnderChestIndex {
 
     public int occupiedSlotCount() {
         return keysByLocation.size();
+    }
+
+    /**
+     * Lightweight immutable snapshot for protocol work that only needs totals.
+     */
+    public List<AggregateEntry> aggregates() {
+        List<AggregateEntry> result = new ArrayList<>(entries.size());
+        entries.forEach((key, entry) ->
+                result.add(new AggregateEntry(key, entry.totalAmount)));
+        return List.copyOf(result);
+    }
+
+    public record AggregateEntry(ItemTemplateKey template, long totalAmount) {
+        public AggregateEntry {
+            if(totalAmount < 0) {
+                throw new IllegalArgumentException("Total amount must not be negative");
+            }
+        }
     }
 
     private static final class MutableEntry {

@@ -58,6 +58,10 @@ public final class StoragePage {
         return state;
     }
 
+    public long contentVersion() {
+        return contentVersion;
+    }
+
     public boolean isReady() {
         return state == StoragePageState.READY
                 || state == StoragePageState.DIRTY

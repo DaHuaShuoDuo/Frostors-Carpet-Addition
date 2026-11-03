@@ -76,6 +76,21 @@ public final class FakePageDataStore {
         return container;
     }
 
+    public void loadAsync(
+            PageMetadata metadata,
+            Consumer<PlayerEnderChestContainer> success,
+            Consumer<IOException> failure
+    ) {
+        ioExecutor.execute(() -> {
+            try {
+                PlayerEnderChestContainer container = load(metadata);
+                server.execute(() -> success.accept(container));
+            }catch(IOException exception) {
+                server.execute(() -> failure.accept(exception));
+            }
+        });
+    }
+
     public void save(PageMetadata metadata, PlayerEnderChestContainer container) throws IOException {
         NameAndId identity = identity(metadata);
         if(server.getPlayerList().getPlayer(metadata.pageUuid()) != null) {

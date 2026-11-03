@@ -10,6 +10,7 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.level.block.Blocks;
 import top.frostor.carpet.FrostorSettings;
+import top.frostor.carpet.bigenderchest.menu.BigEnderChestTerminalMenu;
 
 public final class BigEnderChest {
     private static boolean registered;
@@ -21,6 +22,7 @@ public final class BigEnderChest {
         if(registered) return;
         registered = true;
 
+        BigEnderChestTerminalMenu.menuType();
         BigEnderChestProtocolServer.register();
         UseBlockCallback.EVENT.register((player, level, hand, hitResult) -> {
             if(!(level instanceof ServerLevel serverLevel)

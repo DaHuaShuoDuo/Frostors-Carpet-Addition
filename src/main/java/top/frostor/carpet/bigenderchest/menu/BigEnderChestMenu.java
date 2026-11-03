@@ -1,5 +1,6 @@
 package top.frostor.carpet.bigenderchest.menu;
 
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.ChestMenu;
@@ -34,7 +35,7 @@ public final class BigEnderChestMenu extends ChestMenu {
         super(MenuType.GENERIC_9x6, syncId, playerInventory, view.container(), 6);
         this.service = service;
         this.view = view;
-        BigEnderChestSessions.attachMenu(this);
+        BigEnderChestSessions.attachMenu(this, service);
         this.view.refresh();
     }
 
@@ -306,7 +307,10 @@ public final class BigEnderChestMenu extends ChestMenu {
 
     @Override
     public boolean stillValid(Player player) {
-        return player == service.owner() && service.isOpen();
+        return player == service.owner()
+                && service.isOpen()
+                && (!(player instanceof ServerPlayer serverPlayer)
+                || BigEnderChestSessions.isWithinSourceRange(serverPlayer));
     }
 
     private record VirtualAction(int slotId, int button, ContainerInput input) {

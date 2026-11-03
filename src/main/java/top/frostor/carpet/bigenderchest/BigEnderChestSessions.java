@@ -1,14 +1,19 @@
 package top.frostor.carpet.bigenderchest;
 
-import net.minecraft.network.chat.Component;
+import net.fabricmc.fabric.api.menu.v1.ExtendedMenuProvider;
 import net.minecraft.core.BlockPos;
+import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.util.Unit;
 import net.minecraft.world.SimpleMenuProvider;
 import net.minecraft.world.entity.player.Inventory;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.inventory.AbstractContainerMenu;
 import top.frostor.carpet.FrostorSettings;
 import top.frostor.carpet.bigenderchest.menu.BigEnderChestMenu;
+import top.frostor.carpet.bigenderchest.menu.BigEnderChestTerminalMenu;
 import top.frostor.carpet.bigenderchest.menu.BigEnderChestView;
 import top.frostor.carpet.bigenderchest.page.FakePageDataStore;
 import top.frostor.carpet.bigenderchest.page.PageRegistry;
@@ -37,7 +42,14 @@ public final class BigEnderChestSessions {
     }
 
     public static boolean open(ServerPlayer player) {
-        return open(player, null, null);
+        Session current = session(player);
+        return current == null
+                ? open(player, null, null)
+                : open(
+                        player,
+                        current.sourceLevel(),
+                        current.sourcePosition()
+                );
     }
 
     public static boolean open(ServerPlayer player, ServerLevel level, BlockPos pos) {
@@ -45,16 +57,10 @@ public final class BigEnderChestSessions {
             return false;
         }
         Session session = beginSession(player);
-        BigEnderChestView view = new BigEnderChestView(session.service());
-        OptionalInt menuId = player.openMenu(new SimpleMenuProvider(
-                (syncId, inventory, ignored) -> new BigEnderChestMenu(
-                        syncId,
-                        inventory,
-                        session.service(),
-                        view
-                ),
-                Component.translatable("big_ender_chest.menu.title")
-        ));
+        boolean terminal = BigEnderChestProtocolServer.isTerminalClient(player);
+        OptionalInt menuId = player.openMenu(terminal
+                ? terminalMenuProvider(session.service())
+                : vanillaMenuProvider(session.service()));
         if(menuId.isEmpty() || session.menu == null) {
             close(player);
             return false;
@@ -65,6 +71,41 @@ public final class BigEnderChestSessions {
         return true;
     }
 
+    static ExtendedMenuProvider<Unit> terminalMenuProvider(BigEnderChestService service) {
+        return new ExtendedMenuProvider<>() {
+            @Override
+            public Unit getScreenOpeningData(ServerPlayer player) {
+                return Unit.INSTANCE;
+            }
+
+            @Override
+            public Component getDisplayName() {
+                return Component.translatable("big_ender_chest.menu.title");
+            }
+
+            @Override
+            public BigEnderChestTerminalMenu createMenu(
+                    int syncId,
+                    Inventory inventory,
+                    Player player
+            ) {
+                return new BigEnderChestTerminalMenu(syncId, inventory, service);
+            }
+        };
+    }
+
+    private static SimpleMenuProvider vanillaMenuProvider(BigEnderChestService service) {
+        return new SimpleMenuProvider(
+                (syncId, inventory, ignored) -> new BigEnderChestMenu(
+                        syncId,
+                        inventory,
+                        service,
+                        new BigEnderChestView(service)
+                ),
+                Component.translatable("big_ender_chest.menu.title")
+        );
+    }
+
     /**
      * Used by compatibility hooks that provide their own {@link net.minecraft.world.MenuProvider}.
      */
@@ -73,6 +114,10 @@ public final class BigEnderChestSessions {
                 || !FrostorSettings.bigEnderChest
                 || server == null
                 || pageRegistry == null) {
+            return null;
+        }
+        if(BigEnderChestProtocolServer.isTerminalClient(player)) {
+            player.level().getServer().execute(() -> open(player));
             return null;
         }
         Session session = beginSession(player);
@@ -94,15 +139,21 @@ public final class BigEnderChestSessions {
         BigEnderChestProtocolServer.sessionOpened(session);
     }
 
-    public static Session attachMenu(BigEnderChestMenu menu) {
-        Session session = SESSIONS.get(menu.service().owner().getUUID());
-        if(session == null || session.service != menu.service()) return null;
+    public static <T extends AbstractContainerMenu> T attachMenu(
+            T menu,
+            BigEnderChestService service
+    ) {
+        Session session = SESSIONS.get(service.owner().getUUID());
+        if(session == null || session.service != service) return menu;
         session.menu = menu;
         session.containerId = menu.containerId;
-        return session;
+        return menu;
     }
 
-    public static void menuRemoved(net.minecraft.world.entity.player.Player player, BigEnderChestMenu menu) {
+    public static void menuRemoved(
+            net.minecraft.world.entity.player.Player player,
+            AbstractContainerMenu menu
+    ) {
         if(!(player instanceof ServerPlayer serverPlayer)) return;
         Session session = SESSIONS.get(serverPlayer.getUUID());
         if(session != null && session.menu == menu) {
@@ -135,12 +186,24 @@ public final class BigEnderChestSessions {
                 close(session.owner);
                 continue;
             }
+            if(!session.isWithinSourceRange()) {
+                close(session.owner);
+                continue;
+            }
             session.service.tick();
-            if(session.menu != null) session.menu.tickVirtualActions();
+            if(session.menu instanceof BigEnderChestMenu vanillaMenu) {
+                vanillaMenu.tickVirtualActions();
+            }
             if(saveTick) session.service.saveDirtyPages();
             if(session.menu != null) {
                 announceSession(session);
-                session.menu.view().refresh();
+                if(session.menu instanceof BigEnderChestMenu vanillaMenu) {
+                    vanillaMenu.view().refresh();
+                }
+                if(session.service.revision() != session.lastPublishedRevision) {
+                    session.menu.broadcastChanges();
+                    session.lastPublishedRevision = session.service.revision();
+                }
             }
         }
     }
@@ -170,6 +233,11 @@ public final class BigEnderChestSessions {
         return Collections.unmodifiableMap(SESSIONS);
     }
 
+    public static boolean isWithinSourceRange(ServerPlayer player) {
+        Session session = session(player);
+        return session != null && session.isWithinSourceRange();
+    }
+
     public static PageRegistry pageRegistry() {
         return pageRegistry;
     }
@@ -180,8 +248,9 @@ public final class BigEnderChestSessions {
         private final BigEnderChestBlockAnimation blockAnimation;
         private final long sessionId;
         private int containerId = -1;
-        private BigEnderChestMenu menu;
+        private AbstractContainerMenu menu;
         private boolean protocolAnnounced;
+        private long lastPublishedRevision = -1;
 
         private Session(ServerPlayer owner, BigEnderChestService service) {
             this.owner = owner;
@@ -206,8 +275,24 @@ public final class BigEnderChestSessions {
             return containerId;
         }
 
-        public BigEnderChestMenu menu() {
+        public AbstractContainerMenu menu() {
             return menu;
+        }
+
+        public BigEnderChestMenu vanillaMenu() {
+            return menu instanceof BigEnderChestMenu vanillaMenu ? vanillaMenu : null;
+        }
+
+        public boolean isWithinSourceRange() {
+            return blockAnimation.isWithinRange();
+        }
+
+        private ServerLevel sourceLevel() {
+            return blockAnimation.sourceLevel();
+        }
+
+        private BlockPos sourcePosition() {
+            return blockAnimation.sourcePosition();
         }
 
         public void closeContainer() {

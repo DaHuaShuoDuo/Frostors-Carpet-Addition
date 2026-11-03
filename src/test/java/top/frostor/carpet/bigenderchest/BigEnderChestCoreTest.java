@@ -88,6 +88,24 @@ public final class BigEnderChestCoreTest {
 
         index.rebuild(Map.of(0, page0, 1, page1));
         check(index.entry(dirt).totalAmount() == 32, "rebuild must recover the source of truth");
+
+        page1.setItem(5, new ItemStack(Items.DIRT, 8));
+        index.replacePage(1, page1);
+        check(
+                index.entry(dirt).totalAmount() == 40,
+                "replacing one page must update that page without rebuilding others"
+        );
+        check(
+                index.entry(ItemTemplateKey.of(new ItemStack(Items.STONE))).totalAmount() == 64,
+                "incremental page replacement must preserve other pages"
+        );
+        check(
+                index.aggregates().stream()
+                        .filter(entry -> entry.template().equals(dirt))
+                        .mapToLong(BigEnderChestIndex.AggregateEntry::totalAmount)
+                        .sum() == 40,
+                "lightweight aggregate snapshots must retain total amounts"
+        );
     }
 
     private static void testCapacityMath() {
@@ -146,20 +164,155 @@ public final class BigEnderChestCoreTest {
     private static void testProtocolDtos() {
         Hello hello = new Hello(BigEnderChestProtocol.PROTOCOL_VERSION, 0b1111, 64 * 1024);
         check(Hello.fromTag(hello.toTag()).equals(hello), "hello DTOs must round trip");
+        BigEnderChestProtocol.SessionOpen sessionOpen = new BigEnderChestProtocol.SessionOpen(
+                42,
+                7,
+                8,
+                64,
+                3,
+                5,
+                false,
+                BigEnderChestProtocol.CAPABILITIES,
+                7,
+                0
+        );
+        check(
+                BigEnderChestProtocol.SessionOpen.fromTag(sessionOpen.toTag())
+                        .equals(sessionOpen),
+                "session-open DTOs must round trip terminal metadata"
+        );
+
+        BigEnderChestProtocol.PageCatalog catalog = new BigEnderChestProtocol.PageCatalog(
+                42,
+                5,
+                List.of(
+                        new BigEnderChestProtocol.PageInfo(0, "READY", false, 3, 4),
+                        new BigEnderChestProtocol.PageInfo(1, "READY", true, 0, 2)
+                )
+        );
+        check(
+                BigEnderChestProtocol.PageCatalog.fromTag(catalog.toTag()).equals(catalog),
+                "page catalogs must round trip"
+        );
+
+        BigEnderChestProtocol.SnapshotAck ack = new BigEnderChestProtocol.SnapshotAck(
+                42,
+                9,
+                List.of(1, 3)
+        );
+        check(
+                BigEnderChestProtocol.SnapshotAck.fromTag(ack.toTag()).equals(ack),
+                "snapshot ACKs must retain missing chunks"
+        );
+
+        BigEnderChestProtocol.SnapshotBegin snapshotBegin =
+                new BigEnderChestProtocol.SnapshotBegin(42, 9, 8, 2, 0, 2);
+        check(
+                BigEnderChestProtocol.SnapshotBegin.fromTag(snapshotBegin.toTag())
+                        .equals(snapshotBegin),
+                "snapshot begin metadata must round trip"
+        );
+        BigEnderChestProtocol.SnapshotEnd snapshotEnd =
+                new BigEnderChestProtocol.SnapshotEnd(42, 9, 8, 2, 2);
+        check(
+                BigEnderChestProtocol.SnapshotEnd.fromTag(snapshotEnd.toTag())
+                        .equals(snapshotEnd),
+                "snapshot end metadata must round trip"
+        );
+
+        BigEnderChestProtocol.EntryRecord entryRecord =
+                new BigEnderChestProtocol.EntryRecord(
+                        3,
+                        new ItemStack(Items.DIRT),
+                        64,
+                        List.of(new BigEnderChestProtocol.SlotRecord(1, 2, 3, 64))
+                );
+        BigEnderChestProtocol.EntryRecord decodedEntry =
+                BigEnderChestProtocol.EntryRecord.fromTag(
+                        entryRecord.toTag(MinecraftServerContext.registries()),
+                        MinecraftServerContext.registries()
+                );
+        check(
+                decodedEntry.templateSerial() == entryRecord.templateSerial()
+                        && decodedEntry.totalAmount() == entryRecord.totalAmount()
+                        && decodedEntry.locations().equals(entryRecord.locations()),
+                "aggregate entry records must retain serial, total, and locations"
+        );
+        check(
+                ItemTemplateKey.of(decodedEntry.item()).equals(
+                        ItemTemplateKey.of(entryRecord.item())
+                ),
+                "aggregate entry records must round trip item templates"
+        );
+
+        BigEnderChestProtocol.ActionRequest request =
+                new BigEnderChestProtocol.ActionRequest(
+                        42,
+                        10,
+                        7,
+                        8,
+                        -1,
+                        -1,
+                        3,
+                        BigEnderChestProtocol.ACTION_BATCH_STORAGE_TO_PLAYER,
+                        (byte) 0,
+                        128,
+                        11,
+                        List.of(9, 10, 11)
+                );
+        check(
+                BigEnderChestProtocol.ActionRequest.fromTag(request.toTag())
+                        .equals(request),
+                "template actions must round trip amount, sequence, and slot lists"
+        );
         BigEnderChestProtocol.Delta delta = new BigEnderChestProtocol.Delta(
                 42,
                 7,
                 8,
+                List.of(new BigEnderChestProtocol.EntryRecord(
+                        3,
+                        new ItemStack(Items.DIRT),
+                        64,
+                        List.of(new BigEnderChestProtocol.SlotRecord(1, 2, 3, 64))
+                )),
                 List.of(),
-                List.of(new BigEnderChestProtocol.SlotRecord(1, 2, 3, 64)),
+                List.of(new BigEnderChestProtocol.PageInfo(2, "READY", false, 1, 1)),
                 List.of(2),
-                true
+                true,
+                2,
+                false
         );
         check(
-                delta.slotChanges().getFirst().amount() == 64,
-                "slot deltas must retain 64-bit quantities"
+                delta.entryChanges().getFirst().totalAmount() == 64,
+                "aggregate deltas must retain 64-bit quantities"
         );
         check(delta.capacityChanged(), "page additions must be visible in delta DTOs");
+        BigEnderChestProtocol.Delta decodedDelta = BigEnderChestProtocol.Delta.fromTag(
+                delta.toTag(MinecraftServerContext.registries()),
+                MinecraftServerContext.registries()
+        );
+        check(
+                decodedDelta.sessionId() == delta.sessionId()
+                        && decodedDelta.baseRevision() == delta.baseRevision()
+                        && decodedDelta.revision() == delta.revision()
+                        && decodedDelta.removedTemplateSerials()
+                        .equals(delta.removedTemplateSerials())
+                        && decodedDelta.pageChanges().equals(delta.pageChanges())
+                        && decodedDelta.pageAdded().equals(delta.pageAdded())
+                        && decodedDelta.capacityChanged() == delta.capacityChanged()
+                        && decodedDelta.pageRevision() == delta.pageRevision()
+                        && decodedDelta.readOnly() == delta.readOnly()
+                        && decodedDelta.entryChanges().size() == delta.entryChanges().size(),
+                "aggregate deltas must round trip metadata"
+        );
+        check(
+                ItemTemplateKey.of(decodedDelta.entryChanges().getFirst().item()).equals(
+                        ItemTemplateKey.of(delta.entryChanges().getFirst().item())
+                )
+                        && decodedDelta.entryChanges().getFirst().totalAmount()
+                        == delta.entryChanges().getFirst().totalAmount(),
+                "aggregate deltas must round trip item templates and totals"
+        );
 
         FriendlyByteBuf buffer = new FriendlyByteBuf(Unpooled.buffer());
         ByteBufCodecs.VAR_INT.encode(buffer, Integer.MAX_VALUE);
@@ -186,5 +339,13 @@ public final class BigEnderChestCoreTest {
                 .set(DataComponents.MAX_STACK_SIZE, 64)
                 .set(DataComponents.ITEM_NAME, Component.literal(name))
                 .build());
+    }
+
+    private static final class MinecraftServerContext {
+        private static net.minecraft.core.HolderLookup.Provider registries() {
+            return net.minecraft.core.RegistryAccess.fromRegistryOfRegistries(
+                    net.minecraft.core.registries.BuiltInRegistries.REGISTRY
+            );
+        }
     }
 }

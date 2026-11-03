@@ -46,6 +46,7 @@ public final class BigEnderChestService {
 
     private final ItemStack[] lastPlayerPage = new ItemStack[StorageLocation.SLOTS_PER_PAGE];
     private long revision;
+    private long pageRevision = 1;
     private long pendingBaseRevision = -1;
     private boolean closed;
 
@@ -92,6 +93,47 @@ public final class BigEnderChestService {
         return revision;
     }
 
+    public long pageRevision() {
+        return pageRevision;
+    }
+
+    public int pageCount() {
+        return pages.size();
+    }
+
+    public boolean isReadOnly() {
+        return pages.values().stream().anyMatch(page ->
+                page.state() == StoragePageState.UNLOADED
+                        || page.state() == StoragePageState.LOADING
+                        || page.state() == StoragePageState.ERROR);
+    }
+
+    public boolean hasPageErrors() {
+        return pages.values().stream()
+                .anyMatch(page -> page.state() == StoragePageState.ERROR);
+    }
+
+    public List<PageStatus> pageCatalog() {
+        List<PageStatus> result = new ArrayList<>(pages.size());
+        for(StoragePage page : pages.values()) {
+            int occupied = 0;
+            if(page.isReady()) {
+                Container container = page.container();
+                for(int slot = 0; slot < StorageLocation.SLOTS_PER_PAGE; slot++) {
+                    if(!container.getItem(slot).isEmpty()) occupied++;
+                }
+            }
+            result.add(new PageStatus(
+                    page.index(),
+                    page.state(),
+                    page.isReady() && occupied == 0,
+                    occupied,
+                    page.contentVersion()
+            ));
+        }
+        return List.copyOf(result);
+    }
+
     public SortPreference sortPreference() {
         return pageRegistry.sortPreference(owner.getUUID());
     }
@@ -115,6 +157,10 @@ public final class BigEnderChestService {
 
     public List<StorageEntry> entries() {
         return index.entries();
+    }
+
+    public List<BigEnderChestIndex.AggregateEntry> aggregateEntries() {
+        return index.aggregates();
     }
 
     public int templateCount() {
@@ -173,6 +219,7 @@ public final class BigEnderChestService {
      * Atomically inserts into all supplied stacks. Capacity is checked before any source is changed.
      */
     public boolean insertAll(List<ItemStack> stacks) {
+        // The terminal protocol gates loading pages; the vanilla menu may use already loaded pages.
         if(!isOpen()) return false;
         List<ItemStack> nonEmpty = stacks.stream()
                 .filter(stack -> !stack.isEmpty())
@@ -194,6 +241,7 @@ public final class BigEnderChestService {
     }
 
     public ItemStack take(ItemTemplateKey key, int requestedAmount) {
+        // The terminal protocol gates loading pages; the vanilla menu may use already loaded pages.
         if(!isOpen() || key == null || requestedAmount <= 0) return ItemStack.EMPTY;
         List<LocatedStack> candidates = findMatchingStacks(key);
         if(candidates.isEmpty()) return ItemStack.EMPTY;
@@ -291,14 +339,17 @@ public final class BigEnderChestService {
                 .filter(page -> page.state() == StoragePageState.DIRTY)
                 .forEach(page -> {
                     long version = page.beginSaving();
+                    pageRevision++;
                     dataStore.saveAsync(
                             page.metadata(),
                             (net.minecraft.world.inventory.PlayerEnderChestContainer) page.container(),
                             success -> {
                                 if(success) {
                                     page.finishSaving(version);
+                                    pageRevision++;
                                 }else {
                                     page.failSaving();
+                                    pageRevision++;
                                     FrostorsCarpetAddition.LOGGER.error(
                                             "Failed to save big ender chest page {} for {}",
                                             page.index(),
@@ -312,28 +363,43 @@ public final class BigEnderChestService {
 
     private void loadExtraPages() {
         for(PageMetadata metadata : pageRegistry.pages(storageOwner)) {
-            try {
-                net.minecraft.world.inventory.PlayerEnderChestContainer container = dataStore.load(metadata);
-                pages.put(
-                        metadata.storagePage(),
-                        StoragePage.fakePage(metadata, () -> container, StoragePageState.READY)
-                );
-            }catch(IOException exception) {
-                pages.put(
-                        metadata.storagePage(),
-                        StoragePage.fakePage(
-                                metadata,
-                                net.minecraft.world.inventory.PlayerEnderChestContainer::new,
-                                StoragePageState.ERROR
-                        )
-                );
-                FrostorsCarpetAddition.LOGGER.error(
-                        "Failed to load big ender chest page {} for {}",
-                        metadata.storagePage(),
-                        owner.getScoreboardName(),
-                        exception
-                );
-            }
+            net.minecraft.world.inventory.PlayerEnderChestContainer container =
+                    new net.minecraft.world.inventory.PlayerEnderChestContainer();
+            StoragePage page = StoragePage.fakePage(
+                    metadata,
+                    () -> container,
+                    StoragePageState.LOADING
+            );
+            pages.put(metadata.storagePage(), page);
+            pageRevision++;
+            dataStore.loadAsync(
+                    metadata,
+                    loaded -> {
+                        if(closed) return;
+                        copyItems(loaded, container);
+                        page.setState(StoragePageState.READY);
+                        index.replacePage(metadata.storagePage(), container);
+                        pageRevision++;
+                        revision++;
+                    },
+                    exception -> {
+                        if(closed) return;
+                        page.setState(StoragePageState.ERROR);
+                        pageRevision++;
+                        FrostorsCarpetAddition.LOGGER.error(
+                                "Failed to load big ender chest page {} for {}",
+                                metadata.storagePage(),
+                                owner.getScoreboardName(),
+                                exception
+                        );
+                    }
+            );
+        }
+    }
+
+    private static void copyItems(Container source, Container target) {
+        for(int slot = 0; slot < StorageLocation.SLOTS_PER_PAGE; slot++) {
+            target.setItem(slot, source.getItem(slot).copy());
         }
     }
 
@@ -375,6 +441,7 @@ public final class BigEnderChestService {
                     nextPage,
                     StoragePage.fakePage(metadata, () -> container, StoragePageState.READY)
             );
+            pageRevision++;
             pendingPageAdds.add(nextPage);
         }
         return true;
@@ -605,10 +672,20 @@ public final class BigEnderChestService {
         StoragePage page = pages.get(pageIndex);
         if(page != null && page.index() > 0 && page.isReady()) {
             page.markChanged();
+            pageRevision++;
         }
     }
 
     public record SlotChange(StorageLocation location, ItemStack stack) {
+    }
+
+    public record PageStatus(
+            int pageId,
+            StoragePageState state,
+            boolean empty,
+            int occupiedSlots,
+            long contentRevision
+    ) {
     }
 
     public record Delta(

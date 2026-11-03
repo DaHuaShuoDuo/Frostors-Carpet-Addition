@@ -1,226 +1,259 @@
 # Frostor's Carpet Addition
 
-一个 [Carpet](https://github.com/gnembon/fabric-carpet) 附属模组，Java 包名与 Maven
-group 为 `top.frostor`。
+Frostor's Carpet Addition（FCA）是一个面向 Minecraft Java 版的
+[Carpet](https://github.com/gnembon/fabric-carpet) 附属模组，提供服务端大末影箱、
+Player Ladder、轻松放置协议 V2-Extra 和正版资料回退等功能。
 
-> **声明：本项目的代码由 AI 辅助完成。** 需求、功能设计与发布由 Frostor 负责，实现代码在 AI 辅助下生成并经人工审阅。
+模组 ID 为 `frostors-carpet-addition`，Java 包名为 `top.frostor.carpet`。
+FCA 的主要逻辑运行在服务端。除明确标记为客户端规则的选项外，功能不依赖客户端安装
+FCA 或其他特定客户端模组。
 
-## 支持的版本
+## 支持版本
 
-| Minecraft | Fabric Loader | Carpet | Fabric API |
+| Minecraft | Fabric Loader | Fabric API | Carpet |
 | --- | --- | --- | --- |
-| 26.2 | >= 0.19.3 | >= 26.2 < 26.3 | >= 0.152.1 |
-| 26.3 | >= 0.19.5 | >= 26.3 < 26.4 | >= 0.160.5 |
+| 26.2 | >= 0.19.3 | >= 0.152.1 | >= 26.2 < 26.3 |
+| 26.3 | >= 0.19.5 | >= 0.160.5 | >= 26.3 < 26.4 |
 
-对应产物名为 `frostors-carpet-addition-fabric-<Minecraft 版本>`。
+项目要求 Java 25。安装时必须选择与 Minecraft 版本对应的 FCA 构建。
 
-## 依赖
+## 安装
 
-- [Carpet](https://github.com/gnembon/fabric-carpet)（必需，`fabric.mod.json` 中声明为 `depends`）
-- [Fabric API](https://modrinth.com/mod/fabric-api)（必需）
-- Java 25
+将 FCA 放入服务端的 `mods` 目录，同时安装对应版本的 Fabric Loader、Fabric API 和
+Carpet。客户端只有需要使用客户端规则或兼容功能时才需要安装 FCA。
 
-## 构建
+FCA 的规则由 Carpet 管理，并随世界配置保存。使用以下命令查看全部规则：
 
-```powershell
-$env:JAVA_HOME="C:\Program Files\Zulu\zulu-25"
-.\gradlew.bat :26.2:build :26.3:build
+```text
+/carpet list fca
 ```
 
-产物位于 `versions/<版本>/build/libs/`。
-
-Carpet 仅以 `compileOnly` 方式引用（`libs/fabric-carpet-<版本>.jar`），不会被打进产物。
-
-两个子项目的 `build` 都会运行无需启动游戏的骑乘链规则测试，并编译 Fabric GameTest。
-若已明确同意 Minecraft EULA，可额外执行服务端多人运行期测试：
-
-```powershell
-.\gradlew.bat :26.2:runGameTest :26.3:runGameTest -PacceptMinecraftEula=true
-```
-
-客户端 Mixin 加载测试：
-
-```powershell
-.\gradlew.bat :26.2:runClientGameTest :26.3:runClientGameTest -PacceptMinecraftEula=true
-```
-
-`acceptMinecraftEula=true` 会让测试运行目录自动写入 EULA 接受标记。不传该参数时不会
-启动游戏测试，也不会自动接受 EULA。客户端测试首次运行可能需要下载 Minecraft
-资源；它用于确认客户端 Mixin 能正常应用，真实准星命中体验仍应进行一次手动验证。
+规则名区分大小写，可用 `/carpet <规则名>` 查看，或用
+`/carpet <规则名> <值>` 修改。
 
 ## 规则
 
-安装后可用 `/carpet <规则名>` 查看或修改，规则随世界保存在 `carpet.conf`。
-FCA 的全部规则同时归入 `fca` 分类，可使用 `/carpet list fca` 集中查看。
-
 | 规则 | 默认值 | 说明 |
 | --- | --- | --- |
-| `bigEnderChest` | `false` | 服务端大末影箱总开关 |
-| `bigEnderChestPageLimit` | `64` | 额外假人存储页上限（不含原版页 0），有效值 `1..1024`；`-1` 表示无限 |
-| `easyPlaceProtocolExtra` | `false` | 启用服务端轻松放置协议 V2-Extra 握手与方块状态同步 |
-| `playerLadder` | `false` | 人梯功能总开关 |
-| `playerLadderClickMode` | `ride` | 右键行为：`ride` / `pick_up` / `none` |
-| `playerLadderPickupDepthLimit` | `16` | 举起时向上寻找的最大层数 |
-| `playerLadderRideDepthLimit` | `16` | 骑乘时向上寻找的最大层数 |
-| `playerLadderAllowNonPlayers` | `false` | 是否允许非玩家实体作为骑乘或举起对象 |
-| `playerLadderIgnoredEntities` | 见下 | 逗号分隔的忽略实体 id / 标签 |
-| `playerLadderDismountOnGameModeChange` | `false` | 切换游戏模式时是否让乘客下马 |
-| `playerLadderAllowRiderStacking` | `true` | 是否允许 3 人及以上的玩家堆叠（关闭时仅允许两位玩家骑乘） |
-| `playerLadderAllowFakePlayers` | `false` | 是否允许骑乘/举起 Carpet 假人 |
-| `playerLadderClientAimingFix` | `true` | 客户端准星修正（仅客户端生效） |
+| `bigEnderChest` | `false` | 启用服务端大末影箱 |
+| `bigEnderChestPageLimit` | `64` | 每名玩家的额外存储页上限；`1..1024`，`-1` 表示不设配置上限 |
+| `easyPlaceProtocolExtra` | `false` | 启用服务端轻松放置协议 V2-Extra |
+| `onlineProfileFallback` | `false` | 在正版模式下提供用户名解析与资料回退 |
+| `playerLadder` | `false` | 启用 Player Ladder |
+| `playerLadderClickMode` | `ride` | 右键行为：`ride`、`pick_up` 或 `none` |
+| `playerLadderPickupDepthLimit` | `16` | 举起实体时向上查找的最大层数 |
+| `playerLadderRideDepthLimit` | `16` | 骑乘实体时向上查找的最大层数 |
+| `playerLadderAllowNonPlayers` | `false` | 是否允许非玩家实体进行骑乘或举起 |
+| `playerLadderIgnoredEntities` | 见下文 | 逗号分隔的忽略实体 ID 或 `#` 标签 |
+| `playerLadderDismountOnGameModeChange` | `false` | 载体切换游戏模式时是否让乘客下马 |
+| `playerLadderAllowRiderStacking` | `true` | 是否允许两名以上玩家继续堆叠 |
+| `playerLadderAllowFakePlayers` | `false` | 是否允许与 Carpet 假人进行骑乘或举起 |
+| `playerLadderClientAimingFix` | `true` | 客户端准星修正，仅客户端生效 |
 
 `playerLadderIgnoredEntities` 默认值：
 
-```
+```text
 minecraft:wither,minecraft:ender_dragon,minecraft:warden,minecraft:minecart,#minecraft:boat,#minecraft:dismounts_underwater
 ```
 
-> 该模组原先的 `config/playerladder.json` 已完全移除，所有设置改由 Carpet 规则承载，
-> 随世界保存在 `carpet.conf` 中，可用 `/carpet <规则名> <值>` 修改。
+## 大末影箱
 
-### 大末影箱
+启用 `bigEnderChest` 后，玩家空手使用末影箱会打开一个原版 `GENERIC_9x6` 菜单。
+未安装客户端工具的玩家仍可使用完整的聚合查看、取放、排序、翻页和丢弃功能。
 
-`bigEnderChest` 开启后，空手使用原版末影箱会打开一个 `GENERIC_9x6` 菜单：顶部
-`5×9` 格显示全部存储页聚合后的物品模板，底部 9 格固定为首页、上一页、页码、下一页、
-末页、排序字段、排序方向和刷新，最后一个为不可交互的预留占位。控制项不会进入玩家背包，
-也不能被交换、丢弃、双击收集或通过第三方批量点击修改。聚合条目保持原版名称和组件，物品
-图标右下角按原版规则显示至多一组，完整库存量追加在物品 Lore 中，不再改写物品名称。查看
-页的翻页和排序不会创建存储页。
+### 原版 6×9 菜单
 
-页 0 始终直接映射玩家自己的原版 27 格末影箱，不复制其内容。额外页由不会进入
-`PlayerList`、不会生成 `ServerPlayer`、不会参与 tick 的假人档案承载，每页仍是一个标准
-27 格 `EnderItems` 容器。页面身份、名称和 UUID 保存在世界 `data` 目录的元数据文件中；
-物品本身只写入对应 `playerdata/<uuid>.dat`，并以临时文件、原子替换和 `.dat_old` 备份保存。
+- 顶部 `5×9` 个槽位显示所有存储页聚合后的物品模板。
+- 底部 9 个槽位提供首页、上一页、页码、下一页、末页、排序字段、排序方向和刷新。
+- 物品保持原版名称、组件和图标；完整库存量显示在 Lore 中。
+- 左键取一组；光标持有物品时左键存入。
+- Shift + 左键将一组物品移到玩家背包。
+- 右键取半组，数量按可见组容量向上取整。
+- Q 丢弃一个；Ctrl + Q 丢弃一组。
+- 玩家背包装满时，Shift + 左键仍可存入聚合存储。
+- 查看页只影响聚合列表的翻页和排序，不会创建新的物理存储页。
 
-页面元数据中的 owner 只属于创建该页的玩家。首次打开会准备两页缓冲；查看页滚动、排序或
-搜索不会触发扩容。实际需要写入更多槽位时才按整页预留，并受
-`bigEnderChestPageLimit` 限制。有限模式有效值为 `1..1024`；设为 `-1` 时不再应用配置
-页数上限，但实际仍受磁盘、内存、整数页号和服务器性能限制。降低上限不会删除已有页面，
-已有页面仍可读取和操作，但不会继续扩容；关闭规则会隐藏 FCA 菜单并保留全部数据。
+聚合槽是服务端管理的虚拟槽。控制项不能被交换、丢弃、复制或作为普通物品取出。
+服务端限制连续点击和整理模组提交的批量虚拟操作，并以服务端事务结果纠正客户端状态。
 
-每位玩家最后使用的排序字段和排序方向按 UUID 保存在同一世界级元数据文件中，重新打开
-菜单或重启服务器后自动恢复。
+### 存储页
 
-页面空档案、元数据和脏页快照写入由有界 I/O 执行器串行完成，服务端主线程只负责生成内存
-页面和当前内容的 NBT 快照。`SAVING` 状态仍允许存取；保存期间继续发生的修改会把页面重新
-标为 `DIRTY`，由后续保存写入最新版本。服务器停止时会等待待处理写入完成。
+页 0 直接映射玩家自己的原版 27 格末影箱，不复制其内容。额外存储页由不参与游戏 tick 的
+假人档案承载，每页仍为标准的 27 格 `EnderItems` 容器。
 
-原版菜单的存入和取出语义：
+页面身份、假人 UUID、名称和排序偏好保存在世界 `data` 目录的 FCA 元数据文件中；
+页面物品保存在服务器原版 `playerdata` 中。元数据和页面档案使用后台 I/O、临时文件与
+原子替换保存，服务器停止时会等待待处理写入完成。
 
-- 玩家背包槽 Shift + 左键存入 `BigEnderChestService`。即使当前 45 个查看槽已满也可以
-  存入新模板。
-- 光标为空时左键查看条目，取一组到光标；光标持有物品时左键查看条目则存入。查看条目
-  Shift + 左键直接移动一组到玩家背包。
-- 光标为空时右键查看条目，取该条目一组容量的一半（向上取整）到光标。
-- 鼠标悬浮查看条目时按 Q 丢弃一个；按住 Q 产生的重复丢弃请求每次 tick 最多提交一个。
-  Ctrl + Q 丢弃一组。
-- 顶部 45 个聚合查看槽是虚拟槽。每个服务端 tick 最多提交一个查看/控制操作；同一 tick
-  出现多个虚拟槽点击时全部丢弃并回推完整状态，避免整理模组或重复点击造成批量取物。
-  右击、拖拽、交换、丢弃、双击收集和其它非白名单动作仍会被拒绝。
-- 该守卫在服务端菜单点击入口执行，客户端无法把本地临时整理或虚拟按钮物品提交为真实物品。
-- Shift 左键、右键半组和丢弃均从原版容器点击包在服务端解析，不要求服务端另装客户端桥接。
-  纯服务端部署时客户端可能短暂显示本地虚拟槽变化，服务端事务完成后会广播真实状态。
-- 同模板优先补齐已有非满堆，再按稳定的页面/槽位顺序使用空槽；容量不足时不移动源物品。
+页面按实际容量需求生成。首次打开会准备少量缓冲页；查看、翻页和排序不会触发扩容。
+降低 `bigEnderChestPageLimit` 不会删除已有页面，已有页面仍可访问，但不会继续扩容。
 
-从原版末影箱方块打开时，FCA 会把 6×9 会话绑定到该方块实体的原版开启计数，并在关闭菜单、
-切换规则或断线时释放；箱盖动画、开合音效和原版容器开启事件会在会话结束时正常收尾。
+关闭 `bigEnderChest` 只会隐藏功能，不删除页面或物品。再次开启后可继续读取。
 
-安装客户端工具的玩家可在同一服务端会话上使用独立终端 GUI。FCA 协议通道为
-`frostors-carpet-addition:big_ender_chest`，协议版本为 `1`，包含 Hello/Ack、
-会话打开、带 CRC32 校验和分块的快照、revision Delta、动作请求与结果。快照只发给完成
-握手且声明相应能力的客户端；原版客户端不会收到 FCA 自定义协议包。终端动作只提交会话、
-槽位和动作，不提交物品栈，服务端会验证菜单、会话、revision、页面状态、槽位模板和玩家
-背包前提后再调用统一事务。终端 GUI、按键和本地搜索不在本项目中实现。
-
-QuickShulker 的快捷末影箱也走同一功能入口。FCA 会识别 QuickShulker 为
-`PlayerEnderChestContainer` 创建原版三行菜单的服务端路径，并在规则开启时替换为
-`GENERIC_9x6` 大末影箱；规则关闭时仍保留 QuickShulker 原本的 27 格行为。这个兼容注入
-只在服务端加载，6×9 菜单和快捷末影箱都不注入客户端 GUI。
-
-额外页假人仍可通过 Carpet `/player <名称> spawn` 上线并访问同一个标准末影箱；页面 uuid
-和名称会写入服务器用户名缓存，并在后续启动时复用，不会随机改名。
-
-新页面的假人名称采用固定 16 字符的可读格式：
+额外页名称采用固定 16 字符的可读格式：
 
 ```text
-fec_p<36进制页号>_<玩家名前4字符><4位所有者摘要>
+fec_p<36 进制页号>_<玩家名前缀><所有者摘要>
 ```
 
-例如 `fec_p01_Frosa1b2` 表示 Frostor 的第 1 个额外存储页。页号使用 36 进制，以便在
-Minecraft 16 字符名称限制内保留完整所有者隔离；末尾摘要防止不同玩家或页面冲突。
-已有页面保持原名，不会因格式升级而迁移或破坏既有 `playerdata`。
+名称在创建时写入服务器用户名缓存，后续启动保持稳定。
 
-### 轻松放置协议 V2-Extra
+### 会话与来源校验
 
-`easyPlaceProtocolExtra` 仅实现服务端部分：兼容使用 EarlyCompat 通道的客户端握手、解析命中位置中的 V2-Extra 状态值，并在方块放置后恢复方向、朝向、开关、堆叠数量等原版方块状态。只要规则开启且客户端完成 V2-Extra 握手，服务端就会保持普通轨、充能轨和探测轨的投影形状，不依赖客户端额外的“铁轨不更新”子配置；客户端编码、Litematica 集成和三项“移植”配置由 TriWasa 提供。
+从末影箱方块打开时，FCA 会接管原版箱盖动画、开启计数和音效。关闭菜单、关闭规则、
+断线或会话失效时，箱盖动画会正常结束。
 
-服务端状态语义直接对齐 Servux 的精准放置行为，不根据服务端是否安装 Servux 切换实现。
-因此同一套规则不会因 Servux 的安装状态、加载顺序或版本产生不同结果。合成器锁槽、
-现有的红石点状状态和拉杆通电映射保持 FCA 的既定行为。新增的兼容状态包括床首位占用
-校验、蛋糕咬数、铜傀儡姿态、铜灯开关和通电状态，以及门上下半状态。双箱子使用原版
-配对语义并在每次放置后归一化，连续或间隔放置都会形成 54 格组合容器。
-多面方块会基于目标位置的世界状态合并附着面，避免密集方块图案中因重复面而漏放。
-命中点放宽由 FCA 自身完成，不要求开启 Carpet 的 `antiCheatDisabled`。
+通过原版末影箱方块打开的大末影箱会话会检查来源方块：
 
-服务端 HELLO 应答和能力广播会携带 V2-Extra 协议版本、显式能力布尔值以及能力列表；
-TriWasa 会校验该能力。旧版仅含 `mod_version` 的应答仍按兼容模式接受。
+- 玩家离开来源末影箱 8 格以上或切换维度后，终端会话失效。
+- 协议终端动作要求玩家仍打开当前会话菜单。
+- Quick Shulker 等没有方块来源的外部会话沿用其自身的打开条件。
 
-在单人游戏或集成服务器中，FCA 检测到 TriWasa 时会复用 TriWasa 的协议
-Payload/Codec；TriWasa 负责客户端编码，FCA 负责同一进程内的服务端处理。TriWasa
-会在 Litematica 与 `litematica-printer` 的真实调用点执行编码，因此可与 MasaGadget
-开启的 `fixAccurateProtocol` 共存。
+### Quick Shulker
 
+Quick Shulker 使用原版三行末影箱菜单打开玩家末影箱时，FCA 会在服务端将它替换为
+`GENERIC_9x6` 大末影箱。规则关闭时保留 Quick Shulker 原本的 27 格行为。
 
-新增规则的方式：
+该兼容逻辑只注册在服务端，不修改 Quick Shulker 的客户端界面，也不要求 FCA 客户端。
 
-1. 在 `top.frostor.carpet.FrostorSettings` 中添加 `@Rule(categories = RuleCategory.FEATURE) public static ...` 字段，字段名即规则名（大小写敏感）。
-2. 在 `src/main/resources/assets/frostors-carpet-addition/lang/en_us.json`（以及 `zh_cn.json`）中补充 `carpet.rule.<字段名>.name` 与 `carpet.rule.<字段名>.desc`。缺少 `.desc` 时 Carpet 会拒绝注册该规则。
-3. 在代码中直接读取该静态字段即可。
+### 客户端工具协议
+
+FCA 不包含自定义终端 GUI。兼容的客户端工具可以在原版 6×9 菜单之外实现独立终端。
+
+协议通道：
+
+```text
+frostors-carpet-addition:big_ender_chest
+```
+
+当前协议版本为 `2`。未完成握手的客户端继续使用原版 6×9 菜单；完成握手并声明终端能力
+的客户端使用：
+
+```text
+frostors-carpet-addition:big_ender_chest_terminal
+```
+
+终端菜单只同步玩家背包和 carried item，不同步 45 个原版展示槽。协议包含：
+
+- 双方能力交集和服务端会话信息。
+- 页面目录、页面状态、容量和只读状态。
+- 从完整聚合索引生成的物品模板快照。
+- CRC32 分块、`SnapshotEnd`、ACK、缺块重传和主动重同步。
+- 模板新增、删除、总量变化和页面 revision Delta。
+- 按 `templateSerial` 和数量执行的服务端权威取放。
+- 批量存入、批量移回玩家背包、丢弃、动作序号、请求幂等和每 tick 限流。
+- 菜单关闭、断线、规则关闭和会话失效通知。
+
+`ActionRequest.playerSlots` 和 `QUICK_MOVE_FROM_PLAYER.button` 使用玩家
+`Inventory` 索引 `0..35`，不是菜单槽位索引。协议动作不会直接提交受信任的物品栈，
+服务端会重新校验菜单、会话、revision、页面状态、模板和玩家背包。
+
+## 轻松放置协议 V2-Extra
+
+`easyPlaceProtocolExtra` 提供 Servux 兼容的服务端轻松放置语义，通过 EarlyCompat
+网络通道接收客户端精确状态。客户端编码、Litematica 投影读取和按键交互不包含在本模组中。
+
+服务端会恢复或同步包括方向、朝向、开关、堆叠数量、床首位、蛋糕咬数、铜傀儡姿态、
+铜灯通电、门上下半、双箱子配对和多面方块附着面等原版状态。
+
+规则开启且客户端完成握手后，FCA 会放宽 V2-Extra 编码命中位置的原版中心距离限制，
+但仍执行玩家触及范围和最终 `BlockItem.canPlace` 校验。该放宽不依赖 Carpet 的
+`antiCheatDisabled`。
+
+依赖行为以 FCA 自身实现为准，不根据服务端是否安装 Servux 切换状态语义。
+
+## Player Ladder
+
+`playerLadder` 开启后，玩家可以按照规则设置骑乘或举起实体。功能支持 Carpet 假人、
+玩家堆叠、忽略实体列表、深度限制和游戏模式变化处理。
+
+- `ride`：右键让目标成为载具。
+- `pick_up`：右键将目标举到玩家上方。
+- `none`：关闭右键交互，但保留相关状态清理逻辑。
+
+`playerLadderAllowNonPlayers`、`playerLadderAllowFakePlayers`、
+`playerLadderAllowRiderStacking` 和两个深度限制可分别控制允许对象与遍历范围。
+
+`playerLadderClientAimingFix` 是客户端规则，只影响堆叠玩家的准星选择；服务端逻辑和
+骑乘结构不依赖该规则。
+
+## 在线资料回退
+
+`onlineProfileFallback` 仅用于特定的私人服务器场景：当玩家用户名对应的正版 UUID
+已存在于服务器玩家档案中时，允许正版模式登录继续解析该用户名和历史皮肤/披风资料。
+
+该功能不验证账号所有权，不能替代 Mojang 会话验证，不应在公开或不可信服务器上开启。
+
+## 构建
+
+使用项目自带的 Gradle Wrapper，并将 `JAVA_HOME` 指向 Java 25。不要使用 Java 17
+或 Java 21 代替。
+
+PowerShell 示例：
+
+```powershell
+$env:JAVA_HOME = '<Java 25 installation>'
+.\gradlew.bat :26.2:build :26.3:build
+```
+
+如果 Gradle 无法在默认位置创建缓存，可以仅为当前命令指定用户缓存：
+
+```powershell
+$env:GRADLE_USER_HOME = Join-Path $env:USERPROFILE '.gradle'
+```
+
+共享源码、资源或 Mixin 修改后必须同时构建 26.2 和 26.3。构建会编译测试和 GameTest，
+运行无需启动游戏的规则测试，并验证两个版本均可打包。
+
+## 运行期测试
+
+运行 GameTest 会启动 Minecraft 测试服务器。只有在你明确同意 Minecraft EULA
+后才能传入 `-PacceptMinecraftEula=true`：
+
+```powershell
+.\gradlew.bat :26.2:runGameTest :26.3:runGameTest -PacceptMinecraftEula=true
+.\gradlew.bat :26.2:runClientGameTest :26.3:runClientGameTest -PacceptMinecraftEula=true
+```
+
+该参数会让测试运行目录写入 EULA 接受标记。普通构建不会启动游戏，也不会默认接受 EULA。
+
+客户端 GameTest 主要验证客户端类、Mixin、菜单和协议加载。真实准星、拖拽和界面手感仍需
+在开发客户端中人工验证。
+
+## 数据与兼容性
+
+- 规则保存在世界的 `carpet.conf` 中，不使用独立的 `config/playerladder.json`。
+- 大末影箱页面元数据保存在世界目录内，不写入客户端配置。
+- Carpet 仅作为编译期依赖引用，不会被打进 FCA 产物。
+- Quick Shulker 兼容路径不要求将其编译依赖或二进制打包进 FCA。
+- 客户端工具协议不包含终端 GUI；兼容客户端由独立项目实现。
 
 ## 项目结构
 
-```
-.
-├── common.gradle                 # 各版本共享的构建脚本
-├── gradle.properties             # 全局属性（mod 版本、loom、loader）
-├── libs/                         # Carpet 编译期依赖（不打包）
-├── settings.gradle               # 26.2 / 26.3 两个子项目
-├── src/main/java/top/frostor/carpet
-│   ├── FrostorsCarpetAddition.java   # 入口：注册 Carpet 扩展、加载翻译
-│   ├── FrostorSettings.java          # Carpet 规则
-│   ├── bigenderchest                # 大末影箱存储、菜单、页面与客户端工具协议
-│   └── playerladder                  # 由 PlayerLadder 移植的人梯功能
-│       ├── PlayerLadder.java         # 事件注册（UseEntity / 断线）
-│       ├── SharedHandler.java        # 骑乘 / 举起 / 下马逻辑
-│       ├── ClickMode.java
-│       └── mixin/                    # 玩家 tick、游戏模式、载具序列化、准星修正
-├── src/main/resources
-│   ├── fabric.mod.json
-│   ├── frostors-carpet-addition.mixins.json
-│   └── assets/frostors-carpet-addition/lang/
-├── src/test/java                    # 无外部依赖的骑乘链规则测试
-├── src/gametest                     # Fabric GameTest 运行期测试
-└── versions/
-    ├── 26.2/gradle.properties
-    └── 26.3/gradle.properties
+```text
+src/main/java/top/frostor/carpet
+├── bigenderchest/      大末影箱存储、页面、菜单和工具协议
+├── easyplace/          轻松放置 V2-Extra 服务端实现
+├── onlineprofile/      在线资料回退
+├── playerladder/       Player Ladder
+├── FrostorSettings.java
+└── FrostorsCarpetAddition.java
+
+src/main/resources      元数据、Mixin 配置和翻译
+src/test/java           无游戏运行期的逻辑与协议测试
+src/gametest             Fabric GameTest
+versions/26.2           26.2 版本属性
+versions/26.3           26.3 版本属性
 ```
 
-## 工作方式
+FCA 在 `FrostorsCarpetAddition.onInitialize()` 中通过
+`CarpetServer.manageExtension(this)` 注册 Carpet 扩展，并在游戏启动后注册
+`FrostorSettings` 中的规则。
 
-Carpet 26.x 不再通过入口点自动发现扩展，因此本模组在自己的 `main` 入口点里调用
-`CarpetServer.manageExtension(this)`。Carpet 的 `server` / `client` 入口点会在所有 `main`
-入口点之后执行，其 `onGameStarted()` 会依次回调扩展，注册规则与翻译。
+## 许可证与第三方来源
 
-## 许可证
+FCA 本身使用 [MIT License](LICENSE)。
 
-[MIT](LICENSE)。基于 Carpet 生态开发，未复制 Carpet 源码。
-
-人梯功能改编自 [PlayerLadder](https://github.com/ForwarD-NerN/PlayerLadder)，
-原作者为 ForwarD-NerN，原项目使用 MIT 许可证。
-
-轻松放置协议 V2-Extra 与方块状态适配逻辑改编自
-[EarlyCompat](https://github.com/chenjunfu2/EarlyCompat)，原作者为 chenjunfu2，原项目使用
-[CC0-1.0](https://github.com/chenjunfu2/EarlyCompat/blob/master/LICENSE)。详情见
+Player Ladder 改编自 ForwarD-NerN 的 PlayerLadder（MIT）。轻松放置协议 V2-Extra
+的服务端实现改编自 chenjunfu2 的 EarlyCompat（CC0-1.0）。其他行为参考和来源说明见
 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
-
-依赖校验和与来源追踪事项见 [TODO.md](TODO.md)。
