@@ -10,6 +10,7 @@ import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.inventory.MenuType;
+import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
 import top.frostor.carpet.bigenderchest.BigEnderChestService;
 import top.frostor.carpet.bigenderchest.BigEnderChestSessions;
@@ -63,6 +64,19 @@ public final class BigEnderChestTerminalMenu extends AbstractContainerMenu {
 
     @Override
     public ItemStack quickMoveStack(Player player, int index) {
+        if(service == null || index < 0 || index >= slots.size()) {
+            return ItemStack.EMPTY;
+        }
+        Slot source = slots.get(index);
+        if(!source.hasItem() || !source.mayPickup(player)) {
+            return ItemStack.EMPTY;
+        }
+        ItemStack remaining = source.getItem().copy();
+        if(service.insert(remaining)) {
+            source.setByPlayer(remaining);
+            source.setChanged();
+            broadcastChanges();
+        }
         return ItemStack.EMPTY;
     }
 
