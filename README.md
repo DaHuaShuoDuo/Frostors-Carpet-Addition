@@ -4,6 +4,9 @@ Frostor's Carpet Addition（FCA）是一个面向 Minecraft Java 版的
 [Carpet](https://github.com/gnembon/fabric-carpet) 附属模组，提供服务端大末影箱、
 Player Ladder、轻松放置协议 V2-Extra 和正版资料回退等功能。
 
+> **AI 辅助开发声明：** 本项目的部分代码、测试和文档由生成式 AI 辅助编写，并由
+> 项目维护者审阅。功能设计、发布决策、最终审查和维护责任由项目维护者承担。
+
 模组 ID 为 `frostors-carpet-addition`，Java 包名为 `top.frostor.carpet`。
 FCA 的主要逻辑运行在服务端。除明确标记为客户端规则的选项外，功能不依赖客户端安装
 FCA 或其他特定客户端模组。
