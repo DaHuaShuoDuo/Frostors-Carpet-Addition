@@ -137,6 +137,9 @@ frostors-carpet-addition:big_ender_chest
 frostors-carpet-addition:big_ender_chest_terminal
 ```
 
+客户端可以在会话中重新发送 `HELLO` 增删终端能力。服务端会关闭当前会话并按新能力重开
+同一位置的菜单，因此关闭终端能力时回退到原版 6×9 菜单，重新声明时恢复终端。
+
 终端菜单只同步玩家背包和 carried item，不同步 45 个原版展示槽。协议包含：
 
 - 双方能力交集和服务端会话信息。

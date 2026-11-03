@@ -205,6 +205,7 @@ public final class BigEnderChestProtocolServer {
 
     private static void handleHello(ServerPlayer player, CompoundTag data) {
         Hello hello = Hello.fromTag(data);
+        boolean wasTerminalClient = isTerminalClient(player);
         boolean accepted = hello.protocolVersion() == BigEnderChestProtocol.PROTOCOL_VERSION
                 && hello.maxChunkBytes() > 0
                 && (hello.capabilities() & BigEnderChestProtocol.CAPABILITY_SNAPSHOT) != 0
@@ -238,6 +239,10 @@ public final class BigEnderChestProtocolServer {
             return;
         }
         BigEnderChestSessions.Session session = BigEnderChestSessions.session(player);
+        if(session != null && wasTerminalClient != isTerminalClient(player)) {
+            BigEnderChestSessions.open(player);
+            return;
+        }
         if(session != null) sessionOpened(session);
     }
 
