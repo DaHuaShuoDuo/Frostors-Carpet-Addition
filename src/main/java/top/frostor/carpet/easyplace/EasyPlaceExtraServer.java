@@ -3,8 +3,10 @@ package top.frostor.carpet.easyplace;
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
-import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.loader.api.FabricLoader;
+import carpet.CarpetServer;
+import carpet.api.settings.SettingsManager;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.StringTag;
@@ -25,7 +27,7 @@ public final class EasyPlaceExtraServer {
     public static final String CAPABILITY_HIT_POSITION_RELAXATION =
             EasyPlaceExtraPayload.CAPABILITY_HIT_POSITION_RELAXATION;
     private static final Set<UUID> SUPPORTED_PLAYERS = ConcurrentHashMap.newKeySet();
-    private static boolean lastRuleState;
+    private static SettingsManager observedManager;
 
     private EasyPlaceExtraServer() {
     }
@@ -45,14 +47,28 @@ public final class EasyPlaceExtraServer {
         );
         ServerPlayConnectionEvents.DISCONNECT.register((handler, server) ->
                 SUPPORTED_PLAYERS.remove(handler.player.getUUID()));
-        ServerTickEvents.END_SERVER_TICK.register(server -> {
-            boolean enabled = FrostorSettings.easyPlaceProtocolExtra;
-            if(enabled != lastRuleState) {
-                broadcastCapability(server, enabled);
-                if(!enabled) SUPPORTED_PLAYERS.clear();
-            }
-            lastRuleState = enabled;
+    }
+
+    public static void registerRuleObserver(SettingsManager settingsManager) {
+        if(FabricLoader.getInstance().isModLoaded("earlycompat")) return;
+        if(settingsManager == observedManager) return;
+        observedManager = settingsManager;
+        settingsManager.registerRuleObserver((source, rule, newValue) -> {
+            if(!"easyPlaceProtocolExtra".equals(rule.name())) return;
+            MinecraftServer server = source == null
+                    ? CarpetServer.minecraft_server
+                    : source.getServer();
+            boolean enabled = rule.value() instanceof Boolean value
+                    ? value
+                    : FrostorSettings.easyPlaceProtocolExtra;
+            onRuleChanged(server, enabled);
         });
+    }
+
+    public static void onRuleChanged(MinecraftServer server, boolean enabled) {
+        if(server == null) return;
+        broadcastCapability(server, enabled);
+        if(!enabled) SUPPORTED_PLAYERS.clear();
     }
 
     public static boolean isSupported(ServerPlayer player) {

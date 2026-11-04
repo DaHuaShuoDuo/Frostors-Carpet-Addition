@@ -1,5 +1,7 @@
 package top.frostor.carpet.bigenderchest;
 
+import carpet.CarpetServer;
+import carpet.api.settings.SettingsManager;
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
@@ -76,6 +78,7 @@ public final class BigEnderChestProtocolServer {
             }
     );
     private static boolean registered;
+    private static SettingsManager observedManager;
 
     private BigEnderChestProtocolServer() {
     }
@@ -89,6 +92,38 @@ public final class BigEnderChestProtocolServer {
                 context.server().execute(() -> handle(context.player(), payload)));
         ServerPlayConnectionEvents.DISCONNECT.register((handler, ignored) ->
                 CLIENTS.remove(handler.player.getUUID()));
+    }
+
+    public static void registerRuleObserver(SettingsManager settingsManager) {
+        if(settingsManager == observedManager) return;
+        observedManager = settingsManager;
+        settingsManager.registerRuleObserver((source, rule, newValue) -> {
+            if(!"bigEnderChest".equals(rule.name())) return;
+            MinecraftServer server = source == null
+                    ? CarpetServer.minecraft_server
+                    : source.getServer();
+            boolean enabled = rule.value() instanceof Boolean value
+                    ? value
+                    : FrostorSettings.bigEnderChest;
+            onRuleChanged(server, enabled);
+        });
+    }
+
+    public static void onRuleChanged(MinecraftServer server, boolean enabled) {
+        if(!enabled) {
+            if(server != null) BigEnderChestFakePlayers.tick(server, false);
+            BigEnderChestSessions.closeAll();
+        }
+        if(server == null) return;
+        for(Map.Entry<UUID, ClientState> entry : CLIENTS.entrySet()) {
+            ServerPlayer player = server.getPlayerList().getPlayer(entry.getKey());
+            ClientState state = entry.getValue();
+            if(player != null
+                    && state.accepted
+                    && (state.capabilities & BigEnderChestProtocol.CAPABILITY_RULE_STATE_ACK) != 0) {
+                sendHelloAck(player, state);
+            }
+        }
     }
 
     public static void sessionOpened(BigEnderChestSessions.Session session) {
@@ -172,16 +207,20 @@ public final class BigEnderChestProtocolServer {
 
     static boolean isTerminalClient(ServerPlayer player) {
         ClientState state = CLIENTS.get(player.getUUID());
-        return state != null
+        return FrostorSettings.bigEnderChest
+                && state != null
                 && state.accepted
                 && (state.capabilities
                 & BigEnderChestProtocol.CAPABILITY_TERMINAL_MENU) != 0;
     }
 
     private static void handle(ServerPlayer player, Payload payload) {
+        if(payload.messageType() == BigEnderChestProtocol.HELLO) {
+            handleHello(player, payload.data());
+            return;
+        }
         if(!FrostorSettings.bigEnderChest) return;
         switch(payload.messageType()) {
-            case BigEnderChestProtocol.HELLO -> handleHello(player, payload.data());
             case BigEnderChestProtocol.ACTION_REQUEST -> handleAction(
                     player,
                     ActionRequest.fromTag(payload.data())
@@ -223,17 +262,7 @@ public final class BigEnderChestProtocolServer {
             state.chunkByteLimit = chunkLimit;
             state.capabilities = capabilities;
         }
-        if(ServerPlayNetworking.canSend(player, Payload.TYPE)) {
-            ServerPlayNetworking.send(player, new Payload(
-                    BigEnderChestProtocol.HELLO_ACK,
-                    new HelloAck(
-                            accepted ? BigEnderChestProtocol.PROTOCOL_VERSION : 0,
-                            capabilities,
-                            chunkLimit,
-                            accepted
-                    ).toTag()
-            ));
-        }
+        if(state != null) sendHelloAck(player, state);
         if(!accepted) {
             CLIENTS.remove(player.getUUID());
             return;
@@ -244,6 +273,23 @@ public final class BigEnderChestProtocolServer {
             return;
         }
         if(session != null) sessionOpened(session);
+    }
+
+    private static void sendHelloAck(ServerPlayer player, ClientState state) {
+        if(!ServerPlayNetworking.canSend(player, Payload.TYPE)) return;
+        int capabilities = state.capabilities;
+        if(!FrostorSettings.bigEnderChest) {
+            capabilities &= ~BigEnderChestProtocol.CAPABILITY_TERMINAL_MENU_ACTIVE;
+        }
+        ServerPlayNetworking.send(player, new Payload(
+                BigEnderChestProtocol.HELLO_ACK,
+                new HelloAck(
+                        state.accepted ? BigEnderChestProtocol.PROTOCOL_VERSION : 0,
+                        capabilities,
+                        state.chunkByteLimit,
+                        state.accepted
+                ).toTag()
+        ));
     }
 
     private static void sendSessionOpen(

@@ -162,6 +162,16 @@ public final class BigEnderChestCoreTest {
     }
 
     private static void testProtocolDtos() {
+        check(
+                (BigEnderChestProtocol.CAPABILITIES
+                        & BigEnderChestProtocol.CAPABILITY_RULE_STATE_ACK) != 0,
+                "protocol must advertise event-driven rule-state acknowledgements"
+        );
+        check(
+                (BigEnderChestProtocol.CAPABILITIES
+                        & BigEnderChestProtocol.CAPABILITY_TERMINAL_MENU_ACTIVE) != 0,
+                "protocol must advertise dynamic terminal-menu activity"
+        );
         Hello hello = new Hello(BigEnderChestProtocol.PROTOCOL_VERSION, 0b1111, 64 * 1024);
         check(Hello.fromTag(hello.toTag()).equals(hello), "hello DTOs must round trip");
         BigEnderChestProtocol.SessionOpen sessionOpen = new BigEnderChestProtocol.SessionOpen(

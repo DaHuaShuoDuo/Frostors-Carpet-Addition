@@ -9,6 +9,7 @@ import net.fabricmc.loader.api.FabricLoader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import top.frostor.carpet.bigenderchest.BigEnderChest;
+import top.frostor.carpet.bigenderchest.BigEnderChestProtocolServer;
 import top.frostor.carpet.easyplace.EasyPlaceExtraServer;
 import top.frostor.carpet.onlineprofile.OnlineProfileFallback;
 import top.frostor.carpet.playerladder.PlayerLadder;
@@ -50,6 +51,8 @@ public class FrostorsCarpetAddition implements ModInitializer, CarpetExtension {
     @Override
     public void onGameStarted() {
         CarpetServer.settingsManager.parseSettingsClass(FrostorSettings.class);
+        EasyPlaceExtraServer.registerRuleObserver(CarpetServer.settingsManager);
+        BigEnderChestProtocolServer.registerRuleObserver(CarpetServer.settingsManager);
     }
 
     @Override
