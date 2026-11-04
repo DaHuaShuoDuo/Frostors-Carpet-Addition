@@ -63,13 +63,14 @@ SOFTWARE.
 
 ## Gugle's Carpet Addition
 
-The virtual menu button and client-side click-prediction guard were informed by the fake-player
-inventory menu behavior in:
+The organization of virtual menu buttons and the general client-side click interaction were
+reviewed as high-level UI and behavioral references from:
 
 - Project: Gugle's Carpet Addition (GCA)
 - Author: Gugle
 - Source: https://github.com/Gu-ZT/gugle-carpet-addition
 - License: MIT
 
-No GCA binary is bundled and GCA is not a runtime dependency. The FCA implementation is
-adapted for its server-authoritative aggregate ender chest view.
+No GCA source code, assets, or binaries were copied into FCA. FCA independently implements
+the menu behavior for its server-authoritative aggregate ender chest view. GCA is not a
+runtime dependency.
