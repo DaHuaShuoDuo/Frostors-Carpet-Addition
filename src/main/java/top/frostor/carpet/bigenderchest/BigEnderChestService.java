@@ -1,11 +1,18 @@
 package top.frostor.carpet.bigenderchest;
 
 import carpet.patches.EntityPlayerMPFake;
+import carpet.patches.FakeClientConnection;
+import com.mojang.authlib.GameProfile;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.protocol.PacketFlow;
+import net.minecraft.server.level.ClientInformation;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.server.network.CommonListenerCookie;
+import net.minecraft.util.ProblemReporter;
 import net.minecraft.world.Container;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.GameType;
+import net.minecraft.world.level.storage.TagValueInput;
 import top.frostor.carpet.FrostorSettings;
 import top.frostor.carpet.FrostorsCarpetAddition;
 import top.frostor.carpet.bigenderchest.capacity.BigEnderChestCapacity;
@@ -509,23 +516,13 @@ public final class BigEnderChestService {
                 pendingAutoPages.remove(pageIndex);
                 continue;
             }
-            if(EntityPlayerMPFake.isSpawningPlayer(metadata.pageName())) continue;
             long lastAttempt = lastAutoSpawnAttempts.getOrDefault(
                     pageIndex,
                     Long.MIN_VALUE
             );
             if(lastAttempt != Long.MIN_VALUE && serviceTick - lastAttempt < 100) continue;
             lastAutoSpawnAttempts.put(pageIndex, serviceTick);
-            if(EntityPlayerMPFake.createFake(
-                    metadata.pageName(),
-                    owner.level().getServer(),
-                    owner.position(),
-                    owner.getYRot(),
-                    owner.getXRot(),
-                    owner.level().dimension(),
-                    GameType.SPECTATOR,
-                    false
-            )) {
+            if(spawnLivePageFake(page)) {
                 autoSpawnedPages.add(pageIndex);
                 pendingAutoPages.remove(pageIndex);
             }else {
@@ -535,6 +532,62 @@ public final class BigEnderChestService {
                         owner.getScoreboardName()
                 );
             }
+        }
+    }
+
+    private boolean spawnLivePageFake(StoragePage page) {
+        PageMetadata metadata = page.metadata();
+        try {
+            GameProfile profile = new GameProfile(
+                    metadata.pageUuid(),
+                    metadata.pageName()
+            );
+            ClientInformation clientInformation = ClientInformation.createDefault();
+            EntityPlayerMPFake fake = EntityPlayerMPFake.respawnFake(
+                    owner.level().getServer(),
+                    owner.level(),
+                    profile,
+                    clientInformation
+            );
+            owner.level().getServer().getPlayerList()
+                    .loadPlayerData(fake.nameAndId())
+                    .ifPresent(tag -> fake.load(TagValueInput.create(
+                            ProblemReporter.DISCARDING,
+                            owner.level().getServer().registryAccess(),
+                            tag
+                    )));
+            Container offline = offlinePageContainers.get(page.index());
+            if(page.state() == StoragePageState.DIRTY && offline != null) {
+                copyItems(offline, fake.getEnderChestInventory());
+            }
+            owner.level().getServer().getPlayerList().placeNewPlayer(
+                    new FakeClientConnection(PacketFlow.SERVERBOUND),
+                    fake,
+                    new CommonListenerCookie(profile, 0, clientInformation, false)
+            );
+            fake.setGameMode(GameType.SPECTATOR);
+            fake.getAbilities().flying = true;
+            fake.onUpdateAbilities();
+            fake.teleportTo(
+                    owner.level(),
+                    owner.getX(),
+                    owner.getY() + 1.0,
+                    owner.getZ(),
+                    Set.of(),
+                    owner.getYRot(),
+                    owner.getXRot(),
+                    true
+            );
+            return owner.level().getServer().getPlayerList()
+                    .getPlayer(metadata.pageUuid()) != null;
+        }catch(RuntimeException exception) {
+            FrostorsCarpetAddition.LOGGER.error(
+                    "Failed to create live big ender chest page {} for {}",
+                    metadata.pageName(),
+                    owner.getScoreboardName(),
+                    exception
+            );
+            return false;
         }
     }
 
