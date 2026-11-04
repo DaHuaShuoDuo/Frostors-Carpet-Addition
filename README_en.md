@@ -34,6 +34,11 @@ Required:
 - Fabric API
 - The Carpet version matching your Minecraft version
 
+Optional:
+
+- Quick Shulker: opens the big ender chest through its keybinding, inventory
+  actions, or hand-use interaction; install it on both client and server.
+
 Place FCA and the required dependencies in the server's `mods` directory. The
 client only needs FCA for client rules or optional compatibility features.
 
@@ -59,8 +64,8 @@ extract, sort, page, and discard items.
 - `bigEnderChestLiveFakePlayers` can bring a page fake player online only after
   an actual storage insertion or extraction. Indexing and read-only browsing
   stay on the offline file path.
-- Quick Shulker's three-row ender chest menu is converted to the big ender chest
-  menu server-side.
+- Quick Shulker's keybinding, inventory, and hand-use paths open the big ender
+  chest through its public `QuickOpenableRegistry` API.
 
 Automatic page fake players track idle time per page. Closing the menu does not
 stop all page fake players; data is synchronized before idle cleanup, rule
@@ -113,6 +118,8 @@ side, accepted values, purpose, and command. Rule names are case-sensitive:
 - Big ender chest page metadata is stored in the world directory, not in client
   configuration.
 - Carpet is a compile-time dependency only and is never bundled into FCA.
+- Quick Shulker is used only for an optional public API integration; it is not
+  bundled into FCA and is not a hard dependency.
 - The client-tool protocol does not include a terminal GUI; compatible clients
   are separate projects.
 - Big ender chest and Easy Place capability handshakes are driven by Carpet
@@ -136,7 +143,7 @@ $env:JAVA_HOME = '<JDK 25 installation>'
 .\gradlew.bat :26.2:build :26.3:build
 ```
 
-Prepare the matching Carpet compile dependency as described in
+Prepare the matching Carpet and Quick Shulker compile dependencies as described in
 [`libs/README.md`](https://github.com/DaHuaShuoDuo/Frostors-Carpet-Addition/blob/main/libs/README.md). Shared source, resource, or Mixin changes
 must be built for both 26.2 and 26.3.
 

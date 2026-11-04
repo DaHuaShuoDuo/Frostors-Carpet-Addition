@@ -27,6 +27,9 @@ dependencies {
 
 	// Carpet is supplied by the player at runtime; the local JAR is only for compilation and dev runs.
 	compileOnly files(rootProject.file("libs/fabric-carpet-${project.minecraft_version}.jar"))
+	// Quick Shulker is an optional runtime integration; its public provider API is compile-only.
+	compileOnly files(rootProject.file("libs/quickshulker-${project.minecraft_version}.jar"))
+	testImplementation files(rootProject.file("libs/quickshulker-${project.minecraft_version}.jar"))
 }
 
 loom {
