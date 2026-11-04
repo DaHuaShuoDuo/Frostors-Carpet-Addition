@@ -1,5 +1,7 @@
 # Frostor's Carpet Addition
 
+[English](https://github.com/DaHuaShuoDuo/Frostors-Carpet-Addition/blob/main/README_en.md) | 简体中文
+
 Frostor's Carpet Addition（FCA）是一个面向 Minecraft Java 版的
 [Carpet](https://github.com/gnembon/fabric-carpet) 附属模组，提供服务端大末影箱、
 Player Ladder、轻松放置协议 V2-Extra 和正版资料回退等功能。

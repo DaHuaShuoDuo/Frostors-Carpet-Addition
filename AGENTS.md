@@ -219,6 +219,9 @@ Java 枚举常量改成小写，否则 Carpet 无法解析。
 - 提交信息使用清晰的 `type: summary` 前缀，例如 `fix:`、`feat:`、`refactor:`、
   `ci:`、`docs:`。不得提交 `.gradle/`、`build/`、`versions/*/build/`、运行世界、
   日志、本地依赖 JAR 或其他生成内容。
+- `README.md` 与 `README_en.md` 是互为镜像的中英文用户文档。修改功能、安装、
+  依赖、规则、协议或兼容性说明时同步更新两种语言，并保留文件顶部互相跳转的绝对
+  GitHub 链接；两份 README 对 `RULES.md` 等技术细节的指向必须一致。
 - 用户要求创建 PR 时，PR 必须说明改动范围、自动测试、GameTest/手测结果、未验证风险
   和性能影响；涉及 TriWasa 协议兼容时注明使用的 `fca_ref` 或 FCA 提交。
 - `main` 只能通过 PR 合并，必需检查为固定的 `CI Gate`，分支必须与最新 `main`
