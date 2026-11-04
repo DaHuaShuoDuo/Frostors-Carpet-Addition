@@ -10,6 +10,8 @@ on:
       - "common.gradle"
       - "gradle.properties"
       - "gradle/**"
+      - "gradlew"
+      - "gradlew.bat"
       - "settings.gradle"
   pull_request:
   workflow_dispatch:
@@ -51,7 +53,7 @@ jobs:
             files="$(git diff --no-renames --name-only "${BASE_SHA}...${HEAD_SHA}")"
             while IFS= read -r path; do
               case "$path" in
-                .github/workflows/*|src/*|versions/*|gradle/*|build.gradle|common.gradle|gradle.properties|settings.gradle)
+                .github/workflows/*|src/*|versions/*|gradle/*|build.gradle|common.gradle|gradle.properties|gradlew|gradlew.bat|settings.gradle)
                   build_required=true
                   break
                   ;;
