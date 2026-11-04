@@ -99,7 +99,8 @@ minecraft:wither,minecraft:ender_dragon,minecraft:warden,minecraft:minecart,#min
 
 `bigEnderChestLiveFakePlayers` 默认关闭。开启后，建立索引、搜索、排序和只读浏览仍不会
 上线假人；只有页面实际发生存入或取出时，FCA 才会请求该页面对应的假人上线，并保持在线
-到当前大末影箱会话结束。会话关闭时只下线由 FCA 自动启动的假人，手动上线的假人不受影响。
+至页面连续 200 tick 未被使用。空闲超时或会话关闭时只下线由 FCA 自动启动的假人，手动
+上线的假人不受影响。
 
 关闭 `bigEnderChest` 只会隐藏功能，不删除页面或物品。再次开启后可继续读取。
 

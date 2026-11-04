@@ -648,10 +648,12 @@ public final class BigEnderChestService {
     }
 
     private Container activePageContainer(PageMetadata metadata) {
-        ServerPlayer online = onlinePagePlayer(metadata);
-        return online == null
-                ? offlinePageContainers.get(metadata.storagePage())
-                : online.getEnderChestInventory();
+        int pageIndex = metadata.storagePage();
+        if(onlinePages.contains(pageIndex)) {
+            Container online = onlinePageContainers.get(pageIndex);
+            if(online != null) return online;
+        }
+        return offlinePageContainers.get(pageIndex);
     }
 
     private ServerPlayer onlinePagePlayer(PageMetadata metadata) {
