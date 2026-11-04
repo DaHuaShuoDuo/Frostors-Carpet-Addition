@@ -130,6 +130,11 @@ FCA 不包含自定义终端 GUI。兼容的客户端工具可以在原版 6×9 
 frostors-carpet-addition:big_ender_chest
 ```
 
+FCA 通过
+`top.frostor.carpet.bigenderchest.api.BigEnderChestProtocol.Payload` 公开该通道的
+Payload、消息 DTO 和 Codec。TriWasa 在编译期引用该 API，并在 FCA 同进程加载时直接复用
+同一 Payload 类；客户端未安装 FCA 时才使用自身的线兼容实现。
+
 当前协议版本为 `2`。未完成握手的客户端继续使用原版 6×9 菜单；完成握手并声明终端能力
 的客户端使用：
 
@@ -159,6 +164,11 @@ frostors-carpet-addition:big_ender_chest_terminal
 
 `easyPlaceProtocolExtra` 提供 Servux 兼容的服务端轻松放置语义，通过 EarlyCompat
 网络通道接收客户端精确状态。客户端编码、Litematica 投影读取和按键交互不包含在本模组中。
+
+FCA 公开 `top.frostor.carpet.easyplace.EasyPlaceExtraPayload`，由它定义
+`earlycompat:network` 通道、消息 DTO 与 Codec。TriWasa 在编译期引用该公开 API，并在
+FCA 同进程加载时直接复用同一 Payload 类；未安装 FCA 的客户端连接专用服务器时才使用
+TriWasa 自身的线兼容 Payload。
 
 服务端会恢复或同步包括方向、朝向、开关、堆叠数量、床首位、蛋糕咬数、铜傀儡姿态、
 铜灯通电、门上下半、双箱子配对和多面方块附着面等原版状态。

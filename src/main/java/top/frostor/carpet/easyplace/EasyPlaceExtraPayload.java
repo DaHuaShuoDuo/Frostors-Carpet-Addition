@@ -8,14 +8,21 @@ import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.Identifier;
 
 /**
- * Wire-compatible with EarlyCompat's Fanetlib payload.
+ * Stable public payload API for the V2-Extra handshake.
+ *
+ * <p>FCA owns this type on integrated clients and dedicated servers. Client tools may compile
+ * against it, but must provide their own wire-compatible fallback for servers without FCA.</p>
  */
 public record EasyPlaceExtraPayload(int packetId, CompoundTag data) implements CustomPacketPayload {
+    public static final Identifier CHANNEL = Identifier.fromNamespaceAndPath("earlycompat", "network");
+    public static final int PROTOCOL_VERSION = 1;
     public static final int HELLO = 0;
     public static final int HELLO_ACK = 0;
-    public static final Type<EasyPlaceExtraPayload> TYPE = new Type<>(
-            Identifier.fromNamespaceAndPath("earlycompat", "network")
-    );
+    public static final String NBT_PROTOCOL_VERSION = "protocol_version";
+    public static final String NBT_CAPABILITIES = "capabilities";
+    public static final String CAPABILITY_EASY_PLACE_V2_EXTRA = "easy_place_v2_extra";
+    public static final String CAPABILITY_HIT_POSITION_RELAXATION = "hit_position_relaxation";
+    public static final Type<EasyPlaceExtraPayload> TYPE = new Type<>(CHANNEL);
     public static final StreamCodec<RegistryFriendlyByteBuf, EasyPlaceExtraPayload> CODEC =
             StreamCodec.composite(
                     ByteBufCodecs.VAR_INT,

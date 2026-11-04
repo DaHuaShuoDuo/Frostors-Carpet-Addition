@@ -8,7 +8,6 @@ import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.StringTag;
-import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.server.level.ServerPlayer;
 import top.frostor.carpet.FrostorSettings;
 import top.frostor.carpet.FrostorsCarpetAddition;
@@ -18,11 +17,13 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 public final class EasyPlaceExtraServer {
-    public static final int PROTOCOL_VERSION = 1;
-    public static final String NBT_PROTOCOL_VERSION = "protocol_version";
-    public static final String NBT_CAPABILITIES = "capabilities";
-    public static final String CAPABILITY_EASY_PLACE_V2_EXTRA = "easy_place_v2_extra";
-    public static final String CAPABILITY_HIT_POSITION_RELAXATION = "hit_position_relaxation";
+    public static final int PROTOCOL_VERSION = EasyPlaceExtraPayload.PROTOCOL_VERSION;
+    public static final String NBT_PROTOCOL_VERSION = EasyPlaceExtraPayload.NBT_PROTOCOL_VERSION;
+    public static final String NBT_CAPABILITIES = EasyPlaceExtraPayload.NBT_CAPABILITIES;
+    public static final String CAPABILITY_EASY_PLACE_V2_EXTRA =
+            EasyPlaceExtraPayload.CAPABILITY_EASY_PLACE_V2_EXTRA;
+    public static final String CAPABILITY_HIT_POSITION_RELAXATION =
+            EasyPlaceExtraPayload.CAPABILITY_HIT_POSITION_RELAXATION;
     private static final Set<UUID> SUPPORTED_PLAYERS = ConcurrentHashMap.newKeySet();
     private static boolean lastRuleState;
 
@@ -37,12 +38,9 @@ public final class EasyPlaceExtraServer {
             return;
         }
 
-        @SuppressWarnings("unchecked")
-        CustomPacketPayload.Type<CustomPacketPayload> payloadType =
-                (CustomPacketPayload.Type<CustomPacketPayload>) EasyPlacePayloadBridge.type();
-        registerPayloadType(payloadType);
+        registerPayloadType();
         ServerPlayNetworking.registerGlobalReceiver(
-                payloadType,
+                EasyPlaceExtraPayload.TYPE,
                 (payload, context) -> context.server().execute(() -> handle(context.player(), payload))
         );
         ServerPlayConnectionEvents.DISCONNECT.register((handler, server) ->
@@ -65,9 +63,9 @@ public final class EasyPlaceExtraServer {
         return SUPPORTED_PLAYERS.contains(player.getUUID());
     }
 
-    private static void handle(ServerPlayer player, CustomPacketPayload payload) {
+    private static void handle(ServerPlayer player, EasyPlaceExtraPayload payload) {
         if(!FrostorSettings.easyPlaceProtocolExtra
-                || EasyPlacePayloadBridge.packetId(payload) != EasyPlaceExtraPayload.HELLO) return;
+                || payload.packetId() != EasyPlaceExtraPayload.HELLO) return;
 
         FrostorsCarpetAddition.LOGGER.info("[EasyPlace] Received V2-Extra hello from {}", player.getScoreboardName());
         acceptHello(player);
@@ -75,14 +73,14 @@ public final class EasyPlaceExtraServer {
 
     static void acceptHello(ServerPlayer player) {
         SUPPORTED_PLAYERS.add(player.getUUID());
-        if(player.connection == null || !ServerPlayNetworking.canSend(player, EasyPlacePayloadBridge.type())) return;
+        if(player.connection == null || !ServerPlayNetworking.canSend(player, EasyPlaceExtraPayload.TYPE)) return;
         sendAck(player, true);
     }
 
     private static void sendAck(ServerPlayer player, boolean enabled) {
         ServerPlayNetworking.send(
                 player,
-                EasyPlacePayloadBridge.create(EasyPlaceExtraPayload.HELLO_ACK, capabilityData(enabled))
+                new EasyPlaceExtraPayload(EasyPlaceExtraPayload.HELLO_ACK, capabilityData(enabled))
         );
     }
 
@@ -117,7 +115,7 @@ public final class EasyPlaceExtraServer {
     ) {
         int count = 0;
         for(ServerPlayer player : server.getPlayerList().getPlayers()) {
-            if(!ServerPlayNetworking.canSend(player, EasyPlacePayloadBridge.type())) continue;
+            if(!ServerPlayNetworking.canSend(player, EasyPlaceExtraPayload.TYPE)) continue;
             if(enabled) SUPPORTED_PLAYERS.add(player.getUUID());
             sendAck(player, enabled);
             count++;
@@ -129,15 +127,14 @@ public final class EasyPlaceExtraServer {
         );
     }
 
-    @SuppressWarnings({"unchecked", "rawtypes"})
-    private static void registerPayloadType(CustomPacketPayload.Type<CustomPacketPayload> payloadType) {
+    private static void registerPayloadType() {
         PayloadTypeRegistry.serverboundPlay().register(
-                (CustomPacketPayload.Type) payloadType,
-                (net.minecraft.network.codec.StreamCodec) EasyPlacePayloadBridge.codec()
+                EasyPlaceExtraPayload.TYPE,
+                EasyPlaceExtraPayload.CODEC
         );
         PayloadTypeRegistry.clientboundPlay().register(
-                (CustomPacketPayload.Type) payloadType,
-                (net.minecraft.network.codec.StreamCodec) EasyPlacePayloadBridge.codec()
+                EasyPlaceExtraPayload.TYPE,
+                EasyPlaceExtraPayload.CODEC
         );
     }
 }
