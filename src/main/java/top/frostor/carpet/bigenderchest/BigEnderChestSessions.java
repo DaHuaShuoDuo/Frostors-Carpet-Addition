@@ -188,11 +188,6 @@ public final class BigEnderChestSessions {
     }
 
     public static void tick(MinecraftServer minecraftServer) {
-        if(!FrostorSettings.bigEnderChest) {
-            BigEnderChestFakePlayers.tick(minecraftServer, false);
-            closeAll();
-            return;
-        }
         BigEnderChestFakePlayers.tick(minecraftServer);
         boolean saveTick = ++tickCounter >= 20;
         if(saveTick) tickCounter = 0;

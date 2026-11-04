@@ -115,6 +115,9 @@ side, accepted values, purpose, and command. Rule names are case-sensitive:
 - Carpet is a compile-time dependency only and is never bundled into FCA.
 - The client-tool protocol does not include a terminal GUI; compatible clients
   are separate projects.
+- Big ender chest and Easy Place capability handshakes are driven by Carpet
+  `RuleObserver` events; live rule changes publish the new capability state to
+  handshaken online clients.
 
 ## Building
 

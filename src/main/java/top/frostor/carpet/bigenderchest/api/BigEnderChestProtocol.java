@@ -48,6 +48,8 @@ public final class BigEnderChestProtocol {
     public static final int CAPABILITY_SEQUENCED_ACTIONS = 1 << 9;
     public static final int CAPABILITY_SNAPSHOT_ACK = 1 << 10;
     public static final int CAPABILITY_SESSION_CLOSE = 1 << 11;
+    public static final int CAPABILITY_RULE_STATE_ACK = 1 << 12;
+    public static final int CAPABILITY_TERMINAL_MENU_ACTIVE = 1 << 13;
     public static final int CAPABILITIES = CAPABILITY_SNAPSHOT
             | CAPABILITY_DELTA
             | CAPABILITY_ACTIONS
@@ -59,7 +61,9 @@ public final class BigEnderChestProtocol {
             | CAPABILITY_DROP_ACTIONS
             | CAPABILITY_SEQUENCED_ACTIONS
             | CAPABILITY_SNAPSHOT_ACK
-            | CAPABILITY_SESSION_CLOSE;
+            | CAPABILITY_SESSION_CLOSE
+            | CAPABILITY_RULE_STATE_ACK
+            | CAPABILITY_TERMINAL_MENU_ACTIVE;
 
     public static final int HELLO = 1;
     public static final int HELLO_ACK = 2;
