@@ -4,6 +4,7 @@
 	"version": "${version}",
 	"name": "Frostor's Carpet Addition",
 	"description": "A Carpet addition by Frostor with a server-side big ender chest, Player Ladder, and other utilities.",
+	"icon": "assets/frostors-carpet-addition/icon.png",
 	"authors": [
 		"Frostor"
 	],
