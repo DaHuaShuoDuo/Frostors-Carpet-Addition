@@ -92,6 +92,10 @@ minecraft:wither,minecraft:ender_dragon,minecraft:warden,minecraft:minecart,#min
 页面按实际容量需求生成。首次打开会准备少量缓冲页；查看、翻页和排序不会触发扩容。
 降低 `bigEnderChestPageLimit` 不会删除已有页面，已有页面仍可访问，但不会继续扩容。
 
+如果额外页对应的假人已经通过 Carpet `/player <名称> spawn` 真实上线，FCA 会直接使用
+该在线假人的末影箱容器，并把外部槽位变化同步进聚合索引。在线期间不会同时读写该 UUID
+的磁盘档案；假人下线后页面自动切回 `playerdata` 路径。当前不会由 FCA 自动上线页面假人。
+
 关闭 `bigEnderChest` 只会隐藏功能，不删除页面或物品。再次开启后可继续读取。
 
 额外页名称采用固定 16 字符的可读格式：

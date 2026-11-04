@@ -31,8 +31,12 @@ public final class BigEnderChest {
         UseBlockCallback.EVENT.register(BigEnderChest::useBlock);
         ServerLifecycleEvents.SERVER_STARTED.register(BigEnderChestSessions::initialize);
         ServerLifecycleEvents.SERVER_STOPPING.register(ignored -> BigEnderChestSessions.shutdown());
-        ServerPlayConnectionEvents.DISCONNECT.register((handler, ignored) ->
-                BigEnderChestSessions.onDisconnect(handler.player));
+        ServerPlayConnectionEvents.JOIN.register((handler, sender, ignored) ->
+                BigEnderChestSessions.onPlayerJoin(handler.player));
+        ServerPlayConnectionEvents.DISCONNECT.register((handler, ignored) -> {
+            BigEnderChestSessions.onPagePlayerDisconnect(handler.player);
+            BigEnderChestSessions.onDisconnect(handler.player);
+        });
         ServerTickEvents.END_SERVER_TICK.register(server -> {
             BigEnderChestSessions.tick(server);
             BigEnderChestProtocolServer.tick(server);

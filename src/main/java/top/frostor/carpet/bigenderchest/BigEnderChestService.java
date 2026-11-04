@@ -23,6 +23,7 @@ import java.util.ArrayDeque;
 import java.util.Comparator;
 import java.util.Deque;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -40,6 +41,10 @@ public final class BigEnderChestService {
     private final PageRegistry pageRegistry;
     private final FakePageDataStore dataStore;
     private final NavigableMap<Integer, StoragePage> pages = new TreeMap<>();
+    private final Map<Integer, Container> offlinePageContainers = new HashMap<>();
+    private final Map<Integer, Container> onlinePageContainers = new HashMap<>();
+    private final Map<Integer, ItemStack[]> onlinePageSnapshots = new HashMap<>();
+    private final Set<Integer> onlinePages = new HashSet<>();
     private final BigEnderChestIndex index = new BigEnderChestIndex();
     private final Set<StorageLocation> pendingChanges = new LinkedHashSet<>();
     private final List<Integer> pendingPageAdds = new ArrayList<>();
@@ -266,10 +271,10 @@ public final class BigEnderChestService {
             remaining -= removed.getCount();
             pageChanged(candidate.location().storagePage());
             index.update(candidate.location(), container.getItem(candidate.location().slot()));
-            if(candidate.location().storagePage() == 0) {
-                lastPlayerPage[candidate.location().slot()] =
-                        container.getItem(candidate.location().slot()).copy();
-            }
+            updatePlayerPageSnapshot(
+                    candidate.location(),
+                    container.getItem(candidate.location().slot())
+            );
             pendingChanges.add(candidate.location());
         }
         if(resultCount == 0) return ItemStack.EMPTY;
@@ -290,6 +295,10 @@ public final class BigEnderChestService {
 
     public void tick() {
         if(!isOpen()) return;
+        if(refreshOnlinePages()) {
+            long baseRevision = ensureBatchStarted();
+            finishMutation(baseRevision);
+        }
         if(refreshPlayerPage()) {
             long baseRevision = ensureBatchStarted();
             finishMutation(baseRevision);
@@ -336,6 +345,8 @@ public final class BigEnderChestService {
     public void saveDirtyPages() {
         pages.values().stream()
                 .filter(page -> page.index() > 0)
+                .filter(page -> !onlinePages.contains(page.index()))
+                .filter(page -> onlinePagePlayer(page.metadata()) == null)
                 .filter(page -> page.state() == StoragePageState.DIRTY)
                 .forEach(page -> {
                     long version = page.beginSaving();
@@ -361,29 +372,64 @@ public final class BigEnderChestService {
                 });
     }
 
+    public boolean onPagePlayerJoin(ServerPlayer pagePlayer) {
+        StoragePage page = pageForPlayer(pagePlayer.getUUID());
+        if(page == null || onlinePages.contains(page.index())) return false;
+        bindOnlinePage(page, pagePlayer.getEnderChestInventory());
+        long baseRevision = ensureBatchStarted();
+        finishMutation(baseRevision);
+        return true;
+    }
+
+    public boolean onPagePlayerDisconnect(ServerPlayer pagePlayer) {
+        StoragePage page = pageForPlayer(pagePlayer.getUUID());
+        if(page == null || !onlinePages.contains(page.index())) return false;
+        unbindOnlinePage(page, pagePlayer.getEnderChestInventory());
+        long baseRevision = ensureBatchStarted();
+        finishMutation(baseRevision);
+        return true;
+    }
+
     private void loadExtraPages() {
         for(PageMetadata metadata : pageRegistry.pages(storageOwner)) {
             net.minecraft.world.inventory.PlayerEnderChestContainer container =
                     new net.minecraft.world.inventory.PlayerEnderChestContainer();
+            int pageIndex = metadata.storagePage();
+            offlinePageContainers.put(pageIndex, container);
             StoragePage page = StoragePage.fakePage(
                     metadata,
-                    () -> container,
+                    () -> activePageContainer(metadata),
                     StoragePageState.LOADING
             );
             pages.put(metadata.storagePage(), page);
             pageRevision++;
+            ServerPlayer online = onlinePagePlayer(metadata);
+            if(online != null) {
+                bindOnlinePage(page, online.getEnderChestInventory());
+                page.setState(StoragePageState.READY);
+                continue;
+            }
             dataStore.loadAsync(
                     metadata,
                     loaded -> {
                         if(closed) return;
                         copyItems(loaded, container);
                         page.setState(StoragePageState.READY);
-                        index.replacePage(metadata.storagePage(), container);
+                        index.replacePage(metadata.storagePage(), page.container());
                         pageRevision++;
                         revision++;
                     },
                     exception -> {
                         if(closed) return;
+                        ServerPlayer nowOnline = onlinePagePlayer(metadata);
+                        if(nowOnline != null) {
+                            bindOnlinePage(page, nowOnline.getEnderChestInventory());
+                            page.setState(StoragePageState.READY);
+                            index.replacePage(metadata.storagePage(), page.container());
+                            pageRevision++;
+                            revision++;
+                            return;
+                        }
                         page.setState(StoragePageState.ERROR);
                         pageRevision++;
                         FrostorsCarpetAddition.LOGGER.error(
@@ -395,6 +441,116 @@ public final class BigEnderChestService {
                     }
             );
         }
+    }
+
+    private boolean refreshOnlinePages() {
+        boolean changed = false;
+        for(StoragePage page : pages.values()) {
+            if(page.index() == 0) continue;
+            ServerPlayer online = onlinePagePlayer(page.metadata());
+            if(online != null) {
+                Container live = online.getEnderChestInventory();
+                if(!onlinePages.contains(page.index())) {
+                    bindOnlinePage(page, live);
+                    changed = true;
+                }else {
+                    onlinePageContainers.put(page.index(), live);
+                    if(page.isReady() && refreshOnlinePageContent(page, live)) {
+                        changed = true;
+                    }
+                }
+            }else if(onlinePages.contains(page.index())) {
+                unbindOnlinePage(page, onlinePageContainers.get(page.index()));
+                changed = true;
+            }
+        }
+        return changed;
+    }
+
+    private boolean refreshOnlinePageContent(StoragePage page, Container container) {
+        ItemStack[] snapshot = onlinePageSnapshots.get(page.index());
+        if(snapshot == null) return false;
+        boolean changed = false;
+        for(int slot = 0; slot < StorageLocation.SLOTS_PER_PAGE; slot++) {
+            ItemStack current = container.getItem(slot);
+            if(ItemStack.matches(snapshot[slot], current)) continue;
+            StorageLocation location = new StorageLocation(page.index(), slot);
+            snapshot[slot] = current.copy();
+            index.update(location, current);
+            pendingChanges.add(location);
+            changed = true;
+        }
+        if(changed) {
+            page.markChanged();
+            pageRevision++;
+        }
+        return changed;
+    }
+
+    private void bindOnlinePage(StoragePage page, Container container) {
+        Container offline = offlinePageContainers.get(page.index());
+        if(page.state() == StoragePageState.DIRTY && offline != null && offline != container) {
+            copyItems(offline, container);
+        }
+        onlinePages.add(page.index());
+        onlinePageContainers.put(page.index(), container);
+        onlinePageSnapshots.put(page.index(), snapshot(container));
+        if(page.state() != StoragePageState.LOADING) {
+            page.setState(StoragePageState.READY);
+        }
+        if(page.isReady()) {
+            index.replacePage(page.index(), container);
+            pageRevision++;
+            addPageToPendingDelta(page.index());
+        }
+    }
+
+    private void unbindOnlinePage(StoragePage page, Container live) {
+        Container offline = offlinePageContainers.get(page.index());
+        if(live != null && offline != null && live != offline) {
+            copyItems(live, offline);
+        }
+        onlinePages.remove(page.index());
+        onlinePageContainers.remove(page.index());
+        onlinePageSnapshots.remove(page.index());
+        page.markChanged();
+        index.replacePage(page.index(), page.container());
+        pageRevision++;
+        addPageToPendingDelta(page.index());
+    }
+
+    private Container activePageContainer(PageMetadata metadata) {
+        ServerPlayer online = onlinePagePlayer(metadata);
+        return online == null
+                ? offlinePageContainers.get(metadata.storagePage())
+                : online.getEnderChestInventory();
+    }
+
+    private ServerPlayer onlinePagePlayer(PageMetadata metadata) {
+        return owner.level().getServer().getPlayerList().getPlayer(metadata.pageUuid());
+    }
+
+    private StoragePage pageForPlayer(UUID playerUuid) {
+        for(StoragePage page : pages.values()) {
+            if(page.index() > 0 && page.metadata().pageUuid().equals(playerUuid)) {
+                return page;
+            }
+        }
+        return null;
+    }
+
+    private void addPageToPendingDelta(int pageIndex) {
+        for(int slot = 0; slot < StorageLocation.SLOTS_PER_PAGE; slot++) {
+            pendingChanges.add(new StorageLocation(pageIndex, slot));
+        }
+    }
+
+    private static ItemStack[] snapshot(Container container) {
+        ItemStack[] snapshot = new ItemStack[StorageLocation.SLOTS_PER_PAGE];
+        for(int slot = 0; slot < snapshot.length; slot++) {
+            snapshot[slot] = container.getItem(slot).copy();
+        }
+        return snapshot;
     }
 
     private static void copyItems(Container source, Container target) {
@@ -581,6 +737,11 @@ public final class BigEnderChestService {
     private void updatePlayerPageSnapshot(StorageLocation location, ItemStack stack) {
         if(location.storagePage() == 0) {
             lastPlayerPage[location.slot()] = stack.copy();
+            return;
+        }
+        ItemStack[] snapshot = onlinePageSnapshots.get(location.storagePage());
+        if(snapshot != null) {
+            snapshot[location.slot()] = stack.copy();
         }
     }
 

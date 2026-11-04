@@ -174,6 +174,18 @@ public final class BigEnderChestSessions {
         close(player);
     }
 
+    public static void onPlayerJoin(ServerPlayer player) {
+        for(Session session : SESSIONS.values()) {
+            session.service().onPagePlayerJoin(player);
+        }
+    }
+
+    public static void onPagePlayerDisconnect(ServerPlayer player) {
+        for(Session session : SESSIONS.values()) {
+            session.service().onPagePlayerDisconnect(player);
+        }
+    }
+
     public static void tick(MinecraftServer minecraftServer) {
         if(!FrostorSettings.bigEnderChest) {
             closeAll();
