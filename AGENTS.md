@@ -151,6 +151,38 @@ Java 枚举常量改成小写，否则 Carpet 无法解析。
 - 运行时依赖版本范围由各版本的 `fabric_api_dependency` 和 `carpet_dependency` 管理，
   并会展开进 `fabric.mod.json`。修改范围时必须双版本构建并检查产物元数据。
 
+## Git、提交与 GitHub
+
+- 开始任务时先运行 `git status --short`，区分并保留用户已有修改；不得覆盖、清理或
+  格式化与当前任务无关的文件。
+- 功能改动默认从最新 `main` 创建 `codex/<主题>` 本地分支。不要在功能分支混入无关
+  提交，也不要直接修改或强推 `main`；确需改写已发布历史时必须取得用户明确同意。
+- 除非用户明确要求，否则不要 push、创建 PR、启用 Auto-merge 或合并 PR。提交前确认
+  暂存区只包含当前任务文件。
+- 提交前按变更类型验证：
+  - 源码、资源、Mixin、版本属性、Gradle、Wrapper 或 workflow：构建 26.2 和 26.3，
+    并运行 `logicTest`、`easyPlaceProtocolTest`。
+  - README、docs、许可证等纯文档改动：至少确认 `CI Gate` 的变更分类逻辑，不要求
+    执行完整 Minecraft 构建。
+  - 涉及运行期、Carpet 规则、假人或大末影箱数据路径：补充对应 GameTest 或明确记录
+    未执行的手测项。`src/gametest` 保持本机开发验证，不提交、不进入 CI。
+- 提交信息使用清晰的 `type: summary` 前缀，例如 `fix:`、`feat:`、`refactor:`、
+  `ci:`、`docs:`。不得提交 `.gradle/`、`build/`、`versions/*/build/`、运行世界、
+  日志、本地依赖 JAR 或其他生成内容。
+- 用户要求创建 PR 时，PR 必须说明改动范围、自动测试、GameTest/手测结果、未验证风险
+  和性能影响；涉及 TriWasa 协议兼容时注明使用的 `fca_ref` 或 FCA 提交。
+- `main` 只能通过 PR 合并，必需检查为固定的 `CI Gate`，分支必须与最新 `main`
+  同步。不要绕过分支保护、直接推送或临时移除必需检查。
+- 只有仓库所有者提交的同仓库、非草稿 PR 才可使用 `auto-merge` 标签；Fork PR、
+  未添加标签的 PR 以及修改 workflow、Gradle、Wrapper 或依赖配置的 PR 必须人工
+  合并。用户未明确授权合并时，不得添加该标签。
+- Auto-merge 使用 Squash。移除 `auto-merge` 标签后应确认 Auto-merge 已关闭。
+- 合并 PR 后同步本地 `main`、清理已合并分支，并确认工作区干净。不得要求用户在聊天
+  中发送 GitHub Token、密码或其他凭据。
+- FCA 与 TriWasa 的协议改动必须按依赖顺序处理。先确认 FCA 的公开 Payload/API
+  状态，再推送或更新 TriWasa 的适配；跨仓库验证失败时不得用旧 JAR 或反射桥接掩盖
+  不兼容。
+
 ## 代码与交付习惯
 
 - 沿用现有 4 空格缩进、UTF-8、功能分包和紧凑的 Java 风格；避免无关格式化或大范围重排。
