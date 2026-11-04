@@ -234,6 +234,10 @@ CI 使用 GitHub Actions 的 Java 25、Gradle 缓存和 26.2/26.3 构建矩阵�
 官方 Release 下载对应编译依赖。每个版本会检查生产 JAR 的模组元数据并确认 Carpet
 类没有被误打包，随后上传构建产物。
 
+仓库所有者可给自己的同仓库 PR 添加 `auto-merge` 标签。双版本 CI 通过后使用 Squash
+自动合并；Fork PR、草稿 PR 以及修改工作流或 Gradle/Wrapper 配置的 PR 仍须手动审核。
+移除标签会关闭已启用的 Auto-merge。
+
 ## 数据与兼容性
 
 - 规则保存在世界的 `carpet.conf` 中，不使用独立的 `config/playerladder.json`。

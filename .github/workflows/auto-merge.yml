@@ -1,0 +1,80 @@
+name: Auto Merge
+
+on:
+  pull_request:
+    types:
+      - labeled
+      - unlabeled
+      - ready_for_review
+      - synchronize
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: auto-merge-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  configure:
+    name: Configure auto-merge
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      GH_TOKEN: ${{ github.token }}
+      PR_URL: ${{ github.event.pull_request.html_url }}
+    steps:
+      - name: Toggle auto-merge safely
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          auto_merge_label=false
+          if gh pr view "$PR_URL" --json labels \
+              --jq '.labels[].name' | grep -Fx 'auto-merge' > /dev/null; then
+            auto_merge_label=true
+          fi
+
+          trusted=false
+          if [[ "${{ github.event.pull_request.user.login }}" == "${{ github.repository_owner }}" ]] \
+              && [[ "${{ github.actor }}" == "${{ github.repository_owner }}" ]] \
+              && [[ "${{ github.event.pull_request.head.repo.full_name }}" == "${{ github.repository }}" ]] \
+              && [[ "${{ github.event.pull_request.draft }}" == "false" ]]; then
+            trusted=true
+          fi
+
+          protected=false
+          while IFS= read -r path; do
+            if [[ "$path" =~ ^\.github/workflows/ ]] \
+                || [[ "$path" =~ ^gradle/wrapper/ ]] \
+                || [[ "$path" == "build.gradle" ]] \
+                || [[ "$path" == "common.gradle" ]] \
+                || [[ "$path" == "settings.gradle" ]] \
+                || [[ "$path" == "gradle.properties" ]] \
+                || [[ "$path" =~ ^versions/[^/]+/gradle\.properties$ ]]; then
+              protected=true
+              break
+            fi
+          done < <(gh pr view "$PR_URL" --json files --jq '.files[].path')
+
+          auto_merge_enabled=false
+          if [[ "$(gh pr view "$PR_URL" --json autoMergeRequest \
+              --jq '.autoMergeRequest != null')" == "true" ]]; then
+            auto_merge_enabled=true
+          fi
+
+          if [[ "$auto_merge_label" == "true" && "$trusted" == "true" \
+              && "$protected" == "false" ]]; then
+            if [[ "$auto_merge_enabled" == "false" ]]; then
+              gh pr merge "$PR_URL" --auto --squash
+            fi
+          else
+            if [[ "$auto_merge_enabled" == "true" ]]; then
+              gh pr merge "$PR_URL" --disable-auto
+            fi
+
+            if [[ "$auto_merge_label" == "true" ]]; then
+              echo "::notice::Auto-merge was not enabled because the PR or changed paths require manual review."
+            fi
+          fi
