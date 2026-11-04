@@ -1,30 +1,17 @@
-name: Build
+name: CI
 
 on:
   push:
     paths:
       - ".github/workflows/**"
       - "src/**"
-      - "versions/**/gradle.properties"
+      - "versions/**"
       - "build.gradle"
       - "common.gradle"
       - "gradle.properties"
-      - "gradle/wrapper/**"
-      - "LICENSE"
+      - "gradle/**"
       - "settings.gradle"
-      - "THIRD_PARTY_NOTICES.md"
   pull_request:
-    paths:
-      - ".github/workflows/**"
-      - "src/**"
-      - "versions/**/gradle.properties"
-      - "build.gradle"
-      - "common.gradle"
-      - "gradle.properties"
-      - "gradle/wrapper/**"
-      - "LICENSE"
-      - "settings.gradle"
-      - "THIRD_PARTY_NOTICES.md"
   workflow_dispatch:
 
 permissions:
@@ -35,8 +22,50 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  changes:
+    name: Detect build requirement
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      build_required: ${{ steps.classify.outputs.build_required }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Classify changed files
+        id: classify
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          build_required=false
+
+          if [[ "$EVENT_NAME" != "pull_request" ]]; then
+            build_required=true
+          else
+            files="$(git diff --no-renames --name-only "${BASE_SHA}...${HEAD_SHA}")"
+            while IFS= read -r path; do
+              case "$path" in
+                .github/workflows/*|src/*|versions/*|gradle/*|build.gradle|common.gradle|gradle.properties|settings.gradle)
+                  build_required=true
+                  break
+                  ;;
+              esac
+            done <<< "$files"
+          fi
+
+          echo "build_required=${build_required}" >> "$GITHUB_OUTPUT"
+          echo "Build required: ${build_required}"
+
   build:
     name: Minecraft ${{ matrix.minecraft }}
+    needs: changes
+    if: needs.changes.outputs.build_required == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     strategy:
@@ -107,3 +136,35 @@ jobs:
           path: versions/${{ matrix.minecraft }}/build/libs/*.jar
           if-no-files-found: error
           retention-days: 14
+
+  gate:
+    name: CI Gate
+    if: always()
+    needs:
+      - changes
+      - build
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Verify required results
+        shell: bash
+        env:
+          CHANGES_RESULT: ${{ needs.changes.result }}
+          BUILD_REQUIRED: ${{ needs.changes.outputs.build_required }}
+          BUILD_RESULT: ${{ needs.build.result }}
+        run: |
+          set -euo pipefail
+          echo "changes=${CHANGES_RESULT} build_required=${BUILD_REQUIRED} build=${BUILD_RESULT}"
+
+          if [[ "$CHANGES_RESULT" != "success" ]]; then
+            echo "::error::Change classification did not succeed."
+            exit 1
+          fi
+          if [[ "$BUILD_REQUIRED" == "true" && "$BUILD_RESULT" != "success" ]]; then
+            echo "::error::Full build was required but did not succeed."
+            exit 1
+          fi
+          if [[ "$BUILD_REQUIRED" == "false" && "$BUILD_RESULT" != "skipped" && "$BUILD_RESULT" != "success" ]]; then
+            echo "::error::Build was unexpectedly not skipped."
+            exit 1
+          fi
