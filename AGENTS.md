@@ -67,7 +67,9 @@ $env:JAVA_HOME = '<JDK 25 installation>'
 - 每条规则都必须在 `en_us.json` 和 `zh_cn.json` 中同时提供
   `carpet.rule.<字段名>.name` 与 `carpet.rule.<字段名>.desc`。缺少 `.desc` 会导致
   Carpet 拒绝注册规则。
-- 新增或修改用户可见规则后，同步更新 `README.md` 的规则表、默认值和说明。
+- `RULES.md` 是 FCA 的规范规则文本，必须覆盖全部 `@Rule` 字段、默认值、作用端、
+  合法取值和用途。新增、删除、重命名规则或修改默认值、取值、作用端时，必须同步更新
+  `RULES.md`、`README.md` 规则表和中英文翻译。
 - 仅客户端规则使用 `RuleCategory.CLIENT`；服务端行为不得依赖客户端配置。
 
 新增规则的最小流程：
@@ -75,7 +77,7 @@ $env:JAVA_HOME = '<JDK 25 installation>'
 1. 在 `FrostorSettings` 中添加带 `@Rule` 的字段及合理默认值。
 2. 在两种语言的资源文件中补齐名称与描述。
 3. 在业务代码中读取该字段，并补充必要的值校验和运行期切换处理。
-4. 更新 README，并重新构建两个版本。
+4. 同步更新 `RULES.md`、README 规则表和中英文翻译，并重新构建两个版本。
 
 规则字段使用 lowerCamelCase，并以所属功能（如 `playerLadder`、`easyPlace`）作为前缀。布尔开关优先使用
 `Allow...` 或明确的语义名称，数量上限使用 `...Limit` / `...DepthLimit`，枚举模式使用
@@ -238,5 +240,5 @@ Java 枚举常量改成小写，否则 Carpet 无法解析。
   JAR 的运行时依赖边界。
 - 保留 MIT 许可证、项目声明以及模组元数据中的作者和依赖信息。
 - 任务完成前至少确认：两个版本的 `logicTest` 与 `easyPlaceProtocolTest` 通过；
-  Carpet 规则翻译完整；README 与行为一致；Carpet 未被误打包；涉及运行期逻辑时记录
-  手动验证结果。
+  Carpet 规则翻译完整；`RULES.md` 与 `FrostorSettings` 的全部 `@Rule` 字段一致；
+  README 与行为一致；Carpet 未被误打包；涉及运行期逻辑时记录手动验证结果。
