@@ -246,6 +246,9 @@ PR 始终运行变更分类和稳定的 `CI Gate`。只有源码、资源、版�
 或 workflow 变化时才执行 26.2/26.3 完整构建；README、文档和许可证等小改动只通过
 变更分类与 Gate。
 
+分支保护只要求 `CI Gate`；构建矩阵是否运行由变更分类决定，文档 PR 不会因缺少矩阵
+检查而被阻塞。
+
 仓库所有者可给自己的同仓库 PR 添加 `auto-merge` 标签。双版本 CI 通过后使用 Squash
 自动合并；Fork PR、草稿 PR 以及修改工作流或 Gradle/Wrapper 配置的 PR 仍须手动审核。
 移除标签会关闭已启用的 Auto-merge。
