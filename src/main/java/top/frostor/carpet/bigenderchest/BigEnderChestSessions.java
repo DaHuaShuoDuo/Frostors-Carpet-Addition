@@ -36,6 +36,7 @@ public final class BigEnderChestSessions {
 
     public static void initialize(MinecraftServer minecraftServer) {
         closeAll();
+        BigEnderChestFakePlayers.initialize();
         server = minecraftServer;
         pageRegistry = new PageRegistry(minecraftServer);
         dataStore = new FakePageDataStore(minecraftServer);
@@ -188,9 +189,11 @@ public final class BigEnderChestSessions {
 
     public static void tick(MinecraftServer minecraftServer) {
         if(!FrostorSettings.bigEnderChest) {
+            BigEnderChestFakePlayers.tick(minecraftServer, false);
             closeAll();
             return;
         }
+        BigEnderChestFakePlayers.tick(minecraftServer);
         boolean saveTick = ++tickCounter >= 20;
         if(saveTick) tickCounter = 0;
         for(Session session : SESSIONS.values()) {
@@ -233,6 +236,7 @@ public final class BigEnderChestSessions {
 
     public static void shutdown() {
         closeAll();
+        if(server != null) BigEnderChestFakePlayers.shutdown(server);
         if(pageRegistry != null) pageRegistry.flush();
         if(dataStore != null) dataStore.flush();
     }

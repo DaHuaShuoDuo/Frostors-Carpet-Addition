@@ -295,14 +295,7 @@ public final class BigEnderChestService {
 
     public void tick() {
         if(!isOpen()) return;
-        if(refreshOnlinePages()) {
-            long baseRevision = ensureBatchStarted();
-            finishMutation(baseRevision);
-        }
-        if(refreshPlayerPage()) {
-            long baseRevision = ensureBatchStarted();
-            finishMutation(baseRevision);
-        }
+        refreshOnlinePageState();
         if(pages.values().stream().anyMatch(page -> page.state() == StoragePageState.ERROR)) {
             return;
         }
@@ -317,6 +310,17 @@ public final class BigEnderChestService {
             int pagesBefore = pendingPageAdds.size();
             growPages(growth);
             if(pendingPageAdds.size() > pagesBefore) commitPendingPageAdds();
+        }
+    }
+
+    void refreshOnlinePageState() {
+        if(refreshOnlinePages()) {
+            long baseRevision = ensureBatchStarted();
+            finishMutation(baseRevision);
+        }
+        if(refreshPlayerPage()) {
+            long baseRevision = ensureBatchStarted();
+            finishMutation(baseRevision);
         }
     }
 
@@ -483,6 +487,7 @@ public final class BigEnderChestService {
         if(changed) {
             page.markChanged();
             pageRevision++;
+            BigEnderChestFakePlayers.touch(page.metadata());
         }
         return changed;
     }
@@ -520,10 +525,12 @@ public final class BigEnderChestService {
     }
 
     private Container activePageContainer(PageMetadata metadata) {
-        ServerPlayer online = onlinePagePlayer(metadata);
-        return online == null
-                ? offlinePageContainers.get(metadata.storagePage())
-                : online.getEnderChestInventory();
+        int pageIndex = metadata.storagePage();
+        if(onlinePages.contains(pageIndex)) {
+            Container online = onlinePageContainers.get(pageIndex);
+            if(online != null) return online;
+        }
+        return offlinePageContainers.get(pageIndex);
     }
 
     private ServerPlayer onlinePagePlayer(PageMetadata metadata) {
@@ -829,12 +836,32 @@ public final class BigEnderChestService {
         revision++;
     }
 
-    private void pageChanged(int pageIndex) {
+    void pageChanged(int pageIndex) {
         StoragePage page = pages.get(pageIndex);
         if(page != null && page.index() > 0 && page.isReady()) {
             page.markChanged();
             pageRevision++;
+            if(BigEnderChestFakePlayers.isManaged(page.metadata().pageUuid())) {
+                BigEnderChestFakePlayers.touch(page.metadata());
+            }else if(FrostorSettings.bigEnderChestLiveFakePlayers
+                    && onlinePagePlayer(page.metadata()) == null) {
+                BigEnderChestFakePlayers.request(
+                        owner,
+                        page.metadata(),
+                        offlinePageContainers.get(page.index())
+                );
+            }
         }
+    }
+
+    void requestLiveFakePage(int pageIndex) {
+        if(pageIndex <= 0 || !pages.containsKey(pageIndex)) return;
+        StoragePage page = pages.get(pageIndex);
+        BigEnderChestFakePlayers.request(
+                owner,
+                page.metadata(),
+                offlinePageContainers.get(pageIndex)
+        );
     }
 
     public record SlotChange(StorageLocation location, ItemStack stack) {

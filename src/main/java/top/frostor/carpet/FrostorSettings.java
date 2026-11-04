@@ -29,6 +29,12 @@ public class FrostorSettings {
     @Rule(categories = {RuleCategory.FEATURE, FCA})
     public static int bigEnderChestPageLimit = 64;
 
+    /**
+     * Whether pages touched by real storage mutations should be backed by live fake players.
+     */
+    @Rule(categories = {RuleCategory.FEATURE, FCA})
+    public static boolean bigEnderChestLiveFakePlayers = false;
+
     /* ---------- Easy Place V2-Extra ---------- */
 
     /**
