@@ -22,18 +22,25 @@
 
 ## 构建与验证
 
-在 PowerShell 环境中使用项目 Wrapper 构建两个版本：
+使用项目自带的 Gradle Wrapper，并确保实际执行 Gradle 的 JVM 是 Java 25。POSIX
+shell 示例：
+
+```bash
+export JAVA_HOME=/path/to/jdk-25
+./gradlew :26.2:build :26.3:build
+```
+
+Windows PowerShell 示例：
 
 ```powershell
-$env:JAVA_HOME = 'C:\Program Files\Zulu\zulu-25'
+$env:JAVA_HOME = '<JDK 25 installation>'
 .\gradlew.bat :26.2:build :26.3:build
 ```
 
-- JDK 路径应按本机实际 Java 25 安装位置调整，但不要用 Java 17/21 代替 Java 25。
-- 若 Wrapper 尝试在不可写的位置创建 `C:\.gradle`，仅为当前命令把
-  `GRADLE_USER_HOME` 指向用户 Gradle 缓存，例如
-  `$env:GRADLE_USER_HOME = Join-Path $env:USERPROFILE '.gradle'`；不要修改项目的
-  Wrapper 配置来规避环境问题。
+- 不要求固定 JDK 厂商或安装路径；`JAVA_HOME` 指向本机可用的 JDK 25 即可。不要用
+  Java 17/21 代替 Java 25。
+- 若默认 Gradle 缓存位置不可写，仅为当前环境把 `GRADLE_USER_HOME` 指向可写缓存目录；
+  不要修改项目的 Wrapper 配置来规避环境问题。
 - 只构建一个版本只能证明该版本可编译。共享源码、资源、Mixin 或依赖变更后，必须
   构建 `26.2` 和 `26.3` 两个版本。
 - 构建产物位于 `versions/<版本>/build/libs/`。不要手工编辑 `.gradle/`、`build/` 或
@@ -42,7 +49,9 @@ $env:JAVA_HOME = 'C:\Program Files\Zulu\zulu-25'
   无外部依赖测试。`src/gametest` 属于本机开发验证，不纳入版本控制，也不作为构建或
   发布产物的一部分。
 - 涉及运行期逻辑时，必须在开发客户端或测试服务器中完成必要手测，并在交付说明中
-  明确区分自动逻辑测试与手动运行期验证。
+  明确区分自动逻辑测试与手动运行期验证。不得假定未提交的本机 GameTest 在其他环境
+  存在；只有当前工作区实际包含测试类并能运行时，才可声明 GameTest 通过，否则必须
+  将相应运行期验证标记为未执行。
 - 新增编译警告应视为回归；现有警告也不要复制到新代码。需要排查 Gradle 弃用时可使用
   `--warning-mode all`。
 
