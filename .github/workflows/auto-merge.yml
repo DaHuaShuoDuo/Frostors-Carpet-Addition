@@ -47,11 +47,13 @@ jobs:
           protected=false
           while IFS= read -r path; do
             if [[ "$path" =~ ^\.github/workflows/ ]] \
-                || [[ "$path" =~ ^gradle/wrapper/ ]] \
+                || [[ "$path" =~ ^gradle/ ]] \
                 || [[ "$path" == "build.gradle" ]] \
                 || [[ "$path" == "common.gradle" ]] \
                 || [[ "$path" == "settings.gradle" ]] \
                 || [[ "$path" == "gradle.properties" ]] \
+                || [[ "$path" == "gradlew" ]] \
+                || [[ "$path" == "gradlew.bat" ]] \
                 || [[ "$path" =~ ^versions/[^/]+/gradle\.properties$ ]]; then
               protected=true
               break
