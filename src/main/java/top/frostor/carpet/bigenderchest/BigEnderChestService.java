@@ -1,8 +1,11 @@
 package top.frostor.carpet.bigenderchest;
 
+import carpet.patches.EntityPlayerMPFake;
+import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.Container;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.GameType;
 import top.frostor.carpet.FrostorSettings;
 import top.frostor.carpet.FrostorsCarpetAddition;
 import top.frostor.carpet.bigenderchest.capacity.BigEnderChestCapacity;
@@ -36,6 +39,8 @@ import java.util.UUID;
  * Main-thread storage facade shared by the vanilla menu and the terminal protocol.
  */
 public final class BigEnderChestService {
+    private static final long AUTO_FAKE_IDLE_TICKS = 200;
+
     private final ServerPlayer owner;
     private final UUID storageOwner;
     private final PageRegistry pageRegistry;
@@ -45,6 +50,10 @@ public final class BigEnderChestService {
     private final Map<Integer, Container> onlinePageContainers = new HashMap<>();
     private final Map<Integer, ItemStack[]> onlinePageSnapshots = new HashMap<>();
     private final Set<Integer> onlinePages = new HashSet<>();
+    private final Set<Integer> autoSpawnedPages = new HashSet<>();
+    private final Set<Integer> pendingAutoPages = new HashSet<>();
+    private final Map<Integer, Long> lastAutoSpawnAttempts = new HashMap<>();
+    private final Map<Integer, Long> lastAutoPageUses = new HashMap<>();
     private final BigEnderChestIndex index = new BigEnderChestIndex();
     private final Set<StorageLocation> pendingChanges = new LinkedHashSet<>();
     private final List<Integer> pendingPageAdds = new ArrayList<>();
@@ -53,6 +62,7 @@ public final class BigEnderChestService {
     private long revision;
     private long pageRevision = 1;
     private long pendingBaseRevision = -1;
+    private long serviceTick;
     private boolean closed;
 
     public BigEnderChestService(
@@ -156,6 +166,7 @@ public final class BigEnderChestService {
 
     public void close() {
         if(closed) return;
+        stopAutoSpawnedPages();
         saveDirtyPages();
         closed = true;
     }
@@ -295,14 +306,9 @@ public final class BigEnderChestService {
 
     public void tick() {
         if(!isOpen()) return;
-        if(refreshOnlinePages()) {
-            long baseRevision = ensureBatchStarted();
-            finishMutation(baseRevision);
-        }
-        if(refreshPlayerPage()) {
-            long baseRevision = ensureBatchStarted();
-            finishMutation(baseRevision);
-        }
+        serviceTick++;
+        maintainLiveFakePages();
+        refreshOnlinePageState();
         if(pages.values().stream().anyMatch(page -> page.state() == StoragePageState.ERROR)) {
             return;
         }
@@ -317,6 +323,17 @@ public final class BigEnderChestService {
             int pagesBefore = pendingPageAdds.size();
             growPages(growth);
             if(pendingPageAdds.size() > pagesBefore) commitPendingPageAdds();
+        }
+    }
+
+    void refreshOnlinePageState() {
+        if(refreshOnlinePages()) {
+            long baseRevision = ensureBatchStarted();
+            finishMutation(baseRevision);
+        }
+        if(refreshPlayerPage()) {
+            long baseRevision = ensureBatchStarted();
+            finishMutation(baseRevision);
         }
     }
 
@@ -384,9 +401,15 @@ public final class BigEnderChestService {
     public boolean onPagePlayerDisconnect(ServerPlayer pagePlayer) {
         StoragePage page = pageForPlayer(pagePlayer.getUUID());
         if(page == null || !onlinePages.contains(page.index())) return false;
+        boolean autoSpawned = autoSpawnedPages.contains(page.index());
         unbindOnlinePage(page, pagePlayer.getEnderChestInventory());
         long baseRevision = ensureBatchStarted();
         finishMutation(baseRevision);
+        if(autoSpawned
+                && !closed
+                && FrostorSettings.bigEnderChestLiveFakePlayers) {
+            pendingAutoPages.add(page.index());
+        }
         return true;
     }
 
@@ -467,6 +490,108 @@ public final class BigEnderChestService {
         return changed;
     }
 
+    void maintainLiveFakePages() {
+        maintainLiveFakePages(FrostorSettings.bigEnderChestLiveFakePlayers);
+    }
+
+    void maintainLiveFakePages(boolean enabled) {
+        if(!enabled) {
+            pendingAutoPages.clear();
+            stopAutoSpawnedPages();
+            return;
+        }
+        releaseIdleAutoPages();
+        for(int pageIndex : List.copyOf(pendingAutoPages)) {
+            StoragePage page = pages.get(pageIndex);
+            if(page == null || !page.isReady()) continue;
+            PageMetadata metadata = page.metadata();
+            if(onlinePagePlayer(metadata) != null) {
+                pendingAutoPages.remove(pageIndex);
+                continue;
+            }
+            if(EntityPlayerMPFake.isSpawningPlayer(metadata.pageName())) continue;
+            long lastAttempt = lastAutoSpawnAttempts.getOrDefault(
+                    pageIndex,
+                    Long.MIN_VALUE
+            );
+            if(lastAttempt != Long.MIN_VALUE && serviceTick - lastAttempt < 100) continue;
+            lastAutoSpawnAttempts.put(pageIndex, serviceTick);
+            if(EntityPlayerMPFake.createFake(
+                    metadata.pageName(),
+                    owner.level().getServer(),
+                    owner.position(),
+                    owner.getYRot(),
+                    owner.getXRot(),
+                    owner.level().dimension(),
+                    GameType.SPECTATOR,
+                    false
+            )) {
+                autoSpawnedPages.add(pageIndex);
+                pendingAutoPages.remove(pageIndex);
+            }else {
+                FrostorsCarpetAddition.LOGGER.warn(
+                        "Failed to spawn big ender chest page fake player {} for {}",
+                        metadata.pageName(),
+                        owner.getScoreboardName()
+                );
+            }
+        }
+    }
+
+    private void releaseIdleAutoPages() {
+        for(int pageIndex : List.copyOf(autoSpawnedPages)) {
+            long lastUse = lastAutoPageUses.getOrDefault(
+                    pageIndex,
+                    Long.MIN_VALUE
+            );
+            if(lastUse != Long.MIN_VALUE
+                    && serviceTick - lastUse < AUTO_FAKE_IDLE_TICKS) {
+                continue;
+            }
+            StoragePage page = pages.get(pageIndex);
+            if(page == null) {
+                autoSpawnedPages.remove(pageIndex);
+                lastAutoPageUses.remove(pageIndex);
+                continue;
+            }
+            ServerPlayer pagePlayer = onlinePagePlayer(page.metadata());
+            if(pagePlayer != null) {
+                releaseAutoSpawnedPage(page, pagePlayer);
+            }
+        }
+    }
+
+    private void stopAutoSpawnedPages() {
+        for(int pageIndex : List.copyOf(autoSpawnedPages)) {
+            StoragePage page = pages.get(pageIndex);
+            if(page == null) continue;
+            ServerPlayer pagePlayer = onlinePagePlayer(page.metadata());
+            if(pagePlayer == null || pagePlayer.connection == null) continue;
+            releaseAutoSpawnedPage(page, pagePlayer);
+        }
+        autoSpawnedPages.clear();
+        lastAutoPageUses.clear();
+    }
+
+    private void releaseAutoSpawnedPage(StoragePage page, ServerPlayer pagePlayer) {
+        autoSpawnedPages.remove(page.index());
+        lastAutoPageUses.remove(page.index());
+        if(onlinePages.contains(page.index())) {
+            unbindOnlinePage(page, pagePlayer.getEnderChestInventory());
+            long baseRevision = ensureBatchStarted();
+            finishMutation(baseRevision);
+        }
+        if(pagePlayer instanceof EntityPlayerMPFake fakePlayer) {
+            fakePlayer.kill(
+                    Component.translatable("big_ender_chest.fake_page.disconnect")
+            );
+        }else if(pagePlayer.connection != null) {
+            pagePlayer.connection.disconnect(
+                    Component.translatable("big_ender_chest.fake_page.disconnect")
+            );
+        }
+    }
+
     private boolean refreshOnlinePageContent(StoragePage page, Container container) {
         ItemStack[] snapshot = onlinePageSnapshots.get(page.index());
         if(snapshot == null) return false;
@@ -483,6 +608,9 @@ public final class BigEnderChestService {
         if(changed) {
             page.markChanged();
             pageRevision++;
+            if(autoSpawnedPages.contains(page.index())) {
+                lastAutoPageUses.put(page.index(), serviceTick);
+            }
         }
         return changed;
     }
@@ -829,12 +957,25 @@ public final class BigEnderChestService {
         revision++;
     }
 
-    private void pageChanged(int pageIndex) {
+    void pageChanged(int pageIndex) {
         StoragePage page = pages.get(pageIndex);
         if(page != null && page.index() > 0 && page.isReady()) {
             page.markChanged();
             pageRevision++;
+            if(autoSpawnedPages.contains(page.index())) {
+                lastAutoPageUses.put(page.index(), serviceTick);
+            }
+            if(FrostorSettings.bigEnderChestLiveFakePlayers
+                    && onlinePagePlayer(page.metadata()) == null) {
+                requestLiveFakePage(page.index());
+            }
         }
+    }
+
+    void requestLiveFakePage(int pageIndex) {
+        if(pageIndex <= 0 || !pages.containsKey(pageIndex)) return;
+        pendingAutoPages.add(pageIndex);
+        lastAutoPageUses.put(pageIndex, serviceTick);
     }
 
     public record SlotChange(StorageLocation location, ItemStack stack) {

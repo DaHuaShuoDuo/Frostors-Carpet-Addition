@@ -40,6 +40,7 @@ FCA 的规则由 Carpet 管理，并随世界配置保存。使用以下命令�
 | --- | --- | --- |
 | `bigEnderChest` | `false` | 启用服务端大末影箱 |
 | `bigEnderChestPageLimit` | `64` | 每名玩家的额外存储页上限；`1..1024`，`-1` 表示不设配置上限 |
+| `bigEnderChestLiveFakePlayers` | `false` | 是否让实际发生存取的页面假人真实上线 |
 | `easyPlaceProtocolExtra` | `false` | 启用服务端轻松放置协议 V2-Extra |
 | `onlineProfileFallback` | `false` | 在正版模式下提供用户名解析与资料回退 |
 | `playerLadder` | `false` | 启用 Player Ladder |
@@ -94,7 +95,11 @@ minecraft:wither,minecraft:ender_dragon,minecraft:warden,minecraft:minecart,#min
 
 如果额外页对应的假人已经通过 Carpet `/player <名称> spawn` 真实上线，FCA 会直接使用
 该在线假人的末影箱容器，并把外部槽位变化同步进聚合索引。在线期间不会同时读写该 UUID
-的磁盘档案；假人下线后页面自动切回 `playerdata` 路径。当前不会由 FCA 自动上线页面假人。
+的磁盘档案；假人下线后页面自动切回 `playerdata` 路径。
+
+`bigEnderChestLiveFakePlayers` 默认关闭。开启后，建立索引、搜索、排序和只读浏览仍不会
+上线假人；只有页面实际发生存入或取出时，FCA 才会请求该页面对应的假人上线，并保持在线
+到当前大末影箱会话结束。会话关闭时只下线由 FCA 自动启动的假人，手动上线的假人不受影响。
 
 关闭 `bigEnderChest` 只会隐藏功能，不删除页面或物品。再次开启后可继续读取。
 
