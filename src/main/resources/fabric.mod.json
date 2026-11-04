@@ -17,7 +17,6 @@
 	},
 	"mixins": [
 		"frostors-carpet-addition.mixins.json",
-		"frostors-carpet-bigenderchest.mixins.json",
 		"frostors-carpet-easyplace.mixins.json",
 		"frostors-carpet-onlineprofile.mixins.json"
 	],
@@ -27,5 +26,8 @@
 		"java": ">=25",
 		"fabric-api": "${fabric_api_dependency}",
 		"carpet": "${carpet_dependency}"
+	},
+	"suggests": {
+		"quickshulker": "*"
 	}
 }

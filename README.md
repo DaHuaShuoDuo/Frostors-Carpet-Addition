@@ -30,6 +30,11 @@ Easy Place V2-Extra、Player Ladder 和私人服务器在线资料回退等功�
 - Fabric API
 - 对应 Minecraft 版本的 Carpet
 
+可选依赖：
+
+- Quick Shulker：允许通过其快捷键、背包操作或手持右键打开大末影箱；需要同时安装在
+  客户端和服务端。
+
 将 FCA 和上述依赖放入服务端的 `mods` 目录。客户端只有需要使用客户端规则或
 可选兼容功能时才安装 FCA。
 
@@ -51,7 +56,8 @@ FCA 的规则由 Carpet 管理，并随世界配置保存：
 - 聚合槽是服务端管理的虚拟槽，最终状态以服务端事务结果为准。
 - `bigEnderChestLiveFakePlayers` 可选地让实际发生存取的页面假人真实上线；索引和
   只读浏览仍使用离线文件。
-- Quick Shulker 打开三行末影箱时会由服务端转换为大末影箱菜单。
+- Quick Shulker 的快捷按键、背包操作和手持右键路径通过其公开
+  `QuickOpenableRegistry` 接口打开大末影箱菜单。
 
 自动页面假人按页独立计时，菜单关闭不会触发统一下线；空闲回收、规则关闭和
 服务器停止时会先同步数据。真实假人首次批量上线可能产生明显的 server tick 尖峰，
@@ -96,6 +102,7 @@ Mojang 会话验证，不应在公开或不可信服务器上启用。
 - FCA 规则保存在世界的 `carpet.conf` 中，不使用独立配置文件。
 - 大末影箱页面元数据保存在世界目录，不写入客户端配置。
 - Carpet 只作为编译期依赖引用，不会打包进 FCA。
+- Quick Shulker 仅用于可选的公开接口适配，不会打包进 FCA，也不会成为硬依赖。
 - 客户端工具协议不包含终端 GUI；兼容客户端由独立项目实现。
 - 大末影箱和 Easy Place 的规则握手由 Carpet `RuleObserver` 事件驱动；规则热切换会向
   已完成握手的在线客户端推送新的能力状态。
@@ -117,7 +124,8 @@ $env:JAVA_HOME = '<JDK 25 installation>'
 .\gradlew.bat :26.2:build :26.3:build
 ```
 
-构建前按 [`libs/README.md`](https://github.com/DaHuaShuoDuo/Frostors-Carpet-Addition/blob/main/libs/README.md) 准备对应版本的 Carpet 编译依赖。
+构建前按 [`libs/README.md`](https://github.com/DaHuaShuoDuo/Frostors-Carpet-Addition/blob/main/libs/README.md)
+准备对应版本的 Carpet 和 Quick Shulker 编译依赖。
 共享源码、资源或 Mixin 修改后必须同时构建 26.2 和 26.3。
 
 PR 始终运行变更分类和 `CI Gate`；只有源码、资源、版本属性、Gradle、Wrapper 或

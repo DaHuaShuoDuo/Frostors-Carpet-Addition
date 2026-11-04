@@ -4,6 +4,7 @@ import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.event.player.UseBlockCallback;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
+import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -14,6 +15,7 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.phys.BlockHitResult;
 import top.frostor.carpet.FrostorSettings;
+import top.frostor.carpet.bigenderchest.compat.QuickShulkerIntegration;
 import top.frostor.carpet.bigenderchest.menu.BigEnderChestTerminalMenu;
 
 public final class BigEnderChest {
@@ -29,7 +31,12 @@ public final class BigEnderChest {
         BigEnderChestTerminalMenu.menuType();
         BigEnderChestProtocolServer.register();
         UseBlockCallback.EVENT.register(BigEnderChest::useBlock);
-        ServerLifecycleEvents.SERVER_STARTED.register(BigEnderChestSessions::initialize);
+        ServerLifecycleEvents.SERVER_STARTED.register(server -> {
+            BigEnderChestSessions.initialize(server);
+            if(FabricLoader.getInstance().isModLoaded("quickshulker")) {
+                QuickShulkerIntegration.register();
+            }
+        });
         ServerLifecycleEvents.SERVER_STOPPING.register(ignored -> BigEnderChestSessions.shutdown());
         ServerPlayConnectionEvents.JOIN.register((handler, sender, ignored) ->
                 BigEnderChestSessions.onPlayerJoin(handler.player));

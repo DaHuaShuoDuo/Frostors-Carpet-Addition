@@ -96,12 +96,12 @@ jobs:
       - name: Make Gradle wrapper executable
         run: chmod +x gradlew
 
-      - name: Download Carpet compile dependency
+      - name: Download compile dependencies
         env:
           GH_TOKEN: ${{ github.token }}
           MC_VERSION: ${{ matrix.minecraft }}
         run: |
-          mkdir -p libs .ci/carpet
+          mkdir -p libs .ci/carpet .ci/quickshulker
           gh release download "v${MC_VERSION}" \
             --repo gnembon/fabric-carpet \
             --pattern "fabric-carpet-${MC_VERSION}*.jar" \
@@ -110,6 +110,18 @@ jobs:
           carpet_jar="$(find .ci/carpet -maxdepth 1 -name '*.jar' -print -quit)"
           test -n "$carpet_jar"
           cp "$carpet_jar" "libs/fabric-carpet-${MC_VERSION}.jar"
+          quickshulker_version="$(sed -n 's/^[[:space:]]*quickshulker_version=//p' \
+            "versions/${MC_VERSION}/gradle.properties")"
+          test -n "$quickshulker_version"
+          gh release download "$quickshulker_version" \
+            --repo MoRanpcy/quickshulker \
+            --pattern "*.jar" \
+            --dir .ci/quickshulker \
+            --clobber
+          quickshulker_jar="$(find .ci/quickshulker -maxdepth 1 -name '*.jar' \
+            ! -name '*-sources.jar' -print -quit)"
+          test -n "$quickshulker_jar"
+          cp "$quickshulker_jar" "libs/quickshulker-${MC_VERSION}.jar"
 
       - name: Build and test
         env:
@@ -127,6 +139,10 @@ jobs:
           jq -e '.depends.carpet != null and .environment == "*"' .ci/fabric.mod.json
           if unzip -Z1 "$main_jar" | grep '^carpet/' > /dev/null; then
             echo "::error::Carpet classes were bundled into $main_jar"
+            exit 1
+          fi
+          if unzip -Z1 "$main_jar" | grep '^net/kyrptonaught/' > /dev/null; then
+            echo "::error::Quick Shulker classes were bundled into $main_jar"
             exit 1
           fi
           echo "Verified $main_jar"
