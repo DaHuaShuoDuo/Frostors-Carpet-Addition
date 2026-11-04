@@ -97,7 +97,7 @@ Do not enable it on public or untrusted servers.
 
 ## Carpet Rules
 
-See the complete [rule reference](RULES.md) for every rule name, default value,
+See the complete [rule reference](https://github.com/DaHuaShuoDuo/Frostors-Carpet-Addition/blob/main/RULES.md) for every rule name, default value,
 side, accepted values, purpose, and command. Rule names are case-sensitive:
 
 ```text
@@ -134,7 +134,7 @@ $env:JAVA_HOME = '<JDK 25 installation>'
 ```
 
 Prepare the matching Carpet compile dependency as described in
-[`libs/README.md`](libs/README.md). Shared source, resource, or Mixin changes
+[`libs/README.md`](https://github.com/DaHuaShuoDuo/Frostors-Carpet-Addition/blob/main/libs/README.md). Shared source, resource, or Mixin changes
 must be built for both 26.2 and 26.3.
 
 Every PR runs change classification and `CI Gate`. The full two-version build
@@ -143,9 +143,9 @@ workflow files change.
 
 ## License and Third-Party Sources
 
-FCA uses the [MIT License](LICENSE).
+FCA uses the [MIT License](https://github.com/DaHuaShuoDuo/Frostors-Carpet-Addition/blob/main/LICENSE).
 
 Player Ladder is adapted from ForwarD-NerN's PlayerLadder (MIT). The Easy Place
 V2-Extra server implementation is adapted from chenjunfu2's EarlyCompat
-(CC0-1.0). See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for additional
+(CC0-1.0). See [THIRD_PARTY_NOTICES.md](https://github.com/DaHuaShuoDuo/Frostors-Carpet-Addition/blob/main/THIRD_PARTY_NOTICES.md) for additional
 notices.

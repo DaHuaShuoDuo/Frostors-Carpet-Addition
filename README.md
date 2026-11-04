@@ -82,7 +82,7 @@ Mojang 会话验证，不应在公开或不可信服务器上启用。
 
 ## Carpet 规则
 
-完整规则规范见 [`RULES.md`](RULES.md)，包括全部规则名、默认值、作用端、合法取值、
+完整规则规范见 [`RULES.md`](https://github.com/DaHuaShuoDuo/Frostors-Carpet-Addition/blob/main/RULES.md)，包括全部规则名、默认值、作用端、合法取值、
 用途和设置命令。规则名区分大小写：
 
 ```text
@@ -115,7 +115,7 @@ $env:JAVA_HOME = '<JDK 25 installation>'
 .\gradlew.bat :26.2:build :26.3:build
 ```
 
-构建前按 [`libs/README.md`](libs/README.md) 准备对应版本的 Carpet 编译依赖。
+构建前按 [`libs/README.md`](https://github.com/DaHuaShuoDuo/Frostors-Carpet-Addition/blob/main/libs/README.md) 准备对应版本的 Carpet 编译依赖。
 共享源码、资源或 Mixin 修改后必须同时构建 26.2 和 26.3。
 
 PR 始终运行变更分类和 `CI Gate`；只有源码、资源、版本属性、Gradle、Wrapper 或
@@ -123,8 +123,8 @@ workflow 变化时才执行双版本完整构建。
 
 ## 许可证与第三方来源
 
-FCA 使用 [MIT License](LICENSE)。
+FCA 使用 [MIT License](https://github.com/DaHuaShuoDuo/Frostors-Carpet-Addition/blob/main/LICENSE)。
 
 Player Ladder 改编自 ForwarD-NerN 的 PlayerLadder（MIT）。Easy Place V2-Extra
 服务端实现改编自 chenjunfu2 的 EarlyCompat（CC0-1.0）。其他来源见
-[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
+[THIRD_PARTY_NOTICES.md](https://github.com/DaHuaShuoDuo/Frostors-Carpet-Addition/blob/main/THIRD_PARTY_NOTICES.md)。
