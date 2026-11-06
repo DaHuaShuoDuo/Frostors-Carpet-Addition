@@ -36,7 +36,7 @@ import top.frostor.carpet.bigenderchest.index.ItemTemplateKey;
 import top.frostor.carpet.bigenderchest.index.StorageEntry;
 import top.frostor.carpet.bigenderchest.index.StorageLocation;
 import top.frostor.carpet.bigenderchest.menu.BigEnderChestMenu;
-import top.frostor.carpet.bigenderchest.menu.BigEnderChestTerminalMenu;
+import top.frostor.carpet.bigenderchest.menu.BigEnderChestTerminalCarrierMenu;
 
 import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;
@@ -205,13 +205,26 @@ public final class BigEnderChestProtocolServer {
         return state != null && state.accepted;
     }
 
-    static boolean isTerminalClient(ServerPlayer player) {
+    static boolean supportsTerminalUi(ServerPlayer player) {
         ClientState state = CLIENTS.get(player.getUUID());
-        return FrostorSettings.bigEnderChest
-                && state != null
+        return state != null
                 && state.accepted
                 && (state.capabilities
                 & BigEnderChestProtocol.CAPABILITY_TERMINAL_MENU) != 0;
+    }
+
+    static boolean supportsGenericTerminalCarrier(ServerPlayer player) {
+        ClientState state = CLIENTS.get(player.getUUID());
+        return state != null
+                && state.accepted
+                && (state.capabilities
+                & BigEnderChestProtocol.CAPABILITY_GENERIC_TERMINAL_CARRIER) != 0;
+    }
+
+    static boolean usesTerminalCarrier(ServerPlayer player) {
+        return FrostorSettings.bigEnderChest
+                && supportsTerminalUi(player)
+                && supportsGenericTerminalCarrier(player);
     }
 
     private static void handle(ServerPlayer player, Payload payload) {
@@ -244,7 +257,7 @@ public final class BigEnderChestProtocolServer {
 
     private static void handleHello(ServerPlayer player, CompoundTag data) {
         Hello hello = Hello.fromTag(data);
-        boolean wasTerminalClient = isTerminalClient(player);
+        boolean wasTerminalCarrier = usesTerminalCarrier(player);
         boolean accepted = hello.protocolVersion() == BigEnderChestProtocol.PROTOCOL_VERSION
                 && hello.maxChunkBytes() > 0
                 && (hello.capabilities() & BigEnderChestProtocol.CAPABILITY_SNAPSHOT) != 0
@@ -254,21 +267,20 @@ public final class BigEnderChestProtocolServer {
                 Math.max(1024, hello.maxChunkBytes())
         );
         int capabilities = hello.capabilities() & BigEnderChestProtocol.CAPABILITIES;
-        ClientState state = accepted
-                ? CLIENTS.computeIfAbsent(player.getUUID(), ignored -> new ClientState())
-                : CLIENTS.get(player.getUUID());
-        if(state != null) {
-            state.accepted = accepted;
-            state.chunkByteLimit = chunkLimit;
-            state.capabilities = capabilities;
-        }
-        if(state != null) sendHelloAck(player, state);
+        ClientState state = CLIENTS.computeIfAbsent(
+                player.getUUID(),
+                ignored -> new ClientState()
+        );
+        state.accepted = accepted;
+        state.chunkByteLimit = chunkLimit;
+        state.capabilities = capabilities;
+        sendHelloAck(player, state);
         if(!accepted) {
             CLIENTS.remove(player.getUUID());
             return;
         }
         BigEnderChestSessions.Session session = BigEnderChestSessions.session(player);
-        if(session != null && wasTerminalClient != isTerminalClient(player)) {
+        if(session != null && wasTerminalCarrier != usesTerminalCarrier(player)) {
             BigEnderChestSessions.open(player);
             return;
         }
@@ -312,10 +324,10 @@ public final class BigEnderChestProtocolServer {
                         session.service().pageRevision(),
                         session.service().isReadOnly(),
                         state.capabilities,
-                        session.menu() instanceof top.frostor.carpet.bigenderchest.menu.BigEnderChestTerminalMenu
-                                ? session.containerId()
-                                : -1,
-                        0
+                        -1,
+                        session.menu() instanceof BigEnderChestTerminalCarrierMenu
+                                ? BigEnderChestProtocol.SESSION_FLAG_GENERIC_TERMINAL_CARRIER
+                                : 0
                 ).toTag()
         );
         state.sentPageRevision = session.service().pageRevision();
@@ -715,8 +727,8 @@ public final class BigEnderChestProtocolServer {
                 || request.sessionId() != session.sessionId()
                 || player.containerMenu != session.menu()
                 || !session.isWithinSourceRange()
-                || (state.capabilities
-                & BigEnderChestProtocol.CAPABILITY_TERMINAL_MENU) == 0) {
+                || !supportsTerminalUi(player)
+                || !supportsGenericTerminalCarrier(player)) {
             sendActionResult(
                     player,
                     request.requestId(),
@@ -725,7 +737,7 @@ public final class BigEnderChestProtocolServer {
             );
             return;
         }
-        if(session.menu() instanceof BigEnderChestTerminalMenu) {
+        if(session.menu() instanceof BigEnderChestTerminalCarrierMenu) {
             sendActionResult(
                     player,
                     request.requestId(),

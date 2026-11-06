@@ -16,7 +16,6 @@ import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.phys.BlockHitResult;
 import top.frostor.carpet.FrostorSettings;
 import top.frostor.carpet.bigenderchest.compat.QuickShulkerIntegration;
-import top.frostor.carpet.bigenderchest.menu.BigEnderChestTerminalMenu;
 
 public final class BigEnderChest {
     private static boolean registered;
@@ -28,7 +27,6 @@ public final class BigEnderChest {
         if(registered) return;
         registered = true;
 
-        BigEnderChestTerminalMenu.menuType();
         BigEnderChestProtocolServer.register();
         UseBlockCallback.EVENT.register(BigEnderChest::useBlock);
         ServerLifecycleEvents.SERVER_STARTED.register(server -> {

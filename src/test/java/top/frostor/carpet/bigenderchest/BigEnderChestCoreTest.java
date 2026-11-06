@@ -162,6 +162,26 @@ public final class BigEnderChestCoreTest {
     }
 
     private static void testProtocolDtos() {
+        check(BigEnderChestProtocol.PROTOCOL_VERSION == 3, "protocol version must be 3");
+        check(
+                BigEnderChestProtocol.CAPABILITY_GENERIC_TERMINAL_CARRIER == 1 << 14,
+                "generic terminal carrier capability must use the next free bit"
+        );
+        check(
+                (BigEnderChestProtocol.CAPABILITIES
+                        & BigEnderChestProtocol.CAPABILITY_GENERIC_TERMINAL_CARRIER) != 0,
+                "generic terminal carrier must be advertised"
+        );
+        check(
+                BigEnderChestProtocol.TERMINAL_CARRIER_CONTAINER_SLOTS == 54,
+                "generic terminal carrier must reserve a full 9x6 container"
+        );
+        check(
+                BigEnderChestProtocol.TERMINAL_PLAYER_SLOT_START == 54
+                        && BigEnderChestProtocol.TERMINAL_CARRIER_MAIN_SLOT_START == 54
+                        && BigEnderChestProtocol.TERMINAL_CARRIER_HOTBAR_SLOT_START == 81,
+                "generic terminal carrier player slots must follow the container slots"
+        );
         check(
                 (BigEnderChestProtocol.CAPABILITIES
                         & BigEnderChestProtocol.CAPABILITY_RULE_STATE_ACK) != 0,
@@ -183,8 +203,13 @@ public final class BigEnderChestCoreTest {
                 5,
                 false,
                 BigEnderChestProtocol.CAPABILITIES,
-                7,
-                0
+                -1,
+                BigEnderChestProtocol.SESSION_FLAG_GENERIC_TERMINAL_CARRIER
+        );
+        check(
+                (sessionOpen.flags()
+                        & BigEnderChestProtocol.SESSION_FLAG_GENERIC_TERMINAL_CARRIER) != 0,
+                "session-open flags must retain the generic terminal carrier marker"
         );
         check(
                 BigEnderChestProtocol.SessionOpen.fromTag(sessionOpen.toTag())

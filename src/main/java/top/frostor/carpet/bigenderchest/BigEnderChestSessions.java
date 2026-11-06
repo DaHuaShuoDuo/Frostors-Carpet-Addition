@@ -1,19 +1,16 @@
 package top.frostor.carpet.bigenderchest;
 
-import net.fabricmc.fabric.api.menu.v1.ExtendedMenuProvider;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.util.Unit;
 import net.minecraft.world.SimpleMenuProvider;
 import net.minecraft.world.entity.player.Inventory;
-import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
 import top.frostor.carpet.FrostorSettings;
 import top.frostor.carpet.bigenderchest.menu.BigEnderChestMenu;
-import top.frostor.carpet.bigenderchest.menu.BigEnderChestTerminalMenu;
+import top.frostor.carpet.bigenderchest.menu.BigEnderChestTerminalCarrierMenu;
 import top.frostor.carpet.bigenderchest.menu.BigEnderChestView;
 import top.frostor.carpet.bigenderchest.page.FakePageDataStore;
 import top.frostor.carpet.bigenderchest.page.PageRegistry;
@@ -58,7 +55,7 @@ public final class BigEnderChestSessions {
             return false;
         }
         Session session = beginSession(player);
-        boolean terminal = BigEnderChestProtocolServer.isTerminalClient(player);
+        boolean terminal = BigEnderChestProtocolServer.usesTerminalCarrier(player);
         OptionalInt menuId = player.openMenu(terminal
                 ? terminalMenuProvider(session.service())
                 : vanillaMenuProvider(session.service()));
@@ -72,27 +69,15 @@ public final class BigEnderChestSessions {
         return true;
     }
 
-    static ExtendedMenuProvider<Unit> terminalMenuProvider(BigEnderChestService service) {
-        return new ExtendedMenuProvider<>() {
-            @Override
-            public Unit getScreenOpeningData(ServerPlayer player) {
-                return Unit.INSTANCE;
-            }
-
-            @Override
-            public Component getDisplayName() {
-                return Component.translatable("big_ender_chest.menu.title");
-            }
-
-            @Override
-            public BigEnderChestTerminalMenu createMenu(
-                    int syncId,
-                    Inventory inventory,
-                    Player player
-            ) {
-                return new BigEnderChestTerminalMenu(syncId, inventory, service);
-            }
-        };
+    static SimpleMenuProvider terminalMenuProvider(BigEnderChestService service) {
+        return new SimpleMenuProvider(
+                (syncId, inventory, ignored) -> new BigEnderChestTerminalCarrierMenu(
+                        syncId,
+                        inventory,
+                        service
+                ),
+                Component.translatable("big_ender_chest.menu.title")
+        );
     }
 
     private static SimpleMenuProvider vanillaMenuProvider(BigEnderChestService service) {
@@ -117,7 +102,7 @@ public final class BigEnderChestSessions {
                 || pageRegistry == null) {
             return null;
         }
-        if(BigEnderChestProtocolServer.isTerminalClient(player)) {
+        if(BigEnderChestProtocolServer.usesTerminalCarrier(player)) {
             player.level().getServer().execute(() -> open(player));
             return null;
         }

@@ -66,6 +66,7 @@ extract, sort, page, and discard items.
   stay on the offline file path.
 - Quick Shulker's keybinding, inventory, and hand-use paths open the big ender
   chest through its public `QuickOpenableRegistry` API.
+- After a protocol v3 handshake that advertises the generic carrier, FCA opens the same vanilla `GENERIC_9x6` carrier: 54 read-only placeholder slots plus 36 player-inventory slots. The complete item list still travels through protocol snapshots and deltas. Neither the vanilla aggregate menu nor the terminal carrier registers a custom `MenuType`.
 
 Automatic page fake players track idle time per page. Closing the menu does not
 stop all page fake players; data is synchronized before idle cleanup, rule
@@ -88,11 +89,7 @@ aiming fix.
 
 ### Client Compatibility and Public Protocols
 
-FCA does not include a custom big ender chest terminal GUI. Clients such as
-TriWasa can use the public `BigEnderChestProtocol.Payload` and
-`EasyPlaceExtraPayload` types, message DTOs, and codecs defined by FCA. When FCA
-is loaded in the same process, clients reuse those types instead of registering
-a different payload class for the same channel.
+FCA does not include a custom big ender chest terminal GUI and does not register a custom terminal `MenuType`. Clients such as TriWasa can use the protocol v3 `BigEnderChestProtocol.Payload` and `EasyPlaceExtraPayload` types, message DTOs, and codecs defined by FCA. The terminal requires a TriWasa build matching FCA `0.2.0-beta.3`; vanilla clients do not need FCA or TriWasa. When FCA is loaded in the same process, clients reuse those types instead of registering a different payload class for the same channel.
 
 ### Online Profile Fallback
 
