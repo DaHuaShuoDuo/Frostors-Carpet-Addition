@@ -1,14 +1,11 @@
 package top.frostor.carpet.bigenderchest.menu;
 
-import net.fabricmc.fabric.api.menu.v1.ExtendedMenuType;
-import net.minecraft.core.Registry;
-import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.util.Unit;
+import net.minecraft.world.SimpleContainer;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.inventory.AbstractContainerMenu;
+import net.minecraft.world.inventory.ChestMenu;
+import net.minecraft.world.inventory.ContainerInput;
 import net.minecraft.world.inventory.MenuType;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
@@ -16,55 +13,59 @@ import top.frostor.carpet.bigenderchest.BigEnderChestService;
 import top.frostor.carpet.bigenderchest.BigEnderChestSessions;
 import top.frostor.carpet.bigenderchest.api.BigEnderChestProtocol;
 
-public final class BigEnderChestTerminalMenu extends AbstractContainerMenu {
-    public static final int PLAYER_SLOT_COUNT = 36;
-    private static final MenuType<BigEnderChestTerminalMenu> MENU_TYPE = Registry.register(
-            BuiltInRegistries.MENU,
-            BigEnderChestProtocol.TERMINAL_MENU_ID,
-            new ExtendedMenuType<BigEnderChestTerminalMenu, Unit>(
-                    (syncId, inventory, ignored) ->
-                            new BigEnderChestTerminalMenu(syncId, inventory),
-                    StreamCodec.unit(Unit.INSTANCE)
-            )
-    );
+/**
+ * Generic 9x6 carrier for the protocol-driven terminal.
+ */
+public final class BigEnderChestTerminalCarrierMenu extends ChestMenu {
+    private static final int CARRIER_SLOT_END =
+            BigEnderChestProtocol.TERMINAL_CARRIER_CONTAINER_SLOTS;
+    private static final int PLAYER_SLOT_END =
+            BigEnderChestProtocol.TERMINAL_CARRIER_HOTBAR_SLOT_START + 9;
 
     private final Player owner;
     private final BigEnderChestService service;
 
-    public BigEnderChestTerminalMenu(int syncId, Inventory inventory) {
-        this(syncId, inventory, null);
-    }
-
-    public BigEnderChestTerminalMenu(
+    public BigEnderChestTerminalCarrierMenu(
             int syncId,
             Inventory inventory,
             BigEnderChestService service
     ) {
-        super(MENU_TYPE, syncId);
+        super(
+                MenuType.GENERIC_9x6,
+                syncId,
+                inventory,
+                new SimpleContainer(BigEnderChestProtocol.TERMINAL_CARRIER_CONTAINER_SLOTS),
+                6
+        );
         this.owner = inventory.player;
         this.service = service;
-        addStandardInventorySlots(inventory, 8, 84);
-        if(service != null) {
-            BigEnderChestSessions.attachMenu(this, service);
-        }
-    }
-
-    public static MenuType<BigEnderChestTerminalMenu> menuType() {
-        return MENU_TYPE;
+        BigEnderChestSessions.attachMenu(this, service);
     }
 
     public BigEnderChestService service() {
         return service;
     }
 
-    public ItemStack moveToPlayerInventory(ItemStack stack) {
-        moveItemStackTo(stack, 0, PLAYER_SLOT_COUNT, true);
-        return stack;
+    @Override
+    public void clicked(int slotId, int button, ContainerInput input, Player player) {
+        if(slotId >= 0 && slotId < CARRIER_SLOT_END) {
+            return;
+        }
+        if(slotId >= BigEnderChestProtocol.TERMINAL_PLAYER_SLOT_START
+                && slotId < PLAYER_SLOT_END
+                && input == ContainerInput.QUICK_MOVE) {
+            quickMoveStack(player, slotId);
+            return;
+        }
+        super.clicked(slotId, button, input, player);
     }
 
     @Override
     public ItemStack quickMoveStack(Player player, int index) {
-        if(service == null || index < 0 || index >= slots.size()) {
+        if(service == null
+                || index < BigEnderChestProtocol.TERMINAL_PLAYER_SLOT_START
+                || index >= PLAYER_SLOT_END
+                || index >= slots.size()) {
             return ItemStack.EMPTY;
         }
         Slot source = slots.get(index);
@@ -78,6 +79,17 @@ public final class BigEnderChestTerminalMenu extends AbstractContainerMenu {
             broadcastChanges();
         }
         return ItemStack.EMPTY;
+    }
+
+    @Override
+    public boolean canDragTo(Slot slot) {
+        return slot.index >= CARRIER_SLOT_END && super.canDragTo(slot);
+    }
+
+    @Override
+    public boolean canTakeItemForPickAll(ItemStack stack, Slot slot) {
+        return slot.index >= CARRIER_SLOT_END
+                && super.canTakeItemForPickAll(stack, slot);
     }
 
     @Override

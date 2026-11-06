@@ -25,16 +25,26 @@ public final class BigEnderChestProtocol {
             FrostorsCarpetAddition.MOD_ID,
             "big_ender_chest"
     );
-    public static final int PROTOCOL_VERSION = 2;
+    public static final int PROTOCOL_VERSION = 3;
     public static final int MAX_CHUNK_BYTES = 256 * 1024;
     public static final int UNLIMITED_PAGE_LIMIT = -1;
+    /** Legacy terminal menu id retained for wire compatibility; protocol v3 does not register it. */
+    @Deprecated(forRemoval = false)
     public static final Identifier TERMINAL_MENU_ID = Identifier.fromNamespaceAndPath(
             FrostorsCarpetAddition.MOD_ID,
             "big_ender_chest_terminal"
     );
+    /** Legacy custom-menu player slot offsets; protocol v3 uses the generic carrier constants below. */
+    @Deprecated(forRemoval = false)
     public static final int TERMINAL_PLAYER_SLOT_COUNT = 36;
+    @Deprecated(forRemoval = false)
     public static final int TERMINAL_MAIN_SLOT_START = 0;
+    @Deprecated(forRemoval = false)
     public static final int TERMINAL_HOTBAR_SLOT_START = 27;
+    public static final int TERMINAL_CARRIER_CONTAINER_SLOTS = 54;
+    public static final int TERMINAL_PLAYER_SLOT_START = TERMINAL_CARRIER_CONTAINER_SLOTS;
+    public static final int TERMINAL_CARRIER_MAIN_SLOT_START = TERMINAL_PLAYER_SLOT_START;
+    public static final int TERMINAL_CARRIER_HOTBAR_SLOT_START = TERMINAL_CARRIER_MAIN_SLOT_START + 27;
 
     public static final int CAPABILITY_SNAPSHOT = 1;
     public static final int CAPABILITY_DELTA = 1 << 1;
@@ -50,6 +60,7 @@ public final class BigEnderChestProtocol {
     public static final int CAPABILITY_SESSION_CLOSE = 1 << 11;
     public static final int CAPABILITY_RULE_STATE_ACK = 1 << 12;
     public static final int CAPABILITY_TERMINAL_MENU_ACTIVE = 1 << 13;
+    public static final int CAPABILITY_GENERIC_TERMINAL_CARRIER = 1 << 14;
     public static final int CAPABILITIES = CAPABILITY_SNAPSHOT
             | CAPABILITY_DELTA
             | CAPABILITY_ACTIONS
@@ -63,7 +74,8 @@ public final class BigEnderChestProtocol {
             | CAPABILITY_SNAPSHOT_ACK
             | CAPABILITY_SESSION_CLOSE
             | CAPABILITY_RULE_STATE_ACK
-            | CAPABILITY_TERMINAL_MENU_ACTIVE;
+            | CAPABILITY_TERMINAL_MENU_ACTIVE
+            | CAPABILITY_GENERIC_TERMINAL_CARRIER;
 
     public static final int HELLO = 1;
     public static final int HELLO_ACK = 2;
@@ -79,6 +91,8 @@ public final class BigEnderChestProtocol {
     public static final int SNAPSHOT_ACK = 12;
     public static final int REQUEST_RESYNC = 13;
     public static final int OPEN_TERMINAL_REQUEST = 14;
+
+    public static final int SESSION_FLAG_GENERIC_TERMINAL_CARRIER = 1 << 0;
 
     public static final int ACTION_TAKE_ONE = 1;
     public static final int ACTION_TAKE_STACK = 2;
