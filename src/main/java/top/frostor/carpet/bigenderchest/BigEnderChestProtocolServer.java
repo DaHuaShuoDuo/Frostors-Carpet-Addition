@@ -267,15 +267,14 @@ public final class BigEnderChestProtocolServer {
                 Math.max(1024, hello.maxChunkBytes())
         );
         int capabilities = hello.capabilities() & BigEnderChestProtocol.CAPABILITIES;
-        ClientState state = accepted
-                ? CLIENTS.computeIfAbsent(player.getUUID(), ignored -> new ClientState())
-                : CLIENTS.get(player.getUUID());
-        if(state != null) {
-            state.accepted = accepted;
-            state.chunkByteLimit = chunkLimit;
-            state.capabilities = capabilities;
-        }
-        if(state != null) sendHelloAck(player, state);
+        ClientState state = CLIENTS.computeIfAbsent(
+                player.getUUID(),
+                ignored -> new ClientState()
+        );
+        state.accepted = accepted;
+        state.chunkByteLimit = chunkLimit;
+        state.capabilities = capabilities;
+        sendHelloAck(player, state);
         if(!accepted) {
             CLIENTS.remove(player.getUUID());
             return;

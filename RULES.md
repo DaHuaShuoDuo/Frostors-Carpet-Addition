@@ -34,9 +34,7 @@ FCA 把全部规则注册到 Carpet 的 `fca` 分类。规则名区分大小写�
 
 ### `bigEnderChest`
 
-功能总开关。关闭后，右键末影箱使用原版行为，同时暂停 FCA 的大末影箱菜单、
-终端会话和页面存储服务。原版客户端获得 6×9 聚合菜单；扩展终端由安装了 TriWasa
-的客户端使用。
+功能总开关。关闭后，右键末影箱使用原版行为，同时暂停 FCA 的大末影箱菜单、终端会话和页面存储服务。原版客户端获得 6×9 聚合菜单。完成 protocol v3 握手且支持 generic carrier 的客户端使用同一个 `GENERIC_9x6` carrier（54 个只读占位槽加 36 个玩家背包槽），由匹配版本的 TriWasa 显示终端；双方都不注册自定义终端 `MenuType`。
 
 ### `bigEnderChestPageLimit`
 

@@ -58,6 +58,7 @@ FCA 的规则由 Carpet 管理，并随世界配置保存：
   只读浏览仍使用离线文件。
 - Quick Shulker 的快捷按键、背包操作和手持右键路径通过其公开
   `QuickOpenableRegistry` 接口打开大末影箱菜单。
+- 完成 protocol v3 握手且支持 generic carrier 的客户端由 FCA 打开同一个原版 `GENERIC_9x6` carrier：54 个只读占位槽加 36 个玩家背包槽；完整物品列表仍通过协议快照和 Delta 传输。原版聚合菜单和终端 carrier 都不注册自定义 `MenuType`。
 
 自动页面假人按页独立计时，菜单关闭不会触发统一下线；空闲回收、规则关闭和
 服务器停止时会先同步数据。真实假人首次批量上线可能产生明显的 server tick 尖峰，
@@ -76,10 +77,7 @@ FCA 的规则由 Carpet 管理，并随世界配置保存：
 
 ### 客户端兼容与公开协议
 
-FCA 不包含自定义大末影箱终端 GUI。TriWasa 等兼容客户端可以通过
-`BigEnderChestProtocol.Payload` 和 `EasyPlaceExtraPayload` 使用 FCA 定义的公开
-Payload、消息 DTO 与 Codec。FCA 同进程加载时，客户端直接复用这些类型，避免在同一
-通道注册不同 Payload 类。
+FCA 不包含自定义大末影箱终端 GUI，也不注册自定义终端 `MenuType`。TriWasa 等兼容客户端可以通过 protocol v3 的 `BigEnderChestProtocol.Payload` 和 `EasyPlaceExtraPayload` 使用 FCA 定义的公开 Payload、消息 DTO 与 Codec。大末影箱终端需要与 FCA `0.2.0-beta.3` 匹配的 TriWasa 版本；原版客户端无需安装 FCA 或 TriWasa。FCA 同进程加载时，客户端直接复用这些类型，避免在同一通道注册不同 Payload 类。
 
 ### 在线资料回退
 
