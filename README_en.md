@@ -83,9 +83,13 @@ schematic access or placement interaction.
 
 ### Player Ladder
 
-`playerLadder` provides riding, picking up, player stacking, entity filtering,
-and depth limits. Carpet fake players are supported, with an optional client
-aiming fix.
+Enable `/carpet playerLadder true` first, then use `/playerladder` to query or
+change riding, picking up, player stacking, entity filtering, and depth-limit
+settings. The interaction path can be the direct `player_ladder` click or the
+`carry_on` gesture, which requires sneaking with both hands empty; the action is
+selected by `/playerladder clickMode`. After a successful `carry_on` interaction,
+that Shift press cannot dismount; releasing Shift and pressing it again performs
+the next dismount. Carpet fake players are supported.
 
 ### Client Compatibility and Public Protocols
 
@@ -110,8 +114,9 @@ side, accepted values, purpose, and command. Rule names are case-sensitive:
 
 ## Compatibility and Data
 
-- FCA rules are stored in the world's `carpet.conf`; there is no separate
-  configuration file.
+- FCA Carpet rules are stored in the world's `carpet.conf`; Player Ladder
+  sub-settings are managed by a separate Carpet settings manager and stored in
+  the current world's `playerladder.conf`.
 - Big ender chest page metadata is stored in the world directory, not in client
   configuration.
 - Carpet is a compile-time dependency only and is never bundled into FCA.

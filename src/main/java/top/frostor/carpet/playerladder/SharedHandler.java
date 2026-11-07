@@ -17,9 +17,16 @@ import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.Level;
 import top.frostor.carpet.FrostorSettings;
 
+import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class SharedHandler {
+    /** Tracks the successful carry-on press until the player releases Shift. */
+    private static final Map<UUID, CarryOnDismountState> CARRY_ON_DISMOUNT_STATES = new ConcurrentHashMap<>();
+    /** Scopes the vanilla canRide bypass to one carry-on startRiding call. */
+    private static final ThreadLocal<Entity> CARRY_ON_MOUNTING_RIDER = new ThreadLocal<>();
     private static final Set<EntityType<?>> entityTypesToExclude = Sets.newHashSet();
     private static final Set<TagKey<EntityType<?>>> entityTagsToExclude = Sets.newHashSet();
     private static String appliedExcludedEntries = null;
@@ -30,13 +37,16 @@ public class SharedHandler {
         Entity vehicle = PlayerStack.highestOrSelf(
                 newVehicle,
                 player,
-                FrostorSettings.playerLadderRideDepthLimit,
+                PlayerLadderSettings.rideDepthLimit,
                 Entity::isVehicle,
                 Entity::getFirstPassenger
         );
         if(vehicle == null || !isPlayerStackAllowed(vehicle, player)) return InteractionResult.FAIL;
 
-        return player.startRiding(vehicle) ? InteractionResult.SUCCESS : InteractionResult.FAIL;
+        boolean mounted = PlayerLadderSettings.interactionMode == PlayerLadderInteractionMode.CARRY_ON
+                ? startRidingForCarryOn(player, vehicle)
+                : player.startRiding(vehicle);
+        return mounted ? InteractionResult.SUCCESS : InteractionResult.FAIL;
     }
 
     public static InteractionResult pickUpEntity(Player player, Entity newPassenger, Level level, InteractionHand hand) {
@@ -45,7 +55,7 @@ public class SharedHandler {
         Entity vehicle = PlayerStack.highestOrSelf(
                 player,
                 newPassenger,
-                FrostorSettings.playerLadderPickupDepthLimit,
+                PlayerLadderSettings.pickupDepthLimit,
                 Entity::isVehicle,
                 Entity::getFirstPassenger
         );
@@ -61,11 +71,11 @@ public class SharedHandler {
 
     /**
      * Whether the resulting ride chain may contain 3 or more players.
-     * When {@code playerLadderAllowRiderStacking} is disabled only two players may ride each other.
+     * When {@link PlayerLadderSettings#allowRiderStacking} is disabled only two players may ride each other.
      */
     private static boolean isPlayerStackAllowed(Entity vehicle, Entity newPassenger) {
         return PlayerStack.allowsRideChain(
-                FrostorSettings.playerLadderAllowRiderStacking,
+                PlayerLadderSettings.allowRiderStacking,
                 vehicle,
                 newPassenger,
                 Player.class::isInstance,
@@ -75,9 +85,9 @@ public class SharedHandler {
 
     private static boolean canPickUpOrRideLiving(Entity entity) {
         if(entity instanceof Player)
-            return FrostorSettings.playerLadderAllowFakePlayers || !isCarpetFakePlayer(entity);
+            return PlayerLadderSettings.allowFakePlayers || !isCarpetFakePlayer(entity);
 
-        if(!FrostorSettings.playerLadderAllowNonPlayers) return false;
+        if(!PlayerLadderSettings.allowNonPlayers) return false;
 
         ensureExcludedEntries();
         return !entityTypesToExclude.contains(entity.getType()) &&
@@ -107,18 +117,84 @@ public class SharedHandler {
     }
 
     public static void onPlayerTick(Player player) {
-        if(!player.level().isClientSide() && player.onGround() && player.isVehicle() && player.isCrouching())
+        if(player.level().isClientSide()) return;
+        if(!FrostorSettings.playerLadder) {
+            CARRY_ON_DISMOUNT_STATES.clear();
+            return;
+        }
+
+        boolean shouldDismount = shouldDismountForShift(player);
+        if(player.onGround() && player.isVehicle() && shouldDismount)
             player.getFirstPassenger().stopRiding();
     }
 
+    public static boolean shouldSuppressCarryOnDismount(Player player) {
+        if(!ensureCarryOnDismountProtectionActive()) return false;
+
+        CarryOnDismountState state = CARRY_ON_DISMOUNT_STATES.get(player.getUUID());
+        if(state == null) return false;
+
+        boolean suppress = !state.shouldDismount(player.isShiftKeyDown());
+        removeReleasedState(player, state);
+        return suppress;
+    }
+
+    public static boolean isCarryOnMounting(Entity rider) {
+        return CARRY_ON_MOUNTING_RIDER.get() == rider;
+    }
+
+    public static void onSuccessfulCarryOnInteraction(Player player) {
+        CARRY_ON_DISMOUNT_STATES.computeIfAbsent(player.getUUID(), ignored -> new CarryOnDismountState())
+                .onSuccessfulInteraction();
+    }
+
     public static void onLogOut(Player player) {
+        CARRY_ON_DISMOUNT_STATES.remove(player.getUUID());
         if(player.isPassenger() && player.getVehicle() instanceof Player)
             player.stopRiding();
     }
 
+    public static void onServerStopping() {
+        CARRY_ON_DISMOUNT_STATES.clear();
+        CARRY_ON_MOUNTING_RIDER.remove();
+    }
+
     public static void onGameModeChange(Player player) {
-        if(player.isVehicle() && (FrostorSettings.playerLadderDismountOnGameModeChange || player.gameMode() == GameType.SPECTATOR))
+        if(player.isVehicle() && (PlayerLadderSettings.dismountOnGameModeChange || player.gameMode() == GameType.SPECTATOR))
             player.getFirstPassenger().stopRiding();
+    }
+
+    private static boolean startRidingForCarryOn(Entity rider, Entity vehicle) {
+        CARRY_ON_MOUNTING_RIDER.set(rider);
+        try {
+            return rider.startRiding(vehicle);
+        }finally{
+            CARRY_ON_MOUNTING_RIDER.remove();
+        }
+    }
+
+    private static boolean shouldDismountForShift(Player player) {
+        if(!ensureCarryOnDismountProtectionActive()) return player.isShiftKeyDown();
+
+        CarryOnDismountState state = CARRY_ON_DISMOUNT_STATES.get(player.getUUID());
+        if(state == null) return player.isShiftKeyDown();
+
+        boolean dismount = state.shouldDismount(player.isShiftKeyDown());
+        removeReleasedState(player, state);
+        return dismount;
+    }
+
+    private static void removeReleasedState(Player player, CarryOnDismountState state) {
+        if(!state.isAwaitingRelease()) CARRY_ON_DISMOUNT_STATES.remove(player.getUUID(), state);
+    }
+
+    private static boolean ensureCarryOnDismountProtectionActive() {
+        if(FrostorSettings.playerLadder
+                && PlayerLadderSettings.interactionMode == PlayerLadderInteractionMode.CARRY_ON)
+            return true;
+
+        CARRY_ON_DISMOUNT_STATES.clear();
+        return false;
     }
 
     private static void addExcludedEntityType(String entity) {
@@ -141,7 +217,7 @@ public class SharedHandler {
      * re-parsed whenever the rule value differs from the last applied one.
      */
     private static void ensureExcludedEntries() {
-        String entries = FrostorSettings.playerLadderIgnoredEntities;
+        String entries = PlayerLadderSettings.ignoredEntities;
         if(entries.equals(appliedExcludedEntries)) return;
         appliedExcludedEntries = entries;
 
