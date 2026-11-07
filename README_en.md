@@ -46,7 +46,11 @@ FCA rules are managed by Carpet and stored with the world configuration:
 
 ```text
 /carpet list fca
+/playerladder
 ```
+
+`/carpet list fca` shows the main rules. Enable `/carpet playerLadder true` first,
+then use `/playerladder` to view or change Player Ladder sub-settings.
 
 ## Feature Overview
 
@@ -91,6 +95,11 @@ selected by `/playerladder clickMode`. After a successful `carry_on` interaction
 that Shift press cannot dismount; releasing Shift and pressing it again performs
 the next dismount. Carpet fake players are supported.
 
+When upgrading from an older version, Player Ladder sub-settings such as
+`playerLadderClickMode`, depth limits, and entity filters are not imported from
+the existing `carpet.conf` into the new `playerladder.conf`. Reconfigure them
+with `/playerladder` after upgrading; unconfigured options use their defaults.
+
 ### Client Compatibility and Public Protocols
 
 FCA does not include a custom big ender chest terminal GUI and does not register a custom terminal `MenuType`. Clients such as TriWasa can use the protocol v3 `BigEnderChestProtocol.Payload` and `EasyPlaceExtraPayload` types, message DTOs, and codecs defined by FCA. The terminal requires a TriWasa build matching FCA `0.2.0-beta.3`; vanilla clients do not need FCA or TriWasa. When FCA is loaded in the same process, clients reuse those types instead of registering a different payload class for the same channel.
@@ -117,6 +126,8 @@ side, accepted values, purpose, and command. Rule names are case-sensitive:
 - FCA Carpet rules are stored in the world's `carpet.conf`; Player Ladder
   sub-settings are managed by a separate Carpet settings manager and stored in
   the current world's `playerladder.conf`.
+- Old Player Ladder sub-rules are not imported automatically from `carpet.conf`.
+  Reapply customized values through `/playerladder` as described in `RULES.md`.
 - Big ender chest page metadata is stored in the world directory, not in client
   configuration.
 - Carpet is a compile-time dependency only and is never bundled into FCA.

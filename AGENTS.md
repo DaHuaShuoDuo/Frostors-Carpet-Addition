@@ -59,34 +59,55 @@ $env:JAVA_HOME = '<JDK 25 installation>'
 
 - 保持 `FrostorsCarpetAddition.onInitialize()` 中的
   `CarpetServer.manageExtension(this)`。Carpet 26.x 不会通过扩展入口点自动发现本模组。
-- 规则统一由 `FrostorSettings` 中的 `@Rule` 静态字段声明，并在
+- 通用功能与总开关规则由 `FrostorSettings` 中的 `@Rule` 静态字段声明，并在
   `onGameStarted()` 中通过 `CarpetServer.settingsManager.parseSettingsClass(...)`
-  注册。不要在项目中重新引入 `config/playerladder.json` 等独立配置。
-- 规则字段名就是 `/carpet` 规则名，大小写敏感，并会被写入世界的 `carpet.conf`。
-  不要无意重命名已有规则；确需重命名时，必须处理旧配置兼容性并同步文档。
-- 每条规则都必须在 `en_us.json` 和 `zh_cn.json` 中同时提供
+  注册。这些规则使用 `/carpet`，并写入世界的 `carpet.conf`。
+- Player Ladder 子设置是有意的独立例外：由 `PlayerLadderSettings` 中的 `@Rule`
+  字段声明，使用独立的 `SettingsManager` 注册为 `/playerladder`，并写入当前世界的
+  `playerladder.conf`。`playerLadder` 总开关仍属于 `FrostorSettings` 和 `/carpet`。
+  不要把总开关迁入子设置管理器，也不要为其他功能随意增加第三套配置存储。
+- 独立管理器必须在执行命令前完成 `parseSettingsClass(...)`，并在
+  `SERVER_STARTED` / `SERVER_STOPPING` 生命周期中成对调用 `attachServer(...)` /
+  `detachServer()`。规则观察器、命令可用性和热切换状态必须与该生命周期一致。
+- 规则字段名就是对应命令中的规则名，大小写敏感。`FrostorSettings` 规则使用
+  `/carpet` 和 `carpet.conf`；`PlayerLadderSettings` 规则使用 `/playerladder` 和
+  `playerladder.conf`。不要无意重命名已有规则；确需迁移时，必须处理或明确说明旧值
+  兼容策略并同步文档。
+- 旧版本的 `playerLadderClickMode` 等子规则不会自动从 `carpet.conf` 导入
+  `playerladder.conf`。若版本没有实现迁移，升级文档必须明确要求管理员通过
+  `/playerladder` 重新配置，不能静默暗示旧值仍会生效。
+- 每条规则都必须在 `en_us.json` 和 `zh_cn.json` 中同时提供名称与描述。主规则使用
   `carpet.rule.<字段名>.name` 与 `carpet.rule.<字段名>.desc`。缺少 `.desc` 会导致
-  Carpet 拒绝注册规则。
-- `RULES.md` 是 FCA 的规范规则文本，必须覆盖全部 `@Rule` 字段、默认值、作用端、
-  合法取值和用途。新增、删除、重命名规则或修改默认值、取值、作用端时，必须同步更新
-  `RULES.md`、`README.md` 规则表和中英文翻译。
+  Carpet 拒绝注册规则。Player Ladder 子设置使用
+  `playerladder.rule.<字段名>.name` 与 `playerladder.rule.<字段名>.desc`，分类使用
+  `playerladder.category.playerladder`。
+- `RULES.md` 是 FCA 的规范规则文本，必须同时覆盖 `FrostorSettings` 与
+  `PlayerLadderSettings` 的全部 `@Rule` 字段、默认值、作用端、合法取值和用途。
+  新增、删除、重命名规则或修改默认值、取值、作用端时，必须同步更新 `RULES.md`、
+  README 和对应中英文翻译。
 - 仅客户端规则使用 `RuleCategory.CLIENT`；服务端行为不得依赖客户端配置。
 
 新增规则的最小流程：
 
-1. 在 `FrostorSettings` 中添加带 `@Rule` 的字段及合理默认值。
-2. 在两种语言的资源文件中补齐名称与描述。
-3. 在业务代码中读取该字段，并补充必要的值校验和运行期切换处理。
-4. 同步更新 `RULES.md`、README 规则表和中英文翻译，并重新构建两个版本。
+1. 确定归属：通用功能或功能总开关放入 `FrostorSettings`；仅属于 Player Ladder
+   命令空间且由 `/carpet playerLadder` 总开关保护的子设置放入
+   `PlayerLadderSettings`。
+2. 在对应设置类中添加带 `@Rule` 的字段及合理默认值。
+3. 在两种语言的资源文件中使用对应前缀补齐名称与描述。
+4. 在业务代码中读取该字段，并补充必要的值校验和运行期切换处理。
+5. 同步更新 `RULES.md`、README、迁移说明和中英文翻译，并重新构建两个版本。
 
-规则字段使用 lowerCamelCase，并以所属功能（如 `playerLadder`、`easyPlace`）作为前缀。布尔开关优先使用
-`Allow...` 或明确的语义名称，数量上限使用 `...Limit` / `...DepthLimit`，枚举模式使用
-`...Mode`，忽略列表使用 `...IgnoredEntities`，客户端修正使用 `...Fix`。避免同时使用
-`Extension`、`InteractWith...`、`RideFakePlayer` 等含义不统一的命名轴。
+`FrostorSettings` 规则字段使用 lowerCamelCase，并以所属功能（如 `playerLadder`、
+`easyPlace`）作为前缀，避免全局 `/carpet` 命名冲突。`PlayerLadderSettings` 的点
+命令已经提供独立命名空间，因此字段可使用简短的 lowerCamelCase 名称；总开关仍保持
+`FrostorSettings.playerLadder`。布尔开关优先使用 `Allow...` 或明确的语义名称，数量
+上限使用 `...Limit` / `...DepthLimit`，枚举模式使用 `...Mode`，忽略列表使用
+`...IgnoredEntities`。避免同时使用 `Extension`、`InteractWith...`、
+`RideFakePlayer` 等含义不统一的命名轴。
 
 Carpet 会把枚举候选显示为小写，并在解析输入时先转为大写再调用 `Enum.valueOf`。因此 Java
-枚举常量应保持 `UPPER_SNAKE_CASE`；README、翻译和实际 `/carpet` 取值使用全小写，不要把
-Java 枚举常量改成小写，否则 Carpet 无法解析。
+枚举常量应保持 `UPPER_SNAKE_CASE`；README、翻译和实际 `/carpet` 或
+`/playerladder` 取值使用全小写，不要把 Java 枚举常量改成小写，否则 Carpet 无法解析。
 
 ## 功能实现边界
 
@@ -101,15 +122,21 @@ Java 枚举常量改成小写，否则 Carpet 无法解析。
 
 ### Player Ladder
 
-- `PlayerLadder` 负责 Fabric 事件注册；交互语义集中在 `SharedHandler`。
+- `PlayerLadderSettings` 管理 `/playerladder` 子设置和 `playerladder.conf`；
+  `PlayerLadder` 负责 Fabric 事件、命令注册、设置管理器生命周期和规则观察器；
+  交互语义集中在 `SharedHandler`。
 - `UseEntityCallback` 和 `SharedHandler` 服务端逻辑必须检查
   `level.isClientSide()`，不要从客户端伪造可改变世界状态的结果。
 - 保持“主手、空手、服务端执行、目标实体可交互”等既有交互前提，除非需求明确改变。
 - 排除实体列表是按逗号分隔的实体 id 或 `#` 标签。修改缓存逻辑时，应确保
-  `/carpet` 修改规则后无需重启即可生效，并正确清理类型缓存与标签缓存。
+  `/playerladder ignoredEntities` 修改后无需重启即可生效，并正确清理类型缓存与标签
+  缓存。
 - 骑乘链遍历、层数上限、第三人堆叠开关、假人开关、断线和游戏模式变化处理之间存在
   关联。修改其中一项时要回归相关分支，避免出现循环骑乘、残留乘客或客户端不同步。
-- 客户端准星修正只应存在于客户端 Mixin 中；服务端和人梯状态同步逻辑不得依赖它。
+- 独立的 `/playerladder` 子设置只在 `FrostorSettings.playerLadder=true` 时可用；
+  关闭总开关后，交互、命令子树和 carry-on 临时状态必须停止生效或得到清理。
+- 旧客户端准星修正已经移除。除非任务明确恢复该功能，不要把服务端状态同步重新依赖
+  到客户端准星 Mixin。
 
 ### Big Ender Chest
 
@@ -243,5 +270,6 @@ Java 枚举常量改成小写，否则 Carpet 无法解析。
   JAR 的运行时依赖边界。
 - 保留 MIT 许可证、项目声明以及模组元数据中的作者和依赖信息。
 - 任务完成前至少确认：两个版本的 `logicTest` 与 `easyPlaceProtocolTest` 通过；
-  Carpet 规则翻译完整；`RULES.md` 与 `FrostorSettings` 的全部 `@Rule` 字段一致；
-  README 与行为一致；Carpet 未被误打包；涉及运行期逻辑时记录手动验证结果。
+  Carpet 规则翻译完整；`RULES.md` 与 `FrostorSettings`、`PlayerLadderSettings`
+  的全部 `@Rule` 字段一致；README 与行为及配置存储说明一致；Carpet 未被误打包；
+  涉及运行期逻辑时记录手动验证结果。

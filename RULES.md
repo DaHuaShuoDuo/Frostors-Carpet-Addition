@@ -1,14 +1,25 @@
 # Frostor's Carpet Addition - Carpet Rules
 
-FCA 把全部规则注册到 Carpet 的 `fca` 分类。规则名区分大小写，并随世界的
-`carpet.conf` 保存。
+FCA 使用两个 Carpet 设置管理器。大末影箱、Easy Place、在线资料回退和
+Player Ladder 总开关等主规则注册到 `fca` 分类，并随世界的 `carpet.conf` 保存。
+Player Ladder 子设置使用独立的 `playerladder` 设置管理器，通过 `/playerladder`
+访问，并保存在当前世界的 `playerladder.conf`。两套名称都区分大小写。
 
 ```text
 /carpet list fca
 /carpet <规则名>
 /carpet <规则名> <值>
 /carpet <规则名> reset
+
+/playerladder
+/playerladder <子项>
+/playerladder <子项> <值>
+/playerladder defaults
+/playerladder setDefault <子项> <值>
+/playerladder removeDefault <子项>
 ```
+
+下表只列出 `/carpet` 主规则；Player Ladder 子设置见下方独立章节。
 
 ## 规则总表
 
@@ -68,8 +79,9 @@ FCA 把全部规则注册到 Carpet 的 `fca` 分类。规则名区分大小写�
 
 ## Player Ladder
 
-`/carpet playerLadder true` 是唯一的总开关。未开启时 `/playerladder` 的选项分支不会
-显示，执行 `/playerladder` 会提示先启用总开关。命令需要游戏管理员级权限（等级 2）。
+`/carpet playerLadder true` 是唯一的总开关。未开启时 `/playerladder` 命令不可用，
+客户端通常会将其显示为未知或不完整命令；请先启用总开关。命令需要游戏管理员级权限
+（等级 2）。
 
 ```text
 /carpet playerLadder true
@@ -84,6 +96,13 @@ FCA 把全部规则注册到 Carpet 的 `fca` 分类。规则名区分大小写�
 Player Ladder 子设置由独立的 Carpet `SettingsManager` 管理，保存在当前世界的
 `playerladder.conf`。菜单、可点击按钮、补全、校验、默认值操作和写盘行为与 `/carpet`
 使用同一套 Carpet 实现。
+
+### 旧配置迁移
+
+旧版本曾在 `carpet.conf` 中保存 `playerLadderClickMode`、深度限制、实体过滤、假人
+开关等子规则。这些旧条目不会自动迁移到 `playerladder.conf`，新版本也不会继续读取
+它们。升级前应先记录自定义值，升级后通过 `/playerladder` 重新应用；未重新配置的
+子项使用默认值。
 
 ### `/playerladder interactionMode`
 
@@ -140,5 +159,7 @@ minecraft:wither,minecraft:ender_dragon,minecraft:warden,minecraft:minecart,#min
 
 Carpet 规则必须在 `FrostorSettings`、`en_us.json`、`zh_cn.json`、本文件、README
 和运行时处理代码之间保持一致。Player Ladder 子设置必须在 `PlayerLadderSettings`、
-`PlayerLadderCommand`、本文件和 README 之间保持一致。新增、删除、重命名、修改默认值
-或修改合法取值时，必须同步更新对应位置并完成双版本构建。
+`PlayerLadderCommand`、`en_us.json`、`zh_cn.json`、本文件和 README 之间保持一致。
+主规则翻译使用 `carpet.rule.<字段名>`，Player Ladder 子设置使用
+`playerladder.rule.<字段名>`。新增、删除、重命名、修改默认值或修改合法取值时，必须
+同步更新对应位置、配置迁移说明并完成双版本构建。
