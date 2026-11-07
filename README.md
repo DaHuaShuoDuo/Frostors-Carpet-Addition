@@ -42,7 +42,11 @@ FCA 的规则由 Carpet 管理，并随世界配置保存：
 
 ```text
 /carpet list fca
+/playerladder
 ```
+
+`/carpet list fca` 显示主规则；先启用 `/carpet playerLadder true`，再使用
+`/playerladder` 查看和修改 Player Ladder 子设置。
 
 ## 功能概览
 
@@ -72,8 +76,15 @@ FCA 的规则由 Carpet 管理，并随世界配置保存：
 
 ### Player Ladder
 
-`playerLadder` 提供骑乘、举起、玩家堆叠、实体过滤和深度限制。支持 Carpet 假人，
-并可选提供客户端准星修正。
+先使用 `/carpet playerLadder true` 解锁，再用 `/playerladder` 查询或修改骑乘、举起、
+玩家堆叠、实体过滤和深度限制等设置。玩家互动路径可选择直接右键的 `player_ladder`，
+或主副手均空手并潜行时右键的 `carry_on`；动作由 `/playerladder clickMode` 决定。
+`carry_on` 成功后，当前按住 Shift 的这段时间不会下骑；松开后再次按下 Shift 才执行下骑。
+功能支持 Carpet 假人。
+
+从旧版升级时，原 `carpet.conf` 中的 `playerLadderClickMode`、深度限制、实体过滤等
+子设置不会自动迁移到新的 `playerladder.conf`。升级后需要使用 `/playerladder`
+重新配置；未配置的子项使用默认值。
 
 ### 客户端兼容与公开协议
 
@@ -97,7 +108,10 @@ Mojang 会话验证，不应在公开或不可信服务器上启用。
 
 ## 兼容性与数据
 
-- FCA 规则保存在世界的 `carpet.conf` 中，不使用独立配置文件。
+- FCA 的 Carpet 规则保存在世界的 `carpet.conf` 中；Player Ladder 子设置由独立的
+  Carpet 设置管理器管理，并保存在当前世界的 `playerladder.conf`。
+- 旧版 Player Ladder 子规则不会从 `carpet.conf` 自动导入；升级后需按 `RULES.md`
+  通过 `/playerladder` 重新设置自定义值。
 - 大末影箱页面元数据保存在世界目录，不写入客户端配置。
 - Carpet 只作为编译期依赖引用，不会打包进 FCA。
 - Quick Shulker 仅用于可选的公开接口适配，不会打包进 FCA，也不会成为硬依赖。

@@ -13,6 +13,7 @@ import top.frostor.carpet.bigenderchest.BigEnderChestProtocolServer;
 import top.frostor.carpet.easyplace.EasyPlaceExtraServer;
 import top.frostor.carpet.onlineprofile.OnlineProfileFallback;
 import top.frostor.carpet.playerladder.PlayerLadder;
+import top.frostor.carpet.playerladder.PlayerLadderSettings;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -51,6 +52,8 @@ public class FrostorsCarpetAddition implements ModInitializer, CarpetExtension {
     @Override
     public void onGameStarted() {
         CarpetServer.settingsManager.parseSettingsClass(FrostorSettings.class);
+        PlayerLadderSettings.initialize();
+        PlayerLadder.registerRuleObserver(CarpetServer.settingsManager);
         EasyPlaceExtraServer.registerRuleObserver(CarpetServer.settingsManager);
         BigEnderChestProtocolServer.registerRuleObserver(CarpetServer.settingsManager);
     }

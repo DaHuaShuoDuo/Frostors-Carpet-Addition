@@ -46,7 +46,11 @@ FCA rules are managed by Carpet and stored with the world configuration:
 
 ```text
 /carpet list fca
+/playerladder
 ```
+
+`/carpet list fca` shows the main rules. Enable `/carpet playerLadder true` first,
+then use `/playerladder` to view or change Player Ladder sub-settings.
 
 ## Feature Overview
 
@@ -83,9 +87,18 @@ schematic access or placement interaction.
 
 ### Player Ladder
 
-`playerLadder` provides riding, picking up, player stacking, entity filtering,
-and depth limits. Carpet fake players are supported, with an optional client
-aiming fix.
+Enable `/carpet playerLadder true` first, then use `/playerladder` to query or
+change riding, picking up, player stacking, entity filtering, and depth-limit
+settings. The interaction path can be the direct `player_ladder` click or the
+`carry_on` gesture, which requires sneaking with both hands empty; the action is
+selected by `/playerladder clickMode`. After a successful `carry_on` interaction,
+that Shift press cannot dismount; releasing Shift and pressing it again performs
+the next dismount. Carpet fake players are supported.
+
+When upgrading from an older version, Player Ladder sub-settings such as
+`playerLadderClickMode`, depth limits, and entity filters are not imported from
+the existing `carpet.conf` into the new `playerladder.conf`. Reconfigure them
+with `/playerladder` after upgrading; unconfigured options use their defaults.
 
 ### Client Compatibility and Public Protocols
 
@@ -110,8 +123,11 @@ side, accepted values, purpose, and command. Rule names are case-sensitive:
 
 ## Compatibility and Data
 
-- FCA rules are stored in the world's `carpet.conf`; there is no separate
-  configuration file.
+- FCA Carpet rules are stored in the world's `carpet.conf`; Player Ladder
+  sub-settings are managed by a separate Carpet settings manager and stored in
+  the current world's `playerladder.conf`.
+- Old Player Ladder sub-rules are not imported automatically from `carpet.conf`.
+  Reapply customized values through `/playerladder` as described in `RULES.md`.
 - Big ender chest page metadata is stored in the world directory, not in client
   configuration.
 - Carpet is a compile-time dependency only and is never bundled into FCA.

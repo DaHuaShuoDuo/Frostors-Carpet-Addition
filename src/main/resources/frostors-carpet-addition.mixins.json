@@ -7,9 +7,6 @@
     "ServerPlayerMixin",
     "shared.EntityMixin"
   ],
-  "client": [
-    "shared.ProjectileUtilMixin"
-  ],
   "injectors": {
     "defaultRequire": 1
   }

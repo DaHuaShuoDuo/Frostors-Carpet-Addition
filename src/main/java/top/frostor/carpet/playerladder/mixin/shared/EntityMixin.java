@@ -36,4 +36,12 @@ public class EntityMixin {
             return original.call(instance);
         }
     }
+
+    @WrapOperation(
+            method = "canRide(Lnet/minecraft/world/entity/Entity;)Z",
+            at = @At(value = "INVOKE", target = "Lnet/minecraft/world/entity/Entity;isShiftKeyDown()Z")
+    )
+    private boolean playerladder$allowCarryOnMountWhileSneaking(Entity instance, Operation<Boolean> original) {
+        return !SharedHandler.isCarryOnMounting(instance) && original.call(instance);
+    }
 }

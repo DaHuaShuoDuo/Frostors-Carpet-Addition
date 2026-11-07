@@ -29,6 +29,7 @@ dependencies {
 	compileOnly files(rootProject.file("libs/fabric-carpet-${project.minecraft_version}.jar"))
 	// Quick Shulker is an optional runtime integration; its public provider API is compile-only.
 	compileOnly files(rootProject.file("libs/quickshulker-${project.minecraft_version}.jar"))
+	testImplementation files(rootProject.file("libs/fabric-carpet-${project.minecraft_version}.jar"))
 	testImplementation files(rootProject.file("libs/quickshulker-${project.minecraft_version}.jar"))
 }
 

@@ -1,14 +1,25 @@
 # Frostor's Carpet Addition - Carpet Rules
 
-FCA 把全部规则注册到 Carpet 的 `fca` 分类。规则名区分大小写，并随世界的
-`carpet.conf` 保存。
+FCA 使用两个 Carpet 设置管理器。大末影箱、Easy Place、在线资料回退和
+Player Ladder 总开关等主规则注册到 `fca` 分类，并随世界的 `carpet.conf` 保存。
+Player Ladder 子设置使用独立的 `playerladder` 设置管理器，通过 `/playerladder`
+访问，并保存在当前世界的 `playerladder.conf`。两套名称都区分大小写。
 
 ```text
 /carpet list fca
 /carpet <规则名>
 /carpet <规则名> <值>
 /carpet <规则名> reset
+
+/playerladder
+/playerladder <子项>
+/playerladder <子项> <值>
+/playerladder defaults
+/playerladder setDefault <子项> <值>
+/playerladder removeDefault <子项>
 ```
+
+下表只列出 `/carpet` 主规则；Player Ladder 子设置见下方独立章节。
 
 ## 规则总表
 
@@ -20,15 +31,6 @@ FCA 把全部规则注册到 Carpet 的 `fca` 分类。规则名区分大小写�
 | `easyPlaceProtocolExtra` | `false` | 服务端 | `true` / `false` | 启用 Easy Place V2-Extra 握手和方块状态处理 |
 | `onlineProfileFallback` | `false` | 服务端 | `true` / `false` | 私人服务器在线资料回退 |
 | `playerLadder` | `false` | 服务端 | `true` / `false` | Player Ladder 总开关 |
-| `playerLadderClickMode` | `ride` | 服务端 | `ride` / `pick_up` / `none` | 空手右键实体时的行为 |
-| `playerLadderPickupDepthLimit` | `16` | 服务端 | 整数，建议 `>= 0` | 举起实体时的最大层数 |
-| `playerLadderRideDepthLimit` | `16` | 服务端 | 整数，建议 `>= 0` | 骑乘实体时的最大层数 |
-| `playerLadderAllowNonPlayers` | `false` | 服务端 | `true` / `false` | 是否允许非玩家实体参与交互 |
-| `playerLadderIgnoredEntities` | 见下方默认值 | 服务端 | 逗号分隔的实体 ID 或 `#` 标签 | 永远不允许骑乘或举起的实体 |
-| `playerLadderDismountOnGameModeChange` | `false` | 服务端 | `true` / `false` | 载体切换游戏模式时是否让乘客下马 |
-| `playerLadderAllowRiderStacking` | `true` | 服务端 | `true` / `false` | 是否允许三名及以上玩家继续堆叠 |
-| `playerLadderAllowFakePlayers` | `false` | 服务端 | `true` / `false` | 是否允许与 Carpet 假人交互 |
-| `playerLadderClientAimingFix` | `true` | 客户端 | `true` / `false` | 堆叠玩家的客户端准星修正 |
 
 ## 大末影箱
 
@@ -77,27 +79,60 @@ FCA 把全部规则注册到 Carpet 的 `fca` 分类。规则名区分大小写�
 
 ## Player Ladder
 
-以下规则仅在 `playerLadder=true` 时产生交互效果。
+`/carpet playerLadder true` 是唯一的总开关。未开启时 `/playerladder` 命令不可用，
+客户端通常会将其显示为未知或不完整命令；请先启用总开关。命令需要游戏管理员级权限
+（等级 2）。
 
-### `playerLadderClickMode`
+```text
+/carpet playerLadder true
+/playerladder
+/playerladder <子项>
+/playerladder <子项> <值>
+/playerladder defaults
+/playerladder setDefault <子项> <值>
+/playerladder removeDefault <子项>
+```
+
+Player Ladder 子设置由独立的 Carpet `SettingsManager` 管理，保存在当前世界的
+`playerladder.conf`。菜单、可点击按钮、补全、校验、默认值操作和写盘行为与 `/carpet`
+使用同一套 Carpet 实现。
+
+### 旧配置迁移
+
+旧版本曾在 `carpet.conf` 中保存 `playerLadderClickMode`、深度限制、实体过滤、假人
+开关等子规则。这些旧条目不会自动迁移到 `playerladder.conf`，新版本也不会继续读取
+它们。升级前应先记录自定义值，升级后通过 `/playerladder` 重新应用；未重新配置的
+子项使用默认值。
+
+### `/playerladder interactionMode`
+
+- `player_ladder`：保持旧行为，直接右键实体即可触发互动。
+- `carry_on`：仅在玩家潜行且主手、副手均为空时，右键实体才会触发互动。
+
+`carry_on` 交互成功后会忽略当前这一段 Shift 按住状态，避免同一次潜行操作立即下骑；
+玩家松开 Shift 后再次按下时，才恢复常规潜行下骑。
+
+两条路径执行的动作仍由 `clickMode` 决定。默认使用 `player_ladder`。
+
+### `/playerladder clickMode`
 
 - `ride`：右键后骑乘目标实体。
 - `pick_up`：右键后举起目标实体。
 - `none`：不执行 Player Ladder 操作。
 
-### `playerLadderPickupDepthLimit`
+### `/playerladder pickupDepthLimit`
 
 举起实体时向上查找的最大叠罗汉层数，默认 `16`。
 
-### `playerLadderRideDepthLimit`
+### `/playerladder rideDepthLimit`
 
 骑乘实体时向上查找的最大叠罗汉层数，默认 `16`。
 
-### `playerLadderAllowNonPlayers`
+### `/playerladder allowNonPlayers`
 
 是否允许非玩家实体作为 Player Ladder 目标，默认关闭。
 
-### `playerLadderIgnoredEntities`
+### `/playerladder ignoredEntities`
 
 按逗号分隔的实体 ID 或 `#` 标签。默认值：
 
@@ -105,27 +140,26 @@ FCA 把全部规则注册到 Carpet 的 `fca` 分类。规则名区分大小写�
 minecraft:wither,minecraft:ender_dragon,minecraft:warden,minecraft:minecart,#minecraft:boat,#minecraft:dismounts_underwater
 ```
 
-修改规则后立即清理并重建实体类型与标签缓存，不需要重启服务器。
+使用 `/playerladder ignoredEntities ""` 清空列表。修改后立即清理并重建实体类型与
+标签缓存，不需要重启服务器。
 
-### `playerLadderDismountOnGameModeChange`
+### `/playerladder dismountOnGameModeChange`
 
 载体切换游戏模式时是否让乘客下马，默认关闭。
 
-### `playerLadderAllowRiderStacking`
+### `/playerladder allowRiderStacking`
 
 是否允许三名及以上玩家继续堆叠，默认开启。关闭后仍允许两个玩家互相骑乘。
 
-### `playerLadderAllowFakePlayers`
+### `/playerladder allowFakePlayers`
 
 是否允许骑乘或举起 Carpet 假人，默认关闭。
 
-### `playerLadderClientAimingFix`
-
-仅客户端规则。开启时，堆叠玩家仍能被准星选中，默认开启；服务端骑乘结构不依赖
-该规则。
-
 ## 变更维护
 
-每条规则必须在 `FrostorSettings`、`en_us.json`、`zh_cn.json`、本文件、README
-规则表和运行时处理代码之间保持一致。新增、删除、重命名、修改默认值或修改合法取值
-时，必须同步更新以上位置并完成双版本构建。
+Carpet 规则必须在 `FrostorSettings`、`en_us.json`、`zh_cn.json`、本文件、README
+和运行时处理代码之间保持一致。Player Ladder 子设置必须在 `PlayerLadderSettings`、
+`PlayerLadderCommand`、`en_us.json`、`zh_cn.json`、本文件和 README 之间保持一致。
+主规则翻译使用 `carpet.rule.<字段名>`，Player Ladder 子设置使用
+`playerladder.rule.<字段名>`。新增、删除、重命名、修改默认值或修改合法取值时，必须
+同步更新对应位置、配置迁移说明并完成双版本构建。
