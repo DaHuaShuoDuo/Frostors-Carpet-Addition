@@ -30,7 +30,6 @@ import net.minecraft.world.level.block.LanternBlock;
 import net.minecraft.world.level.block.LeafLitterBlock;
 import net.minecraft.world.level.block.LeverBlock;
 import net.minecraft.world.level.block.LightBlock;
-import net.minecraft.world.level.block.MultifaceBlock;
 import net.minecraft.world.level.block.MushroomBlock;
 import net.minecraft.world.level.block.NoteBlock;
 import net.minecraft.world.level.block.PoweredRailBlock;
@@ -47,7 +46,6 @@ import net.minecraft.world.level.block.StairBlock;
 import net.minecraft.world.level.block.StructureBlock;
 import net.minecraft.world.level.block.TrapDoorBlock;
 import net.minecraft.world.level.block.TurtleEggBlock;
-import net.minecraft.world.level.block.VineBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.level.block.state.properties.AttachFace;
@@ -94,10 +92,6 @@ public final class EasyPlaceStateSync {
     private static final Direction[] VERTICAL_DIRECTIONS = {
             Direction.NORTH, Direction.SOUTH, Direction.WEST, Direction.EAST
     };
-    private static final Direction[] VINE_DIRECTIONS = {
-            Direction.UP, Direction.NORTH, Direction.SOUTH, Direction.WEST, Direction.EAST
-    };
-
     private EasyPlaceStateSync() {
     }
 
@@ -220,15 +214,8 @@ public final class EasyPlaceStateSync {
             BlockState result = current.is(block) ? state : state.setValue(LeafLitterBlock.FACING, facing);
             return validateIncremental(result, SegmentableBlock.AMOUNT, amount);
         }
-        if(block instanceof MultifaceBlock multifaceBlock) {
-            Direction direction = multifaceDirection(rawValue);
-            if(direction == null) return null;
-            return multifaceBlock.getStateForPlacement(
-                    context.getLevel().getBlockState(context.getClickedPos()),
-                    context.getLevel(),
-                    context.getClickedPos(),
-                    direction
-            );
+        if(MultiFaceBlockRules.isMultiFaceBlock(block)) {
+            return MultiFaceBlockRules.applyPlacementState(block, state, context, rawValue);
         }
         if(block instanceof MushroomBlock) {
             return state
@@ -299,7 +286,6 @@ public final class EasyPlaceStateSync {
         if(block instanceof TurtleEggBlock) {
             return validateIncremental(state, TurtleEggBlock.EGGS, (rawValue & 0x3) + 1);
         }
-        if(block instanceof VineBlock) return addVineFace(state, context, rawValue & 0x7);
         if(block instanceof FaceAttachedHorizontalDirectionalBlock) {
             return replaceSlot(
                     applyGeneric(state, rawValue, context),
@@ -388,38 +374,6 @@ public final class EasyPlaceStateSync {
         DirectionPropertyValue property = getDirectionProperty(state);
         if(property == null || !property.values().contains(direction)) return state;
         return state.setValue((Property) property.property(), direction);
-    }
-
-    private static @Nullable BlockState addVineFace(BlockState state, BlockPlaceContext context, int index) {
-        Direction direction = vineDirection(index);
-        if(direction == null) return null;
-        Property<Boolean> property = VineBlock.getPropertyForFace(direction);
-        BlockState current = context.getLevel().getBlockState(context.getClickedPos());
-        BlockState base = current.is(state.getBlock()) ? current : state;
-        if(!base.hasProperty(property) || base.getValue(property) || !vineCanAttach(context, direction)) {
-            return null;
-        }
-        return base.setValue(property, true);
-    }
-
-    static @Nullable Direction multifaceDirection(int index) {
-        int face = index & 0x7;
-        return face < DIRECTIONS.length ? DIRECTIONS[face] : null;
-    }
-
-    static @Nullable Direction vineDirection(int index) {
-        int face = index & 0x7;
-        return face < VINE_DIRECTIONS.length ? VINE_DIRECTIONS[face] : null;
-    }
-
-    private static boolean vineCanAttach(BlockPlaceContext context, Direction direction) {
-        if(direction == Direction.DOWN) return false;
-        BlockPos target = context.getClickedPos();
-        BlockPos supportPos = target.relative(direction);
-        if(VineBlock.isAcceptableNeighbour(context.getLevel(), supportPos, direction)) return true;
-        if(direction.getAxis() == Direction.Axis.Y) return false;
-        BlockState above = context.getLevel().getBlockState(target.above());
-        return above.is(Blocks.VINE) && above.getValue(VineBlock.getPropertyForFace(direction));
     }
 
     private static RailShape railShape(BlockState state, int index) {

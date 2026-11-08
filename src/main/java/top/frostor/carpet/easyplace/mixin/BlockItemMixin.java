@@ -2,15 +2,16 @@ package top.frostor.carpet.easyplace.mixin;
 
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
+import com.llamalad7.mixinextras.sugar.Local;
+import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.StandingAndWallBlockItem;
 import net.minecraft.world.item.context.BlockPlaceContext;
+import net.minecraft.world.level.LevelReader;
 import net.minecraft.world.level.block.BaseRailBlock;
-import net.minecraft.world.level.block.LeafLitterBlock;
-import net.minecraft.world.level.block.MultifaceBlock;
-import net.minecraft.world.level.block.SegmentableBlock;
-import net.minecraft.world.level.block.VineBlock;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.CandleBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
@@ -21,13 +22,44 @@ import top.frostor.carpet.easyplace.EasyPlaceExtraProtocol;
 import top.frostor.carpet.easyplace.EasyPlaceExtraServer;
 import top.frostor.carpet.easyplace.EasyPlaceChestSync;
 import top.frostor.carpet.easyplace.EasyPlaceItemStackSync;
+import top.frostor.carpet.easyplace.EasyPlaceQuantityRules;
 import top.frostor.carpet.easyplace.EasyPlaceRailUpdateGuard;
 import top.frostor.carpet.easyplace.EasyPlaceStateSync;
+import top.frostor.carpet.easyplace.MultiFaceBlockRules;
 
 @Mixin(BlockItem.class)
 public abstract class BlockItemMixin {
     @Shadow
     protected abstract boolean canPlace(BlockPlaceContext context, BlockState state);
+
+    @WrapOperation(
+            method = "canPlace",
+            at = @At(
+                    value = "INVOKE",
+                    target = "Lnet/minecraft/world/level/block/state/BlockState;canSurvive(Lnet/minecraft/world/level/LevelReader;Lnet/minecraft/core/BlockPos;)Z"
+            )
+    )
+    private boolean frostorsCarpet$allowUnsupportedCandlePlacement(
+            BlockState state,
+            LevelReader level,
+            BlockPos pos,
+            Operation<Boolean> original,
+            @Local(argsOnly = true) BlockPlaceContext context
+    ) {
+        if(original.call(state, level, pos)) return true;
+        if(!(state.getBlock() instanceof CandleBlock)
+                || context.getLevel().isClientSide()
+                || !(context.getPlayer() instanceof ServerPlayer player)
+                || !EasyPlaceExtraServer.isSupported(player)) {
+            return false;
+        }
+
+        int protocolValue = EasyPlaceExtraProtocol.decode(
+                context.getClickLocation(),
+                context.getClickedPos()
+        );
+        return EasyPlaceExtraProtocol.isExtra(protocolValue);
+    }
 
     @WrapOperation(
             method = "place",
@@ -36,7 +68,7 @@ public abstract class BlockItemMixin {
                     target = "Lnet/minecraft/world/item/context/BlockPlaceContext;canPlace()Z"
             )
     )
-    private boolean frostorsCarpet$allowIncrementalLeafLitter(
+    private boolean frostorsCarpet$allowIncrementalQuantity(
             BlockPlaceContext context,
             Operation<Boolean> original
     ) {
@@ -54,13 +86,13 @@ public abstract class BlockItemMixin {
         if(!EasyPlaceExtraProtocol.isExtra(protocolValue)) return false;
 
         BlockState current = context.getLevel().getBlockState(context.getClickedPos());
-        if(!(current.getBlock() instanceof LeafLitterBlock)
-                || !context.getItemInHand().is(current.getBlock().asItem())) {
-            return false;
-        }
-
-        int requestedAmount = (EasyPlaceExtraProtocol.toRawValue(protocolValue) & 0x3) + 1;
-        return current.getValue(SegmentableBlock.AMOUNT) < requestedAmount;
+        Block block = ((BlockItem) (Object) this).getBlock();
+        return context.getItemInHand().is(block.asItem())
+                && EasyPlaceQuantityRules.canIncrement(
+                        current,
+                        block,
+                        EasyPlaceExtraProtocol.toRawValue(protocolValue)
+                );
     }
 
     @Inject(method = "place", at = @At("HEAD"))
@@ -114,7 +146,7 @@ public abstract class BlockItemMixin {
         int protocolValue = EasyPlaceExtraProtocol.decode(context.getClickLocation(), context.getClickedPos());
         BlockState state = original.call(item, context);
         if(state == null && EasyPlaceExtraProtocol.isExtra(protocolValue)) {
-            if(item.getBlock() instanceof VineBlock || item.getBlock() instanceof MultifaceBlock) {
+            if(MultiFaceBlockRules.isMultiFaceBlock(item.getBlock())) {
                 state = item.getBlock().defaultBlockState();
             } else {
                 state = item.getBlock().getStateForPlacement(context);
@@ -149,7 +181,8 @@ public abstract class BlockItemMixin {
                 context,
                 rawValue
         );
-        if(adjusted == null || !canPlace(context, adjusted)) {
+        boolean placeable = adjusted != null && canPlace(context, adjusted);
+        if(!placeable) {
             return null;
         }
 

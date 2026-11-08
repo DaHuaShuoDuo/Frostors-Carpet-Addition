@@ -4,6 +4,9 @@ import net.minecraft.core.Direction;
 import net.minecraft.SharedConstants;
 import net.minecraft.server.Bootstrap;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.VineBlock;
+import net.minecraft.world.level.block.state.properties.IntegerProperty;
 import net.minecraft.world.level.block.SegmentableBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
@@ -40,25 +43,60 @@ public final class EasyPlaceExtraProtocolTest {
         };
         for(int index = 0; index < multifaceDirections.length; index++) {
             check(
-                    EasyPlaceStateSync.multifaceDirection(index) == multifaceDirections[index],
+                    MultiFaceBlockRules.wireDirection(Blocks.GLOW_LICHEN, index)
+                            == multifaceDirections[index],
                     "multiface protocol index " + index + " must match the EarlyCompat direction order"
             );
         }
-        check(EasyPlaceStateSync.multifaceDirection(6) == null, "multiface index 6 must be rejected");
-        check(EasyPlaceStateSync.multifaceDirection(7) == null, "multiface index 7 must be rejected");
+        check(
+                MultiFaceBlockRules.wireDirection(Blocks.GLOW_LICHEN, 6) == null,
+                "multiface index 6 must be rejected"
+        );
+        check(
+                MultiFaceBlockRules.wireDirection(Blocks.GLOW_LICHEN, 7) == null,
+                "multiface index 7 must be rejected"
+        );
 
         Direction[] vineDirections = {
                 Direction.UP, Direction.NORTH, Direction.SOUTH, Direction.WEST, Direction.EAST
         };
         for(int index = 0; index < vineDirections.length; index++) {
             check(
-                    EasyPlaceStateSync.vineDirection(index) == vineDirections[index],
+                    MultiFaceBlockRules.wireDirection(Blocks.VINE, index)
+                            == vineDirections[index],
                     "vine protocol index " + index + " must match the EarlyCompat direction order"
             );
         }
-        check(EasyPlaceStateSync.vineDirection(5) == null, "vine index 5 must be rejected");
-        check(EasyPlaceStateSync.vineDirection(6) == null, "vine index 6 must be rejected");
-        check(EasyPlaceStateSync.vineDirection(7) == null, "vine index 7 must be rejected");
+        check(
+                MultiFaceBlockRules.wireDirection(Blocks.VINE, 5) == null,
+                "vine index 5 must be rejected"
+        );
+        check(
+                MultiFaceBlockRules.wireDirection(Blocks.VINE, 6) == null,
+                "vine index 6 must be rejected"
+        );
+        check(
+                MultiFaceBlockRules.wireDirection(Blocks.VINE, 7) == null,
+                "vine index 7 must be rejected"
+        );
+        BlockState singleVineFace = MultiFaceBlockRules.applyVineFace(
+                Blocks.VINE,
+                Blocks.AIR.defaultBlockState(),
+                Direction.UP
+        );
+        check(
+                singleVineFace != null
+                        && singleVineFace.getValue(VineBlock.UP),
+                "server vine increment must ignore a pre-expanded placement state"
+        );
+        BlockState vineSouth = Blocks.VINE.defaultBlockState().setValue(VineBlock.SOUTH, true);
+        BlockState vineSouthUp = MultiFaceBlockRules.applyVineFace(Blocks.VINE, vineSouth, Direction.UP);
+        check(
+                vineSouthUp != null
+                        && vineSouthUp.getValue(VineBlock.SOUTH)
+                        && vineSouthUp.getValue(VineBlock.UP),
+                "server vine increment must preserve the current face set"
+        );
 
         BlockState wallHangingSign = Blocks.OAK_WALL_HANGING_SIGN.defaultBlockState()
                 .setValue(BlockStateProperties.HORIZONTAL_FACING, Direction.EAST);
@@ -139,7 +177,34 @@ public final class EasyPlaceExtraProtocolTest {
                 ) == null,
                 "leaf litter must reject placement beyond the projected amount"
         );
+        checkQuantityIncrement(Blocks.CANDLE);
+        checkQuantityIncrement(Blocks.PINK_PETALS);
+        checkQuantityIncrement(Blocks.LEAF_LITTER);
+        checkQuantityIncrement(Blocks.SEA_PICKLE);
+        checkQuantityIncrement(Blocks.SNOW);
+        checkQuantityIncrement(Blocks.TURTLE_EGG);
+
         System.out.println("EasyPlaceExtraProtocolTest passed " + checks + " checks");
+    }
+
+    private static void checkQuantityIncrement(Block block) {
+        IntegerProperty property = EasyPlaceQuantityRules.getCountProperty(block);
+        check(property != null, block + " must expose a supported quantity property");
+        BlockState one = block.defaultBlockState().setValue(property, 1);
+        int nextAmountRaw = block instanceof SegmentableBlock ? 0x4 : 0x1;
+        check(
+                EasyPlaceQuantityRules.canIncrement(one, block, nextAmountRaw),
+                block + " must allow the next quantity level"
+        );
+        check(
+                !EasyPlaceQuantityRules.canIncrement(one, block, 0),
+                block + " must reject an unchanged quantity"
+        );
+        BlockState two = one.setValue(property, 2);
+        check(
+                !EasyPlaceQuantityRules.canIncrement(two, block, nextAmountRaw),
+                block + " must reject a target below the current quantity"
+        );
     }
 
     private static void check(boolean condition, String message) {

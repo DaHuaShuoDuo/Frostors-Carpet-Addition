@@ -88,6 +88,8 @@ placement-only lateral-support rule and remain valid after that support is
 removed: V2-Extra permits unsupported placement and restores the projected
 facing. Ceiling hanging signs restore both `rotation` and `attached`, while
 target replaceability, collision, and general placement checks remain enforced.
+Candles likewise require support only during placement; V2-Extra permits
+unsupported placement without changing later `updateShape` behavior. Quantity-state blocks advance by one vanilla placement level per interaction, use the projected amount as the upper bound, and consume one matching item each time.
 
 ### Player Ladder
 
