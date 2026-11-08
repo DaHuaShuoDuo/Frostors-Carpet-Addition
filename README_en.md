@@ -83,7 +83,11 @@ produce a significant server-tick spike, so this path is disabled by default.
 semantics and receives precise block-state encoding from compatible clients over
 `earlycompat:network`. The server still enforces player reach, block placement,
 and final `BlockItem.canPlace` validation. FCA does not include client
-schematic access or placement interaction.
+schematic access or placement interaction. Wall hanging signs follow vanilla's
+placement-only lateral-support rule and remain valid after that support is
+removed: V2-Extra permits unsupported placement and restores the projected
+facing. Ceiling hanging signs restore both `rotation` and `attached`, while
+target replaceability, collision, and general placement checks remain enforced.
 
 ### Player Ladder
 

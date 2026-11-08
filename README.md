@@ -73,6 +73,9 @@ FCA 的规则由 Carpet 管理，并随世界配置保存：
 `easyPlaceProtocolExtra` 提供 Servux 兼容的服务端轻松放置语义，通过
 `earlycompat:network` 接收兼容客户端的精确方块状态编码。服务端仍执行玩家触及、
 方块放置和最终 `BlockItem.canPlace` 校验；FCA 不包含客户端投影读取或放置交互。
+墙挂悬挂牌遵循原版仅在放置时要求侧向支撑、支撑移除后仍保留的特性：V2-Extra
+允许无侧向支撑放置，并恢复投影中的朝向；天花板悬挂牌同时恢复 `rotation` 与
+`attached`，但仍校验目标可替换、碰撞和通用放置约束。
 
 ### Player Ladder
 

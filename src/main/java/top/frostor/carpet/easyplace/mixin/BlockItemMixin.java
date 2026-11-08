@@ -7,6 +7,10 @@ import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.StandingAndWallBlockItem;
 import net.minecraft.world.item.context.BlockPlaceContext;
 import net.minecraft.world.level.block.BaseRailBlock;
+import net.minecraft.world.level.block.LeafLitterBlock;
+import net.minecraft.world.level.block.MultifaceBlock;
+import net.minecraft.world.level.block.SegmentableBlock;
+import net.minecraft.world.level.block.VineBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
@@ -24,6 +28,40 @@ import top.frostor.carpet.easyplace.EasyPlaceStateSync;
 public abstract class BlockItemMixin {
     @Shadow
     protected abstract boolean canPlace(BlockPlaceContext context, BlockState state);
+
+    @WrapOperation(
+            method = "place",
+            at = @At(
+                    value = "INVOKE",
+                    target = "Lnet/minecraft/world/item/context/BlockPlaceContext;canPlace()Z"
+            )
+    )
+    private boolean frostorsCarpet$allowIncrementalLeafLitter(
+            BlockPlaceContext context,
+            Operation<Boolean> original
+    ) {
+        if(original.call(context)) return true;
+        if(context.getLevel().isClientSide()
+                || !(context.getPlayer() instanceof ServerPlayer player)
+                || !EasyPlaceExtraServer.isSupported(player)) {
+            return false;
+        }
+
+        int protocolValue = EasyPlaceExtraProtocol.decode(
+                context.getClickLocation(),
+                context.getClickedPos()
+        );
+        if(!EasyPlaceExtraProtocol.isExtra(protocolValue)) return false;
+
+        BlockState current = context.getLevel().getBlockState(context.getClickedPos());
+        if(!(current.getBlock() instanceof LeafLitterBlock)
+                || !context.getItemInHand().is(current.getBlock().asItem())) {
+            return false;
+        }
+
+        int requestedAmount = (EasyPlaceExtraProtocol.toRawValue(protocolValue) & 0x3) + 1;
+        return current.getValue(SegmentableBlock.AMOUNT) < requestedAmount;
+    }
 
     @Inject(method = "place", at = @At("HEAD"))
     private void frostorsCarpet$beginEasyPlace(
@@ -76,7 +114,11 @@ public abstract class BlockItemMixin {
         int protocolValue = EasyPlaceExtraProtocol.decode(context.getClickLocation(), context.getClickedPos());
         BlockState state = original.call(item, context);
         if(state == null && EasyPlaceExtraProtocol.isExtra(protocolValue)) {
-            state = item.getBlock().getStateForPlacement(context);
+            if(item.getBlock() instanceof VineBlock || item.getBlock() instanceof MultifaceBlock) {
+                state = item.getBlock().defaultBlockState();
+            } else {
+                state = item.getBlock().getStateForPlacement(context);
+            }
         }
         boolean rail = state != null && state.getBlock() instanceof BaseRailBlock;
         if(rail) {
