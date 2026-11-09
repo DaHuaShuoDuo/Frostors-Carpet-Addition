@@ -14,6 +14,7 @@ import net.minecraft.world.level.block.state.properties.IntegerProperty;
 import net.minecraft.world.level.block.SegmentableBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
+import top.frostor.carpet.easyplace.registry.EasyPlaceRegistryTest;
 
 public final class EasyPlaceExtraProtocolTest {
     private static int checks;
@@ -24,6 +25,7 @@ public final class EasyPlaceExtraProtocolTest {
     public static void main(String[] args) {
         SharedConstants.tryDetectVersion();
         Bootstrap.bootStrap();
+        EasyPlaceRegistryTest.run();
 
         check(
                 EasyPlaceExtraPayload.TYPE.id().equals(EasyPlaceExtraPayload.CHANNEL),
