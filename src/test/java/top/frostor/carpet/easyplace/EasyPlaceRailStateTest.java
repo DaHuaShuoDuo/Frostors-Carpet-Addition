@@ -12,34 +12,8 @@ public final class EasyPlaceRailStateTest extends EasyPlaceTestSupport {
 
     public static int run() {
         EasyPlaceRailStateTest test = new EasyPlaceRailStateTest();
-        test.checkRailUpdateGuardScope();
         test.checkRailStateRestoration();
         return test.checks();
-    }
-
-    private void checkRailUpdateGuardScope() {
-        EasyPlaceRailUpdateGuard.beginPlacement();
-        try {
-            check(!EasyPlaceRailUpdateGuard.shouldSuppressUpdate(), "rail suppression must start inactive");
-            EasyPlaceRailUpdateGuard.requestSuppression();
-            check(
-                    EasyPlaceRailUpdateGuard.shouldSuppressUpdate(),
-                    "rail suppression must cover any rail update during the guarded placement"
-            );
-        } finally {
-            EasyPlaceRailUpdateGuard.endPlacement();
-        }
-        check(!EasyPlaceRailUpdateGuard.shouldSuppressUpdate(), "rail suppression must end with placement");
-
-        EasyPlaceRailUpdateGuard.beginPlacement();
-        try {
-            check(
-                    !EasyPlaceRailUpdateGuard.shouldSuppressUpdate(),
-                    "a new rail placement must not inherit a previous suppression flag"
-            );
-        } finally {
-            EasyPlaceRailUpdateGuard.endPlacement();
-        }
     }
 
     private void checkRailStateRestoration() {

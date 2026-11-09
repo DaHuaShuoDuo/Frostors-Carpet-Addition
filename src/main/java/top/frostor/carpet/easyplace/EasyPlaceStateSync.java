@@ -33,6 +33,7 @@ import top.frostor.carpet.easyplace.adapter.special.BellStateRestorer;
 import top.frostor.carpet.easyplace.adapter.sign.HangingSignStateRestorer;
 import top.frostor.carpet.easyplace.adapter.sign.SignStateRestorer;
 import top.frostor.carpet.easyplace.adapter.special.AdministrativeStateRestorer;
+import top.frostor.carpet.easyplace.adapter.wall.WallStateRestorer;
 import top.frostor.carpet.easyplace.registry.EasyPlaceRestoreContext;
 import top.frostor.carpet.easyplace.registry.EasyPlaceStateRestorerRegistry;
 
@@ -46,7 +47,19 @@ public final class EasyPlaceStateSync {
     }
 
     public static @Nullable BlockState apply(Block block, BlockState state, BlockPlaceContext context, int rawValue) {
-        return REGISTRY.restore(new EasyPlaceRestoreContext(block, state, context, rawValue));
+        return apply(block, state, context, rawValue, 0);
+    }
+
+    public static @Nullable BlockState apply(
+            Block block,
+            BlockState state,
+            BlockPlaceContext context,
+            int rawValue,
+            int auxiliaryValue
+    ) {
+        return REGISTRY.restore(
+                new EasyPlaceRestoreContext(block, state, context, rawValue, auxiliaryValue)
+        );
     }
 
     public static @Nullable BlockState applyStandingOrWall(
@@ -69,7 +82,7 @@ public final class EasyPlaceStateSync {
         if(state == null && wall) state = wallBlock.defaultBlockState();
         if(state == null) return null;
         state = EasyPlaceStateSupport.setFirstDirection(state, facing);
-        return apply(block, state, context, stateValue);
+        return apply(block, state, context, stateValue, 0);
     }
 
     static BlockState applyGeneric(BlockState state, int protocolValue, BlockPlaceContext context) {
@@ -116,6 +129,7 @@ public final class EasyPlaceStateSync {
                 new QuantityStateRestorer()
         );
         registry.register("rail", 655, RailStateRestorer::matches, new RailStateRestorer());
+        registry.register("wall", 652, WallStateRestorer::matches, new WallStateRestorer());
         registry.register(
                 "mushroom",
                 654,

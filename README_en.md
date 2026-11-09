@@ -90,11 +90,16 @@ facing. Ceiling hanging signs restore both `rotation` and `attached`, while
 target replaceability, collision, and general placement checks remain enforced.
 Candles likewise require support only during placement; V2-Extra permits
 unsupported placement without changing later `updateShape` behavior. Quantity-state blocks advance by one vanilla placement level per interaction, use the projected amount as the upper bound, and consume one matching item each time.
+All vanilla `WallBlock` variants restore the projected `NONE/LOW/TALL`
+connections on all four sides and the `UP` post state. `WATERLOGGED` is not
+encoded and remains authoritative from the server's placement state. Wall
+placement independently suppresses structural `updateShape` recalculation
+while preserving vanilla side effects such as water-tick scheduling.
 
 Server-side state handling uses explicit behavior-family registries that freeze
 after initialization. The stable `EasyPlaceStateSync.apply(...)` entry point
 selects the owning adapter; concrete restoration lives under
-`easyplace/adapter` in directional, attachment, rail, multiface, quantity,
+`easyplace/adapter` in directional, attachment, rail, wall, multiface, quantity,
 container, sign, redstone, and special families, while shared pure state
 operations live in `EasyPlaceStateSupport`. The old monolithic
 `LegacyEasyPlaceStateSync` mapping and fallback adapter have been removed. The

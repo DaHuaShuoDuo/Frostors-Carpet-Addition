@@ -12,6 +12,7 @@ import net.minecraft.world.level.LevelReader;
 import net.minecraft.world.level.block.BaseRailBlock;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.CandleBlock;
+import net.minecraft.world.level.block.WallBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
@@ -23,8 +24,8 @@ import top.frostor.carpet.easyplace.EasyPlaceExtraServer;
 import top.frostor.carpet.easyplace.EasyPlaceChestSync;
 import top.frostor.carpet.easyplace.EasyPlaceItemStackSync;
 import top.frostor.carpet.easyplace.EasyPlaceQuantityRules;
-import top.frostor.carpet.easyplace.EasyPlaceRailUpdateGuard;
 import top.frostor.carpet.easyplace.EasyPlaceStateSync;
+import top.frostor.carpet.easyplace.EasyPlaceUpdateSuppressionGuard;
 import top.frostor.carpet.easyplace.MultiFaceBlockRules;
 
 @Mixin(BlockItem.class)
@@ -100,7 +101,7 @@ public abstract class BlockItemMixin {
             BlockPlaceContext context,
             CallbackInfoReturnable<net.minecraft.world.InteractionResult> cir
     ) {
-        EasyPlaceRailUpdateGuard.beginPlacement();
+        EasyPlaceUpdateSuppressionGuard.beginPlacement();
         EasyPlaceItemStackSync.beginPlacement();
     }
 
@@ -110,7 +111,7 @@ public abstract class BlockItemMixin {
             CallbackInfoReturnable<net.minecraft.world.InteractionResult> cir
     ) {
         EasyPlaceItemStackSync.endPlacement();
-        EasyPlaceRailUpdateGuard.endPlacement();
+        EasyPlaceUpdateSuppressionGuard.endPlacement();
         if(cir.getReturnValue().consumesAction()
                 && !context.getLevel().isClientSide()
                 && context.getPlayer() instanceof ServerPlayer player
@@ -166,20 +167,21 @@ public abstract class BlockItemMixin {
         if(state == null) return null;
 
         int rawValue = EasyPlaceExtraProtocol.toRawValue(protocolValue);
-        int crafterDisabledMask = EasyPlaceExtraProtocol.decodeZ(
+        int auxiliaryValue = EasyPlaceExtraProtocol.decodeZ(
                 context.getClickLocation(),
                 context.getClickedPos()
         );
         EasyPlaceItemStackSync.applyCrafterSlots(
                 ((BlockItem) (Object) this).getBlock(),
                 context.getItemInHand(),
-                crafterDisabledMask
+                auxiliaryValue
         );
         BlockState adjusted = EasyPlaceStateSync.apply(
                 ((BlockItem) (Object) this).getBlock(),
                 state,
                 context,
-                rawValue
+                rawValue,
+                auxiliaryValue
         );
         boolean placeable = adjusted != null && canPlace(context, adjusted);
         if(!placeable) {
@@ -187,11 +189,20 @@ public abstract class BlockItemMixin {
         }
 
         if(rail) {
-            EasyPlaceRailUpdateGuard.requestSuppression();
+            EasyPlaceUpdateSuppressionGuard.request(EasyPlaceUpdateSuppressionGuard.Family.RAIL);
             top.frostor.carpet.FrostorsCarpetAddition.LOGGER.debug(
                     "[EasyPlace] Requested rail shape preservation at {} (raw=0x{})",
                     context.getClickedPos(),
                     Integer.toHexString(rawValue)
+            );
+        }
+        if(adjusted.getBlock() instanceof WallBlock) {
+            EasyPlaceUpdateSuppressionGuard.request(EasyPlaceUpdateSuppressionGuard.Family.WALL);
+            top.frostor.carpet.FrostorsCarpetAddition.LOGGER.debug(
+                    "[EasyPlace] Requested wall state preservation at {} (raw=0x{}, auxiliary=0x{})",
+                    context.getClickedPos(),
+                    Integer.toHexString(rawValue),
+                    Integer.toHexString(auxiliaryValue)
             );
         }
         return adjusted;

@@ -77,10 +77,13 @@ FCA 的规则由 Carpet 管理，并随世界配置保存：
 允许无侧向支撑放置，并恢复投影中的朝向；天花板悬挂牌同时恢复 `rotation` 与
 `attached`，但仍校验目标可替换、碰撞和通用放置约束。蜡烛同样只在放置阶段要求
 下方支撑，V2-Extra 允许无支撑放置且不改变放置后的 `updateShape` 行为。数量类方块按原版每次增加一级并将投影数量作为上限，每次交互只消耗一个对应物品。
+所有原版 `WallBlock` 变体恢复投影中的四侧 `NONE/LOW/TALL` 连接和 `UP` 柱子状态；
+`WATERLOGGED` 不进入协议状态，仍以服务端当前放置状态为准。墙方块放置期间会独立抑制
+结构性 `updateShape` 重算，同时保留水方块 tick 等原版副作用。
 
 服务端状态处理使用显式、初始化后冻结的行为族注册表。稳定的
 `EasyPlaceStateSync.apply(...)` 入口负责查找 owner；具体状态恢复位于
-`easyplace/adapter` 下的 directional、attachment、rail、multiface、quantity、
+`easyplace/adapter` 下的 directional、attachment、rail、wall、multiface、quantity、
 container、sign、redstone 和 special 等适配器，通用纯状态操作集中在
 `EasyPlaceStateSupport`。旧的 `LegacyEasyPlaceStateSync` 单体映射和 fallback
 适配器已经移除。V2-Extra Payload 标记和协议版本仍为 1，其余字段布局未改变。

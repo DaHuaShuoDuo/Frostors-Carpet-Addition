@@ -194,6 +194,13 @@ Carpet 会把枚举候选显示为小写，并在解析输入时先转为大写�
   没有显式位时只能走保守的可用邻居推断。箱子同步使用
   `Block.UPDATE_CLIENTS | Block.UPDATE_KNOWN_SHAPE` 做受控状态写入，不要直接复用铁轨
   的全局或定时位置抑制标签。
+- `WallBlock` 的四个 `NONE/LOW/TALL` 横侧面按
+  `NORTH + EAST*3 + SOUTH*9 + WEST*27` 编码进 7 位 raw，合法范围为 `0..80`；
+  辅助 Z 通道的 bit0 表示 `UP`。`WATERLOGGED` 必须保持服务端放置状态，不能编码或强写。
+  墙结构重算由独立 `WALL` family 在 `WallBlock.updateShape` 的 `RETURN` 阶段抑制，
+  保留水 tick 等原版副作用；不得在 `HEAD` 直接取消。
+- 放置期更新抑制 guard 按 `RAIL` 和 `WALL` family 分别记录并独立清理。嵌套放置和
+  上一层结束后不得让一个方块族隐式压制另一个方块族。
 - 命中位置中的 V2-Extra 编码会超出原版对方块中心的距离校验。仅对规则已开启且完成
   V2-Extra 握手的玩家放宽该校验，同时保留玩家触及范围和最终 `canPlace` 校验。该
   放宽必须独立生效，不能依赖 `antiCheatDisabled`。

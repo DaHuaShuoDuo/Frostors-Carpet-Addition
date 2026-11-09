@@ -9,7 +9,8 @@
     "RailStateMixin",
     "ServerGamePacketListenerImplMixin",
     "StandingAndWallBlockItemMixin",
-    "WallHangingSignBlockMixin"
+    "WallHangingSignBlockMixin",
+    "WallBlockMixin"
   ],
   "injectors": {
     "defaultRequire": 1

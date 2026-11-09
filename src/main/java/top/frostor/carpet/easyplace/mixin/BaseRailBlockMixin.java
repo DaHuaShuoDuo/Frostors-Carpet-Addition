@@ -11,7 +11,7 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
-import top.frostor.carpet.easyplace.EasyPlaceRailUpdateGuard;
+import top.frostor.carpet.easyplace.EasyPlaceUpdateSuppressionGuard;
 
 @Mixin(BaseRailBlock.class)
 public abstract class BaseRailBlockMixin {
@@ -25,7 +25,9 @@ public abstract class BaseRailBlockMixin {
             boolean movedByPiston,
             CallbackInfo ci
     ) {
-        if(EasyPlaceRailUpdateGuard.shouldSuppressUpdate()) {
+        if(EasyPlaceUpdateSuppressionGuard.shouldSuppress(
+                EasyPlaceUpdateSuppressionGuard.Family.RAIL
+        )) {
             top.frostor.carpet.FrostorsCarpetAddition.LOGGER.debug(
                     "[EasyPlace] Suppressed rail neighborChanged at {}",
                     pos
@@ -46,7 +48,9 @@ public abstract class BaseRailBlockMixin {
             boolean movedByPiston,
             CallbackInfoReturnable<BlockState> cir
     ) {
-        if(EasyPlaceRailUpdateGuard.shouldSuppressUpdate()) {
+        if(EasyPlaceUpdateSuppressionGuard.shouldSuppress(
+                EasyPlaceUpdateSuppressionGuard.Family.RAIL
+        )) {
             top.frostor.carpet.FrostorsCarpetAddition.LOGGER.debug(
                     "[EasyPlace] Suppressed rail updateState at {}",
                     pos
@@ -67,7 +71,9 @@ public abstract class BaseRailBlockMixin {
             boolean forceUpdate,
             CallbackInfoReturnable<BlockState> cir
     ) {
-        if(EasyPlaceRailUpdateGuard.shouldSuppressUpdate()) {
+        if(EasyPlaceUpdateSuppressionGuard.shouldSuppress(
+                EasyPlaceUpdateSuppressionGuard.Family.RAIL
+        )) {
             top.frostor.carpet.FrostorsCarpetAddition.LOGGER.debug(
                     "[EasyPlace] Suppressed rail updateDir at {}",
                     pos
