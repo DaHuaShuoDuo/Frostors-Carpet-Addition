@@ -1,6 +1,6 @@
 # Easy Place Registry Refactor Plan
 
-Status: Phase 1-2 implemented on `codex/easy-place-registry`; Phase 3-6 pending
+Status: Phase 1-3 implemented on `codex/easy-place-registry`; Phase 4-6 pending
 
 Last updated: 2026-11-09
 
@@ -384,3 +384,24 @@ Before touching code, a future agent must:
   the legacy implementations.
 - Both repositories build for 26.2 and 26.3, protocol/logic tests pass, and the
   no-window Mixin preflight passes for both versions.
+
+### 2026-11-09 - Phase 3
+
+- Added explicit FaceAttached adapters. Buttons, levers, and other
+  face-attached directional blocks now own their face/facing restoration; lever
+  powered state remains in the same family adapter.
+- Added explicit hanging-sign adapters. Ceiling hanging signs own rotation and
+  attachment restoration, while wall hanging signs continue through the
+  standing/wall facade and sign adapter without gaining ceiling-only
+  properties.
+- Added explicit multiface adapters on both sides. The client selects one
+  missing attachable face from current world state; the server merges a single
+  requested face into the target state. Wire values and one-face-per-interaction
+  behavior are unchanged.
+- FaceAttached tests cover all three attach faces, four horizontal facings, and
+  the lever powered bit. Existing multiface direction matrices, vine/vine
+  attachment behavior, hanging-sign support rules, and current-state merging
+  tests continue to pass.
+- The newly migrated families and the client facade now use the registry
+  before the legacy fallback. Both repositories build and test for 26.2 and
+  26.3.

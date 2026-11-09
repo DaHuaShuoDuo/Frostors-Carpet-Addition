@@ -10,6 +10,9 @@ import net.minecraft.world.level.block.FlowerBedBlock;
 import net.minecraft.world.level.block.HugeMushroomBlock;
 import net.minecraft.world.level.block.LeafLitterBlock;
 import net.minecraft.world.level.block.VineBlock;
+import net.minecraft.world.level.block.FaceAttachedHorizontalDirectionalBlock;
+import net.minecraft.world.level.block.LeverBlock;
+import net.minecraft.world.level.block.state.properties.AttachFace;
 import net.minecraft.world.level.block.state.properties.IntegerProperty;
 import net.minecraft.world.level.block.SegmentableBlock;
 import net.minecraft.world.level.block.state.BlockState;
@@ -186,6 +189,7 @@ public final class EasyPlaceExtraProtocolTest {
         checkHugeMushroomStates();
         checkRailUpdateGuardScope();
         checkFenceGateOpenState();
+        checkFaceAttachedStates();
         checkSegmentableFacingRetention();
 
         checkQuantityIncrement(Blocks.CANDLE);
@@ -276,6 +280,48 @@ public final class EasyPlaceExtraProtocolTest {
                         && opened.getValue(FenceGateBlock.FACING) == Direction.NORTH
                         && opened.getValue(FenceGateBlock.OPEN),
                 "fence gate protocol must restore facing and open state"
+        );
+    }
+
+    private static void checkFaceAttachedStates() {
+        Direction[] directions = {
+                Direction.NORTH, Direction.SOUTH, Direction.WEST, Direction.EAST
+        };
+        for(int faceIndex = 0; faceIndex < AttachFace.values().length; faceIndex++) {
+            for(int directionIndex = 0; directionIndex < directions.length; directionIndex++) {
+                int directionData = directions[directionIndex].get3DDataValue();
+                int rawValue = (faceIndex << 4) | directionData;
+                BlockState result = EasyPlaceStateSync.apply(
+                        Blocks.LEVER,
+                        Blocks.LEVER.defaultBlockState(),
+                        null,
+                        rawValue
+                );
+                check(
+                        result != null
+                                && result.getValue(FaceAttachedHorizontalDirectionalBlock.FACE)
+                                == AttachFace.values()[faceIndex]
+                                && result.getValue(FaceAttachedHorizontalDirectionalBlock.FACING)
+                                == directions[directionIndex],
+                        "face-attached buttons and levers must restore every face/facing combination"
+                );
+            }
+        }
+
+        BlockState poweredLever = EasyPlaceStateSync.apply(
+                Blocks.LEVER,
+                Blocks.LEVER.defaultBlockState(),
+                null,
+                0x65
+        );
+        check(
+                poweredLever != null
+                        && poweredLever.getValue(FaceAttachedHorizontalDirectionalBlock.FACE)
+                        == AttachFace.CEILING
+                        && poweredLever.getValue(FaceAttachedHorizontalDirectionalBlock.FACING)
+                        == Direction.EAST
+                        && poweredLever.getValue(LeverBlock.POWERED),
+                "lever protocol must preserve face, facing, and powered state"
         );
     }
     private static void checkRailUpdateGuardScope() {

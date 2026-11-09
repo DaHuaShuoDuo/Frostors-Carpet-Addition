@@ -13,7 +13,10 @@ import top.frostor.carpet.easyplace.adapter.directional.FenceGateStateRestorer;
 import top.frostor.carpet.easyplace.adapter.directional.GenericDirectionalStateRestorer;
 import top.frostor.carpet.easyplace.adapter.directional.StairStateRestorer;
 import top.frostor.carpet.easyplace.adapter.directional.TrapDoorStateRestorer;
+import top.frostor.carpet.easyplace.adapter.attachment.FaceAttachedStateRestorer;
 import top.frostor.carpet.easyplace.adapter.legacy.LegacyStateRestorer;
+import top.frostor.carpet.easyplace.adapter.multiface.MultiFaceStateRestorer;
+import top.frostor.carpet.easyplace.adapter.sign.HangingSignStateRestorer;
 import top.frostor.carpet.easyplace.adapter.sign.SignStateRestorer;
 import top.frostor.carpet.easyplace.adapter.special.AdministrativeStateRestorer;
 import top.frostor.carpet.easyplace.registry.EasyPlaceRestoreContext;
@@ -74,6 +77,24 @@ public final class EasyPlaceStateSync {
         registry.register("fence_gate", 680, FenceGateStateRestorer::matches, new FenceGateStateRestorer());
         registry.register("stair", 670, StairStateRestorer::matches, new StairStateRestorer());
         registry.register("sign", 660, SignStateRestorer::matches, new SignStateRestorer());
+        registry.register(
+                "hanging_sign",
+                659,
+                HangingSignStateRestorer::matches,
+                new HangingSignStateRestorer()
+        );
+        registry.register(
+                "face_attached",
+                658,
+                FaceAttachedStateRestorer::matches,
+                new FaceAttachedStateRestorer()
+        );
+        registry.register(
+                "multiface",
+                657,
+                MultiFaceStateRestorer::matches,
+                new MultiFaceStateRestorer()
+        );
         registry.register(
                 "administrative",
                 650,
