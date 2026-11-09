@@ -1,7 +1,7 @@
 # Easy Place Registry Refactor Plan
 
-Status: Phase 1-6 implemented on `codex/easy-place-registry`; runtime manual
-verification pending
+Status: Phase 1-6 complete on `codex/easy-place-registry`, including the family
+test split; dual-version runtime manual verification completed
 
 Last updated: 2026-11-09
 
@@ -10,10 +10,12 @@ Canonical repositories:
 - FCA server: `D:\mcgaoshou\Frostors-Carpet-Addition`
 - TriWasa client: `D:\mcgaoshou\TriWasa`
 
-Current baseline:
+Current branch for both repositories: `codex/easy-place-registry`.
 
-- FCA branch `codex/fix-multiface-vine-placement`, commit `751b754`
-- TriWasa branch `codex/fix-multiface-vine-placement`, commit `c7b6448`
+Current migration checkpoints:
+
+- FCA commit `c543cf1`
+- TriWasa commit `2ac269a`
 
 This file is the canonical cross-repository plan. TriWasa contains a short
 locator file that points here. If the plan changes, update this file first and
@@ -448,3 +450,20 @@ Before touching code, a future agent must:
   remain in their existing policy/Mixin layers.
 - Explicit tests cover the remaining state families without comparing against
   deleted legacy code. Both repositories build and test for 26.2 and 26.3.
+
+### 2026-11-09 - Phase 6 Test Split And Final Verification
+
+- Kept `EasyPlaceExtraProtocolTest` in FCA and `EasyPlaceProtocolTest` in
+  TriWasa as the stable Gradle/build entry points. Both now bootstrap once,
+  run the registry suite, aggregate the family suites, and report one total.
+- Split FCA coverage into explicit wire, multiface, hanging-sign, quantity,
+  mushroom, rail, special, directional, and attachment suites.
+- Split TriWasa coverage into explicit wire, basic-state, container, multiface,
+  quantity, hanging-sign, mushroom, attachment, rail, special, and
+  printer/config suites.
+- The split changed test organization only. No production source, resource,
+  Mixin, JAR output, or protocol behavior changed. The preserved totals are
+  597 FCA checks and 1832 TriWasa checks on each Minecraft version.
+- Dual-version manual verification of Easy Place and printer behavior completed
+  successfully, including the temporary wall-bell click path logs and their
+  removal after resolution.
