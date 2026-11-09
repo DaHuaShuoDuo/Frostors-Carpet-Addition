@@ -26,7 +26,8 @@ public abstract class BaseRailBlockMixin {
             CallbackInfo ci
     ) {
         if(EasyPlaceUpdateSuppressionGuard.shouldSuppress(
-                EasyPlaceUpdateSuppressionGuard.Family.RAIL
+                EasyPlaceUpdateSuppressionGuard.Family.RAIL,
+                pos
         )) {
             top.frostor.carpet.FrostorsCarpetAddition.LOGGER.debug(
                     "[EasyPlace] Suppressed rail neighborChanged at {}",
@@ -49,7 +50,8 @@ public abstract class BaseRailBlockMixin {
             CallbackInfoReturnable<BlockState> cir
     ) {
         if(EasyPlaceUpdateSuppressionGuard.shouldSuppress(
-                EasyPlaceUpdateSuppressionGuard.Family.RAIL
+                EasyPlaceUpdateSuppressionGuard.Family.RAIL,
+                pos
         )) {
             top.frostor.carpet.FrostorsCarpetAddition.LOGGER.debug(
                     "[EasyPlace] Suppressed rail updateState at {}",
@@ -72,7 +74,8 @@ public abstract class BaseRailBlockMixin {
             CallbackInfoReturnable<BlockState> cir
     ) {
         if(EasyPlaceUpdateSuppressionGuard.shouldSuppress(
-                EasyPlaceUpdateSuppressionGuard.Family.RAIL
+                EasyPlaceUpdateSuppressionGuard.Family.RAIL,
+                pos
         )) {
             top.frostor.carpet.FrostorsCarpetAddition.LOGGER.debug(
                     "[EasyPlace] Suppressed rail updateDir at {}",

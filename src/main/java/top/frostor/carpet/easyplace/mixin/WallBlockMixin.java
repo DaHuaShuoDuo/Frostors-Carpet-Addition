@@ -32,7 +32,8 @@ public abstract class WallBlockMixin {
             CallbackInfoReturnable<BlockState> cir
     ) {
         if(EasyPlaceUpdateSuppressionGuard.shouldSuppress(
-                EasyPlaceUpdateSuppressionGuard.Family.WALL
+                EasyPlaceUpdateSuppressionGuard.Family.WALL,
+                pos
         )) {
             cir.setReturnValue(state);
         }

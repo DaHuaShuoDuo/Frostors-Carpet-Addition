@@ -80,13 +80,19 @@ FCA 的规则由 Carpet 管理，并随世界配置保存：
 所有原版 `WallBlock` 变体恢复投影中的四侧 `NONE/LOW/TALL` 连接和 `UP` 柱子状态；
 `WATERLOGGED` 不进入协议状态，仍以服务端当前放置状态为准。墙方块放置期间会独立抑制
 结构性 `updateShape` 重算，同时保留水方块 tick 等原版副作用。
+任意 V2-Extra 方块放置期间，实际放置位置、四个水平邻居和上方邻居内的铁轨结构重算
+会被抑制；墙体则覆盖实际放置位置及六个面相邻位置。斜角、两格以外位置以及普通
+非 Easy Place 放置不受影响。
+这两项保护分别由 TriWasa 的 `easyPlaceRailBlockNoShapeUpdate` 和
+`easyPlaceWallBlockNoShapeUpdate` 子开关控制，默认开启。
 
 服务端状态处理使用显式、初始化后冻结的行为族注册表。稳定的
 `EasyPlaceStateSync.apply(...)` 入口负责查找 owner；具体状态恢复位于
 `easyplace/adapter` 下的 directional、attachment、rail、wall、multiface、quantity、
 container、sign、redstone 和 special 等适配器，通用纯状态操作集中在
 `EasyPlaceStateSupport`。旧的 `LegacyEasyPlaceStateSync` 单体映射和 fallback
-适配器已经移除。V2-Extra Payload 标记和协议版本仍为 1，其余字段布局未改变。
+适配器已经移除。V2-Extra Payload 标记和协议版本仍为 1；辅助 Z 通道低 9 位继续用于
+crafter slot mask，bit9/bit10 分别表示 rail/wall 更新保护请求。
 多面方块的面索引顺序固定为 `DOWN, UP, NORTH, SOUTH, WEST, EAST`，藤蔓从同一顺序
 过滤 `DOWN` 得到 `UP, NORTH, SOUTH, WEST, EAST`。使用历史面顺序构建的客户端或
 服务端必须升级到匹配版本，混用版本时多面方块和藤蔓可能按错误方向解码。旧 `main`

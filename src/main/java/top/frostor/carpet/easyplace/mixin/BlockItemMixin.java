@@ -101,7 +101,7 @@ public abstract class BlockItemMixin {
             BlockPlaceContext context,
             CallbackInfoReturnable<net.minecraft.world.InteractionResult> cir
     ) {
-        EasyPlaceUpdateSuppressionGuard.beginPlacement();
+        EasyPlaceUpdateSuppressionGuard.beginPlacement(context.getClickedPos());
         EasyPlaceItemStackSync.beginPlacement();
     }
 
@@ -188,16 +188,23 @@ public abstract class BlockItemMixin {
             return null;
         }
 
-        if(rail) {
+        EasyPlaceUpdateSuppressionGuard.updatePlacementPosition(context.getClickedPos());
+        boolean preserveRail = EasyPlaceExtraProtocol.requestsRailUpdateSuppression(auxiliaryValue);
+        boolean preserveWall = EasyPlaceExtraProtocol.requestsWallUpdateSuppression(auxiliaryValue);
+        if(preserveRail) {
             EasyPlaceUpdateSuppressionGuard.request(EasyPlaceUpdateSuppressionGuard.Family.RAIL);
+        }
+        if(preserveWall) {
+            EasyPlaceUpdateSuppressionGuard.request(EasyPlaceUpdateSuppressionGuard.Family.WALL);
+        }
+        if(rail && preserveRail) {
             top.frostor.carpet.FrostorsCarpetAddition.LOGGER.debug(
                     "[EasyPlace] Requested rail shape preservation at {} (raw=0x{})",
                     context.getClickedPos(),
                     Integer.toHexString(rawValue)
             );
         }
-        if(adjusted.getBlock() instanceof WallBlock) {
-            EasyPlaceUpdateSuppressionGuard.request(EasyPlaceUpdateSuppressionGuard.Family.WALL);
+        if(adjusted.getBlock() instanceof WallBlock && preserveWall) {
             top.frostor.carpet.FrostorsCarpetAddition.LOGGER.debug(
                     "[EasyPlace] Requested wall state preservation at {} (raw=0x{}, auxiliary=0x{})",
                     context.getClickedPos(),

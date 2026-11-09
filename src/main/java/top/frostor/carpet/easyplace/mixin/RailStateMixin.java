@@ -27,7 +27,8 @@ public abstract class RailStateMixin {
             CallbackInfoReturnable<RailState> cir
     ) {
         if(EasyPlaceUpdateSuppressionGuard.shouldSuppress(
-                EasyPlaceUpdateSuppressionGuard.Family.RAIL
+                EasyPlaceUpdateSuppressionGuard.Family.RAIL,
+                pos
         )) {
             top.frostor.carpet.FrostorsCarpetAddition.LOGGER.debug(
                     "[EasyPlace] Suppressed RailState.place at {}",

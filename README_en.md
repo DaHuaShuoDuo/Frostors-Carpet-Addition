@@ -95,6 +95,14 @@ connections on all four sides and the `UP` post state. `WATERLOGGED` is not
 encoded and remains authoritative from the server's placement state. Wall
 placement independently suppresses structural `updateShape` recalculation
 while preserving vanilla side effects such as water-tick scheduling.
+During any V2-Extra block placement, rail structural recalculation is suppressed
+at the actual placement position, its four horizontal neighbors, and the
+position above it, but not below it. Wall protection covers the placement
+position and all six face-adjacent positions. Diagonal positions, blocks two or
+more steps away, and ordinary non-Easy-Place placements remain unaffected.
+TriWasa controls these protections independently with the
+`easyPlaceRailBlockNoShapeUpdate` and `easyPlaceWallBlockNoShapeUpdate` child
+switches, both enabled by default.
 
 Server-side state handling uses explicit behavior-family registries that freeze
 after initialization. The stable `EasyPlaceStateSync.apply(...)` entry point
@@ -103,8 +111,9 @@ selects the owning adapter; concrete restoration lives under
 container, sign, redstone, and special families, while shared pure state
 operations live in `EasyPlaceStateSupport`. The old monolithic
 `LegacyEasyPlaceStateSync` mapping and fallback adapter have been removed. The
-V2-Extra payload marker and protocol version remain 1, and the rest of the field
-layout is unchanged. Multiface wire indices use the fixed order
+V2-Extra payload marker and protocol version remain 1. In the auxiliary Z
+channel, the low nine bits remain the crafter slot mask, while bits 9 and 10
+request rail and wall update protection respectively. Multiface wire indices use the fixed order
 `DOWN, UP, NORTH, SOUTH, WEST, EAST`; vine derives `UP, NORTH, SOUTH, WEST,
 EAST` by filtering out `DOWN`. Clients or servers built with the historical
 face order must be upgraded to a matching release, because mixed versions can
