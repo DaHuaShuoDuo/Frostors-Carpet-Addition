@@ -5,6 +5,10 @@ import net.minecraft.SharedConstants;
 import net.minecraft.server.Bootstrap;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.FenceGateBlock;
+import net.minecraft.world.level.block.FlowerBedBlock;
+import net.minecraft.world.level.block.HugeMushroomBlock;
+import net.minecraft.world.level.block.LeafLitterBlock;
 import net.minecraft.world.level.block.VineBlock;
 import net.minecraft.world.level.block.state.properties.IntegerProperty;
 import net.minecraft.world.level.block.SegmentableBlock;
@@ -177,6 +181,11 @@ public final class EasyPlaceExtraProtocolTest {
                 ) == null,
                 "leaf litter must reject placement beyond the projected amount"
         );
+        checkHugeMushroomStates();
+        checkRailUpdateGuardScope();
+        checkFenceGateOpenState();
+        checkSegmentableFacingRetention();
+
         checkQuantityIncrement(Blocks.CANDLE);
         checkQuantityIncrement(Blocks.PINK_PETALS);
         checkQuantityIncrement(Blocks.LEAF_LITTER);
@@ -187,6 +196,110 @@ public final class EasyPlaceExtraProtocolTest {
         System.out.println("EasyPlaceExtraProtocolTest passed " + checks + " checks");
     }
 
+    private static void checkHugeMushroomStates() {
+        Block[] hugeMushroomBlocks = {Blocks.BROWN_MUSHROOM_BLOCK, Blocks.RED_MUSHROOM_BLOCK};
+        for(Block block : hugeMushroomBlocks) {
+            check(block instanceof HugeMushroomBlock, block + " must use HugeMushroomBlock");
+            for(int mask = 0; mask < 64; mask++) {
+                BlockState applied = EasyPlaceStateSync.apply(
+                        block,
+                        block.defaultBlockState(),
+                        null,
+                        mask
+                );
+                check(applied != null, "huge mushroom protocol state must apply");
+                check(
+                        applied.getValue(BlockStateProperties.NORTH) == ((mask & 0x01) != 0)
+                                && applied.getValue(BlockStateProperties.EAST) == ((mask & 0x02) != 0)
+                                && applied.getValue(BlockStateProperties.SOUTH) == ((mask & 0x04) != 0)
+                                && applied.getValue(BlockStateProperties.WEST) == ((mask & 0x08) != 0)
+                                && applied.getValue(BlockStateProperties.UP) == ((mask & 0x10) != 0)
+                                && applied.getValue(BlockStateProperties.DOWN) == ((mask & 0x20) != 0),
+                        "huge mushroom six-face state must apply"
+                );
+            }
+        }
+
+        BlockState smallMushroom = Blocks.BROWN_MUSHROOM.defaultBlockState();
+        check(
+                EasyPlaceStateSync.apply(Blocks.BROWN_MUSHROOM, smallMushroom, null, 0) == smallMushroom,
+                "small mushrooms must retain their placement state"
+        );
+    }
+    private static void checkSegmentableFacingRetention() {
+        BlockState flowerBedPlacement = Blocks.PINK_PETALS.defaultBlockState()
+                .setValue(FlowerBedBlock.FACING, net.minecraft.core.Direction.NORTH)
+                .setValue(FlowerBedBlock.AMOUNT, 1);
+        BlockState flowerBedResult = EasyPlaceStateSync.apply(
+                Blocks.PINK_PETALS,
+                flowerBedPlacement,
+                null,
+                0x9
+        );
+        check(
+                flowerBedResult != null
+                        && flowerBedResult.getValue(FlowerBedBlock.FACING)
+                        == net.minecraft.core.Direction.WEST,
+                "flower bed increments must apply the projected facing"
+        );
+
+        BlockState leafLitterPlacement = Blocks.LEAF_LITTER.defaultBlockState()
+                .setValue(LeafLitterBlock.FACING, net.minecraft.core.Direction.NORTH)
+                .setValue(SegmentableBlock.AMOUNT, 1);
+        BlockState leafLitterResult = EasyPlaceStateSync.apply(
+                Blocks.LEAF_LITTER,
+                leafLitterPlacement,
+                null,
+                0x9
+        );
+        check(
+                leafLitterResult != null
+                        && leafLitterResult.getValue(LeafLitterBlock.FACING)
+                        == net.minecraft.core.Direction.WEST,
+                "leaf litter increments must apply the projected facing"
+        );
+    }
+    private static void checkFenceGateOpenState() {
+        BlockState gate = Blocks.OAK_FENCE_GATE.defaultBlockState()
+                .setValue(FenceGateBlock.FACING, Direction.SOUTH)
+                .setValue(FenceGateBlock.OPEN, false);
+        BlockState opened = EasyPlaceStateSync.apply(
+                Blocks.OAK_FENCE_GATE,
+                gate,
+                null,
+                0x12
+        );
+        check(
+                opened != null
+                        && opened.getValue(FenceGateBlock.FACING) == Direction.NORTH
+                        && opened.getValue(FenceGateBlock.OPEN),
+                "fence gate protocol must restore facing and open state"
+        );
+    }
+    private static void checkRailUpdateGuardScope() {
+        EasyPlaceRailUpdateGuard.beginPlacement();
+        try {
+            check(!EasyPlaceRailUpdateGuard.shouldSuppressUpdate(), "rail suppression must start inactive");
+            EasyPlaceRailUpdateGuard.requestSuppression();
+            check(
+                    EasyPlaceRailUpdateGuard.shouldSuppressUpdate(),
+                    "rail suppression must cover any rail update during the guarded placement"
+            );
+        } finally {
+            EasyPlaceRailUpdateGuard.endPlacement();
+        }
+        check(!EasyPlaceRailUpdateGuard.shouldSuppressUpdate(), "rail suppression must end with placement");
+
+        EasyPlaceRailUpdateGuard.beginPlacement();
+        try {
+            check(
+                    !EasyPlaceRailUpdateGuard.shouldSuppressUpdate(),
+                    "a new rail placement must not inherit a previous suppression flag"
+            );
+        } finally {
+            EasyPlaceRailUpdateGuard.endPlacement();
+        }
+    }
     private static void checkQuantityIncrement(Block block) {
         IntegerProperty property = EasyPlaceQuantityRules.getCountProperty(block);
         check(property != null, block + " must expose a supported quantity property");

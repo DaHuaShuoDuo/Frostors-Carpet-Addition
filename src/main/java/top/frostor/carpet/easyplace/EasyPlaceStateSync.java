@@ -30,7 +30,7 @@ import net.minecraft.world.level.block.LanternBlock;
 import net.minecraft.world.level.block.LeafLitterBlock;
 import net.minecraft.world.level.block.LeverBlock;
 import net.minecraft.world.level.block.LightBlock;
-import net.minecraft.world.level.block.MushroomBlock;
+import net.minecraft.world.level.block.HugeMushroomBlock;
 import net.minecraft.world.level.block.NoteBlock;
 import net.minecraft.world.level.block.PoweredRailBlock;
 import net.minecraft.world.level.block.RailBlock;
@@ -171,8 +171,7 @@ public final class EasyPlaceStateSync {
         if(block instanceof FlowerBedBlock) {
             Direction facing = VERTICAL_DIRECTIONS[(rawValue & 0xC) >>> 2];
             int amount = (rawValue & 0x3) + 1;
-            BlockState current = context.getLevel().getBlockState(context.getClickedPos());
-            BlockState result = current.is(block) ? state : state.setValue(FlowerBedBlock.FACING, facing);
+            BlockState result = state.setValue(FlowerBedBlock.FACING, facing);
             return validateIncremental(result, FlowerBedBlock.AMOUNT, amount);
         }
         if(block instanceof HangingSignBlock) {
@@ -210,14 +209,13 @@ public final class EasyPlaceStateSync {
         if(block instanceof LeafLitterBlock) {
             Direction facing = VERTICAL_DIRECTIONS[(rawValue & 0xC) >>> 2];
             int amount = (rawValue & 0x3) + 1;
-            BlockState current = context.getLevel().getBlockState(context.getClickedPos());
-            BlockState result = current.is(block) ? state : state.setValue(LeafLitterBlock.FACING, facing);
+            BlockState result = state.setValue(LeafLitterBlock.FACING, facing);
             return validateIncremental(result, SegmentableBlock.AMOUNT, amount);
         }
         if(MultiFaceBlockRules.isMultiFaceBlock(block)) {
             return MultiFaceBlockRules.applyPlacementState(block, state, context, rawValue);
         }
-        if(block instanceof MushroomBlock) {
+        if(block instanceof HugeMushroomBlock) {
             return state
                     .setValue(NORTH, (rawValue & 0x01) != 0)
                     .setValue(EAST, (rawValue & 0x02) != 0)

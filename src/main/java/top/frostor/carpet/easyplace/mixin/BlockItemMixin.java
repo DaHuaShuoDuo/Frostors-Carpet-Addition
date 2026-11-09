@@ -187,7 +187,7 @@ public abstract class BlockItemMixin {
         }
 
         if(rail) {
-            EasyPlaceRailUpdateGuard.requestSuppression(context.getLevel(), context.getClickedPos());
+            EasyPlaceRailUpdateGuard.requestSuppression();
             top.frostor.carpet.FrostorsCarpetAddition.LOGGER.debug(
                     "[EasyPlace] Requested rail shape preservation at {} (raw=0x{})",
                     context.getClickedPos(),
