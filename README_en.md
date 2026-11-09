@@ -91,6 +91,17 @@ target replaceability, collision, and general placement checks remain enforced.
 Candles likewise require support only during placement; V2-Extra permits
 unsupported placement without changing later `updateShape` behavior. Quantity-state blocks advance by one vanilla placement level per interaction, use the projected amount as the upper bound, and consume one matching item each time.
 
+Server-side state handling uses explicit behavior-family registries that freeze
+after initialization. The stable `EasyPlaceStateSync.apply(...)` entry point
+selects the owning adapter; concrete restoration lives under
+`easyplace/adapter` in directional, attachment, rail, multiface, quantity,
+container, sign, redstone, and special families, while shared pure state
+operations live in `EasyPlaceStateSupport`. The old monolithic
+`LegacyEasyPlaceStateSync` mapping and fallback adapter have been removed. The
+wire protocol and V2-Extra version are unchanged. See
+[`EASY_PLACE_REGISTRY_PLAN.md`](https://github.com/DaHuaShuoDuo/Frostors-Carpet-Addition/blob/main/EASY_PLACE_REGISTRY_PLAN.md)
+for the architecture boundaries and migration record.
+
 ### Player Ladder
 
 Enable `/carpet playerLadder true` first, then use `/playerladder` to query or
@@ -165,6 +176,9 @@ $env:JAVA_HOME = '<JDK 25 installation>'
 Prepare the matching Carpet and Quick Shulker compile dependencies as described in
 [`libs/README.md`](https://github.com/DaHuaShuoDuo/Frostors-Carpet-Addition/blob/main/libs/README.md). Shared source, resource, or Mixin changes
 must be built for both 26.2 and 26.3.
+The build runs `logicTest` and `easyPlaceProtocolTest`. The latter keeps
+`EasyPlaceExtraProtocolTest` as its stable entry point and aggregates the
+protocol and state suites split by behavior family.
 
 Every PR runs change classification and `CI Gate`. The full two-version build
 runs only when source, resources, version properties, Gradle, Wrapper, or

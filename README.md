@@ -78,6 +78,14 @@ FCA 的规则由 Carpet 管理，并随世界配置保存：
 `attached`，但仍校验目标可替换、碰撞和通用放置约束。蜡烛同样只在放置阶段要求
 下方支撑，V2-Extra 允许无支撑放置且不改变放置后的 `updateShape` 行为。数量类方块按原版每次增加一级并将投影数量作为上限，每次交互只消耗一个对应物品。
 
+服务端状态处理使用显式、初始化后冻结的行为族注册表。稳定的
+`EasyPlaceStateSync.apply(...)` 入口负责查找 owner；具体状态恢复位于
+`easyplace/adapter` 下的 directional、attachment、rail、multiface、quantity、
+container、sign、redstone 和 special 等适配器，通用纯状态操作集中在
+`EasyPlaceStateSupport`。旧的 `LegacyEasyPlaceStateSync` 单体映射和 fallback
+适配器已经移除，线协议与 V2-Extra 版本未改变。实现边界和迁移记录见
+[`EASY_PLACE_REGISTRY_PLAN.md`](https://github.com/DaHuaShuoDuo/Frostors-Carpet-Addition/blob/main/EASY_PLACE_REGISTRY_PLAN.md)。
+
 ### Player Ladder
 
 先使用 `/carpet playerLadder true` 解锁，再用 `/playerladder` 查询或修改骑乘、举起、
@@ -143,6 +151,8 @@ $env:JAVA_HOME = '<JDK 25 installation>'
 构建前按 [`libs/README.md`](https://github.com/DaHuaShuoDuo/Frostors-Carpet-Addition/blob/main/libs/README.md)
 准备对应版本的 Carpet 和 Quick Shulker 编译依赖。
 共享源码、资源或 Mixin 修改后必须同时构建 26.2 和 26.3。
+构建会执行 `logicTest` 和 `easyPlaceProtocolTest`；后者以
+`EasyPlaceExtraProtocolTest` 为稳定入口，聚合并执行按行为族拆分的协议与状态测试。
 
 PR 始终运行变更分类和 `CI Gate`；只有源码、资源、版本属性、Gradle、Wrapper 或
 workflow 变化时才执行双版本完整构建。

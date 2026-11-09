@@ -174,8 +174,12 @@ Carpet 会把枚举候选显示为小写，并在解析输入时先转为大写�
   任何新增能力都先扩展 FCA 的公开协议 API，再更新 TriWasa 适配。
 - 协议值只从服务端方块放置上下文中的命中位置解码，最终状态仍须通过 `BlockItem.canPlace`
   校验，不能信任客户端直接写入任意方块状态。
-- 方块状态映射集中在 `easyplace` 包，避免为每种原版方块复制独立 Mixin。新增适配时
-  应补充可离线运行的协议/状态测试，并完成对应手测。
+- 方块状态映射集中在 `easyplace` 包。`EasyPlaceStateSync` 是稳定 facade，实际 owner
+  由初始化后冻结的 `EasyPlaceStateRestorerRegistry` 决定；按 behavior family 注册
+  `easyplace/adapter` 下的 restorer，纯通用状态操作放入 `EasyPlaceStateSupport`。
+  不要把已移除的 `LegacyEasyPlaceStateSync` 单体分支重新引回，也不要为每种原版方块
+  复制独立 Mixin。新增适配时应扩展对应 family suite，同时保留
+  `EasyPlaceExtraProtocolTest` 作为构建入口和集成矩阵。
 - `MultifaceBlock` 的面状态必须从目标位置当前世界状态合并，不能继续使用原始放置状态；
   否则目标状态已含同一面时原版会返回 `null`，在附着方块周围有密集完整方块时表现为
   挂墙/多面方块漏放。必须保留密集图案 GameTest。
