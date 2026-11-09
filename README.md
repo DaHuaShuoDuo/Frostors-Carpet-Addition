@@ -83,7 +83,10 @@ FCA 的规则由 Carpet 管理，并随世界配置保存：
 `easyplace/adapter` 下的 directional、attachment、rail、multiface、quantity、
 container、sign、redstone 和 special 等适配器，通用纯状态操作集中在
 `EasyPlaceStateSupport`。旧的 `LegacyEasyPlaceStateSync` 单体映射和 fallback
-适配器已经移除，线协议与 V2-Extra 版本未改变。实现边界和迁移记录见
+适配器已经移除。V2-Extra Payload 标记和协议版本仍为 1，其余字段布局未改变。
+多面方块的面索引顺序固定为 `DOWN, UP, NORTH, SOUTH, WEST, EAST`，藤蔓从同一顺序
+过滤 `DOWN` 得到 `UP, NORTH, SOUTH, WEST, EAST`。使用历史面顺序构建的客户端或
+服务端必须升级到匹配版本，混用版本时多面方块和藤蔓可能按错误方向解码。实现边界和迁移记录见
 [`EASY_PLACE_REGISTRY_PLAN.md`](https://github.com/DaHuaShuoDuo/Frostors-Carpet-Addition/blob/main/EASY_PLACE_REGISTRY_PLAN.md)。
 
 ### Player Ladder

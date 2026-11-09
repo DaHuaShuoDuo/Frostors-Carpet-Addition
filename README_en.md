@@ -98,7 +98,12 @@ selects the owning adapter; concrete restoration lives under
 container, sign, redstone, and special families, while shared pure state
 operations live in `EasyPlaceStateSupport`. The old monolithic
 `LegacyEasyPlaceStateSync` mapping and fallback adapter have been removed. The
-wire protocol and V2-Extra version are unchanged. See
+V2-Extra payload marker and protocol version remain 1, and the rest of the field
+layout is unchanged. Multiface wire indices use the fixed order
+`DOWN, UP, NORTH, SOUTH, WEST, EAST`; vine derives `UP, NORTH, SOUTH, WEST,
+EAST` by filtering out `DOWN`. Clients or servers built with the historical
+face order must be upgraded to a matching release, because mixed versions can
+decode multiface and vine faces in the wrong direction. See
 [`EASY_PLACE_REGISTRY_PLAN.md`](https://github.com/DaHuaShuoDuo/Frostors-Carpet-Addition/blob/main/EASY_PLACE_REGISTRY_PLAN.md)
 for the architecture boundaries and migration record.
 

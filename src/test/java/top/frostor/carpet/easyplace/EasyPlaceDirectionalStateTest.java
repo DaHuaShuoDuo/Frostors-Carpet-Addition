@@ -26,6 +26,19 @@ public final class EasyPlaceDirectionalStateTest extends EasyPlaceTestSupport {
                         && opened.getValue(FenceGateBlock.OPEN),
                 "fence gate protocol must restore facing and open state"
         );
+
+        BlockState nullContextResult = EasyPlaceStateSync.apply(
+                Blocks.OAK_FENCE_GATE,
+                gate,
+                null,
+                0x16
+        );
+        test.check(
+                nullContextResult != null
+                        && nullContextResult.getValue(FenceGateBlock.FACING) == Direction.SOUTH
+                        && nullContextResult.getValue(FenceGateBlock.OPEN),
+                "fence gate interaction decoding must not require a placement context for protocol index six"
+        );
         return test.checks();
     }
 }

@@ -12,11 +12,16 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.Property;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.Arrays;
+
 public final class MultiFaceBlockRules {
-    private static final Direction[] DIRECTIONS = Direction.values();
-    private static final Direction[] VINE_DIRECTIONS = {
-            Direction.UP, Direction.NORTH, Direction.SOUTH, Direction.WEST, Direction.EAST
+    private static final Direction[] DIRECTIONS = {
+            Direction.DOWN, Direction.UP, Direction.NORTH,
+            Direction.SOUTH, Direction.WEST, Direction.EAST
     };
+    private static final Direction[] VINE_DIRECTIONS = Arrays.stream(DIRECTIONS)
+            .filter(direction -> direction != Direction.DOWN)
+            .toArray(Direction[]::new);
 
     private MultiFaceBlockRules() {
     }

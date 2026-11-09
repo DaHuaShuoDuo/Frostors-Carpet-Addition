@@ -37,13 +37,6 @@ public final class EasyPlaceStateSupport {
                     (protocolValue & 0x10) != 0 ? Half.TOP : Half.BOTTOM
             );
         }
-        if(result.hasProperty(BlockStateProperties.HALF)) {
-            result = result.setValue(
-                    BlockStateProperties.HALF,
-                    (protocolValue & 0x10) != 0 ? Half.TOP : Half.BOTTOM
-            );
-        }
-
         int highBits = protocolValue & ~0xf;
         if(result.hasProperty(RepeaterBlock.DELAY) && highBits >= 0x10) {
             int delay = highBits >>> 4;
@@ -63,7 +56,9 @@ public final class EasyPlaceStateSupport {
     ) {
         int index = protocolValue & 0xf;
         if(index <= 5) return DIRECTIONS[index];
-        if(index == 6) return context.getHorizontalDirection().getOpposite();
+        if(index == 6 && context != null) {
+            return context.getHorizontalDirection().getOpposite();
+        }
         return state.hasProperty(BlockStateProperties.HORIZONTAL_FACING)
                 ? state.getValue(BlockStateProperties.HORIZONTAL_FACING)
                 : Direction.NORTH;

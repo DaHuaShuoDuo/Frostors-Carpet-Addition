@@ -180,6 +180,10 @@ Carpet 会把枚举候选显示为小写，并在解析输入时先转为大写�
   不要把已移除的 `LegacyEasyPlaceStateSync` 单体分支重新引回，也不要为每种原版方块
   复制独立 Mixin。新增适配时应扩展对应 family suite，同时保留
   `EasyPlaceExtraProtocolTest` 作为构建入口和集成矩阵。
+- 多面方块线值顺序必须保持显式 `DOWN, UP, NORTH, SOUTH, WEST, EAST`；藤蔓顺序从
+  同一数组过滤 `DOWN` 派生，不得另手写一份。该顺序属于当前 V2-Extra v1 构建契约：
+  混用使用历史面顺序的 FCA、TriWasa 或 EarlyCompat 构建会错误解码多面/藤蔓方向；
+  调整顺序或增加兼容协商时必须同步两仓库、模板测试、README 和兼容性说明。
 - `MultifaceBlock` 的面状态必须从目标位置当前世界状态合并，不能继续使用原始放置状态；
   否则目标状态已含同一面时原版会返回 `null`，在附着方块周围有密集完整方块时表现为
   挂墙/多面方块漏放。必须保留密集图案 GameTest。

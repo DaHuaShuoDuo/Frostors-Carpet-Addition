@@ -364,6 +364,11 @@ Before touching code, a future agent must:
   the three audited printer forks use Litematica protocol entry points.
 - First implementation milestone: registry skeleton plus simple directional
   families only. Do not start with multiface, quantity, rails, or printers.
+- Canonical multiface protocol order: explicit
+  `DOWN, UP, NORTH, SOUTH, WEST, EAST`; vine order derives from it by filtering
+  `DOWN`. The historical vine order is not restored; mixed old/new face-order
+  builds are a documented compatibility boundary unless versioned dual decode
+  is added later.
 
 ## Implementation Log
 
@@ -467,3 +472,22 @@ Before touching code, a future agent must:
 - Dual-version manual verification of Easy Place and printer behavior completed
   successfully, including the temporary wall-bell click path logs and their
   removal after resolution.
+
+### 2026-11-09 - Review Follow-Up
+
+- Multiface wire order is now a frozen explicit array:
+  `DOWN, UP, NORTH, SOUTH, WEST, EAST`. Vine uses the same array with `DOWN`
+  filtered out, yielding `UP, NORTH, SOUTH, WEST, EAST`. This keeps one source
+  of truth while preserving the current five-face vine semantics.
+- The V2-Extra payload marker and protocol version remain 1, but the canonical
+  face ordering is now documented as a build compatibility contract. Builds
+  using the historical face order must be upgraded together to avoid
+  misdecoding multiface and vine faces.
+- Generic direction decoding no longer throws when protocol index 6 is used
+  without a placement context; it falls back to the state's horizontal facing.
+  Fence-gate interaction coverage exercises the null-context raw value.
+- Removed a duplicated generic `HALF` state assignment introduced during the
+  registry migration.
+- Added exact multiface/vine wire-index round-trip checks and null-context
+  fence-gate coverage. Current totals are 598 FCA checks and 1843 TriWasa
+  checks on each Minecraft version.
