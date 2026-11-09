@@ -73,6 +73,22 @@ FCA 的规则由 Carpet 管理，并随世界配置保存：
 `easyPlaceProtocolExtra` 提供 Servux 兼容的服务端轻松放置语义，通过
 `earlycompat:network` 接收兼容客户端的精确方块状态编码。服务端仍执行玩家触及、
 方块放置和最终 `BlockItem.canPlace` 校验；FCA 不包含客户端投影读取或放置交互。
+墙挂悬挂牌遵循原版仅在放置时要求侧向支撑、支撑移除后仍保留的特性：V2-Extra
+允许无侧向支撑放置，并恢复投影中的朝向；天花板悬挂牌同时恢复 `rotation` 与
+`attached`，但仍校验目标可替换、碰撞和通用放置约束。蜡烛同样只在放置阶段要求
+下方支撑，V2-Extra 允许无支撑放置且不改变放置后的 `updateShape` 行为。数量类方块按原版每次增加一级并将投影数量作为上限，每次交互只消耗一个对应物品。
+
+服务端状态处理使用显式、初始化后冻结的行为族注册表。稳定的
+`EasyPlaceStateSync.apply(...)` 入口负责查找 owner；具体状态恢复位于
+`easyplace/adapter` 下的 directional、attachment、rail、multiface、quantity、
+container、sign、redstone 和 special 等适配器，通用纯状态操作集中在
+`EasyPlaceStateSupport`。旧的 `LegacyEasyPlaceStateSync` 单体映射和 fallback
+适配器已经移除。V2-Extra Payload 标记和协议版本仍为 1，其余字段布局未改变。
+多面方块的面索引顺序固定为 `DOWN, UP, NORTH, SOUTH, WEST, EAST`，藤蔓从同一顺序
+过滤 `DOWN` 得到 `UP, NORTH, SOUTH, WEST, EAST`。使用历史面顺序构建的客户端或
+服务端必须升级到匹配版本，混用版本时多面方块和藤蔓可能按错误方向解码。旧 `main`
+快照保存在双方的 `legacy` 标签中，仅用于历史兼容，不再维护。实现边界和迁移记录见
+[`EASY_PLACE_REGISTRY_PLAN.md`](https://github.com/DaHuaShuoDuo/Frostors-Carpet-Addition/blob/main/EASY_PLACE_REGISTRY_PLAN.md)。
 
 ### Player Ladder
 
@@ -88,7 +104,7 @@ FCA 的规则由 Carpet 管理，并随世界配置保存：
 
 ### 客户端兼容与公开协议
 
-FCA 不包含自定义大末影箱终端 GUI，也不注册自定义终端 `MenuType`。TriWasa 等兼容客户端可以通过 protocol v3 的 `BigEnderChestProtocol.Payload` 和 `EasyPlaceExtraPayload` 使用 FCA 定义的公开 Payload、消息 DTO 与 Codec。大末影箱终端需要与 FCA `0.2.0-beta.3` 匹配的 TriWasa 版本；原版客户端无需安装 FCA 或 TriWasa。FCA 同进程加载时，客户端直接复用这些类型，避免在同一通道注册不同 Payload 类。
+FCA 不包含自定义大末影箱终端 GUI，也不注册自定义终端 `MenuType`。TriWasa 等兼容客户端可以通过 protocol v3 的 `BigEnderChestProtocol.Payload` 和 `EasyPlaceExtraPayload` 使用 FCA 定义的公开 Payload、消息 DTO 与 Codec。大末影箱终端需要与 FCA `0.2.1-beta.1` 匹配的 TriWasa 版本；原版客户端无需安装 FCA 或 TriWasa。FCA 同进程加载时，客户端直接复用这些类型，避免在同一通道注册不同 Payload 类。
 
 ### 在线资料回退
 
@@ -139,6 +155,8 @@ $env:JAVA_HOME = '<JDK 25 installation>'
 构建前按 [`libs/README.md`](https://github.com/DaHuaShuoDuo/Frostors-Carpet-Addition/blob/main/libs/README.md)
 准备对应版本的 Carpet 和 Quick Shulker 编译依赖。
 共享源码、资源或 Mixin 修改后必须同时构建 26.2 和 26.3。
+构建会执行 `logicTest` 和 `easyPlaceProtocolTest`；后者以
+`EasyPlaceExtraProtocolTest` 为稳定入口，聚合并执行按行为族拆分的协议与状态测试。
 
 PR 始终运行变更分类和 `CI Gate`；只有源码、资源、版本属性、Gradle、Wrapper 或
 workflow 变化时才执行双版本完整构建。

@@ -7,7 +7,9 @@ import net.minecraft.world.item.StandingAndWallBlockItem;
 import net.minecraft.world.item.context.BlockPlaceContext;
 import net.minecraft.world.level.LevelReader;
 import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.WallHangingSignBlock;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.phys.shapes.CollisionContext;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
@@ -40,17 +42,33 @@ public abstract class StandingAndWallBlockItemMixin extends BlockItem {
         int protocolValue = EasyPlaceExtraProtocol.decode(context.getClickLocation(), context.getClickedPos());
         if(!EasyPlaceExtraProtocol.isExtra(protocolValue)) return;
 
+        int rawValue = EasyPlaceExtraProtocol.toRawValue(protocolValue);
         BlockState state = cir.getReturnValue();
-        if(state == null) return;
+        if(state == null) {
+            boolean wall = (rawValue & 1) != 0;
+            state = (wall ? wallBlock : getBlock()).defaultBlockState();
+        }
 
         BlockState adjusted = EasyPlaceStateSync.applyStandingOrWall(
                 getBlock(),
                 wallBlock,
                 state,
                 context,
-                EasyPlaceExtraProtocol.toRawValue(protocolValue)
+                rawValue
         );
-        if(adjusted == null || !canPlace(context.getLevel(), adjusted, context.getClickedPos())) {
+        boolean validPlacement = adjusted != null
+                && canPlace(context.getLevel(), adjusted, context.getClickedPos());
+        if(!validPlacement
+                && adjusted != null
+                && adjusted.getBlock() instanceof WallHangingSignBlock) {
+            validPlacement = context.canPlace()
+                    && context.getLevel().isUnobstructed(
+                            adjusted,
+                            context.getClickedPos(),
+                            CollisionContext.placementContext(context.getPlayer())
+                    );
+        }
+        if(!validPlacement) {
             cir.setReturnValue(null);
         } else {
             cir.setReturnValue(adjusted);

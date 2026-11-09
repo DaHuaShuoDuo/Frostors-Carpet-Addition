@@ -4,10 +4,12 @@
   "compatibilityLevel": "JAVA_25",
   "mixins": [
     "BaseRailBlockMixin",
+    "FenceGateBlockMixin",
     "BlockItemMixin",
     "RailStateMixin",
     "ServerGamePacketListenerImplMixin",
-    "StandingAndWallBlockItemMixin"
+    "StandingAndWallBlockItemMixin",
+    "WallHangingSignBlockMixin"
   ],
   "injectors": {
     "defaultRequire": 1

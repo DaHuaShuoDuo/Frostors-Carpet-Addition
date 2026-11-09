@@ -83,7 +83,31 @@ produce a significant server-tick spike, so this path is disabled by default.
 semantics and receives precise block-state encoding from compatible clients over
 `earlycompat:network`. The server still enforces player reach, block placement,
 and final `BlockItem.canPlace` validation. FCA does not include client
-schematic access or placement interaction.
+schematic access or placement interaction. Wall hanging signs follow vanilla's
+placement-only lateral-support rule and remain valid after that support is
+removed: V2-Extra permits unsupported placement and restores the projected
+facing. Ceiling hanging signs restore both `rotation` and `attached`, while
+target replaceability, collision, and general placement checks remain enforced.
+Candles likewise require support only during placement; V2-Extra permits
+unsupported placement without changing later `updateShape` behavior. Quantity-state blocks advance by one vanilla placement level per interaction, use the projected amount as the upper bound, and consume one matching item each time.
+
+Server-side state handling uses explicit behavior-family registries that freeze
+after initialization. The stable `EasyPlaceStateSync.apply(...)` entry point
+selects the owning adapter; concrete restoration lives under
+`easyplace/adapter` in directional, attachment, rail, multiface, quantity,
+container, sign, redstone, and special families, while shared pure state
+operations live in `EasyPlaceStateSupport`. The old monolithic
+`LegacyEasyPlaceStateSync` mapping and fallback adapter have been removed. The
+V2-Extra payload marker and protocol version remain 1, and the rest of the field
+layout is unchanged. Multiface wire indices use the fixed order
+`DOWN, UP, NORTH, SOUTH, WEST, EAST`; vine derives `UP, NORTH, SOUTH, WEST,
+EAST` by filtering out `DOWN`. Clients or servers built with the historical
+face order must be upgraded to a matching release, because mixed versions can
+decode multiface and vine faces in the wrong direction. The old `main` snapshot
+is preserved by the `legacy` tag in both repositories for historical
+compatibility only and is no longer maintained. See
+[`EASY_PLACE_REGISTRY_PLAN.md`](https://github.com/DaHuaShuoDuo/Frostors-Carpet-Addition/blob/main/EASY_PLACE_REGISTRY_PLAN.md)
+for the architecture boundaries and migration record.
 
 ### Player Ladder
 
@@ -102,7 +126,7 @@ with `/playerladder` after upgrading; unconfigured options use their defaults.
 
 ### Client Compatibility and Public Protocols
 
-FCA does not include a custom big ender chest terminal GUI and does not register a custom terminal `MenuType`. Clients such as TriWasa can use the protocol v3 `BigEnderChestProtocol.Payload` and `EasyPlaceExtraPayload` types, message DTOs, and codecs defined by FCA. The terminal requires a TriWasa build matching FCA `0.2.0-beta.3`; vanilla clients do not need FCA or TriWasa. When FCA is loaded in the same process, clients reuse those types instead of registering a different payload class for the same channel.
+FCA does not include a custom big ender chest terminal GUI and does not register a custom terminal `MenuType`. Clients such as TriWasa can use the protocol v3 `BigEnderChestProtocol.Payload` and `EasyPlaceExtraPayload` types, message DTOs, and codecs defined by FCA. The terminal requires a TriWasa build matching FCA `0.2.1-beta.1`; vanilla clients do not need FCA or TriWasa. When FCA is loaded in the same process, clients reuse those types instead of registering a different payload class for the same channel.
 
 ### Online Profile Fallback
 
@@ -159,6 +183,9 @@ $env:JAVA_HOME = '<JDK 25 installation>'
 Prepare the matching Carpet and Quick Shulker compile dependencies as described in
 [`libs/README.md`](https://github.com/DaHuaShuoDuo/Frostors-Carpet-Addition/blob/main/libs/README.md). Shared source, resource, or Mixin changes
 must be built for both 26.2 and 26.3.
+The build runs `logicTest` and `easyPlaceProtocolTest`. The latter keeps
+`EasyPlaceExtraProtocolTest` as its stable entry point and aggregates the
+protocol and state suites split by behavior family.
 
 Every PR runs change classification and `CI Gate`. The full two-version build
 runs only when source, resources, version properties, Gradle, Wrapper, or

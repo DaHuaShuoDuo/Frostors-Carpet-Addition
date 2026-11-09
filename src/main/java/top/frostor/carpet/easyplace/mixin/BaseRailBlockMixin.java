@@ -3,15 +3,37 @@ package top.frostor.carpet.easyplace.mixin;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.BaseRailBlock;
+import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.redstone.Orientation;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 import top.frostor.carpet.easyplace.EasyPlaceRailUpdateGuard;
 
 @Mixin(BaseRailBlock.class)
 public abstract class BaseRailBlockMixin {
+    @Inject(method = "neighborChanged", at = @At("HEAD"), cancellable = true)
+    private void frostorsCarpet$keepEasyPlaceRailNeighborhood(
+            BlockState state,
+            Level level,
+            BlockPos pos,
+            Block neighborBlock,
+            Orientation orientation,
+            boolean movedByPiston,
+            CallbackInfo ci
+    ) {
+        if(EasyPlaceRailUpdateGuard.shouldSuppressUpdate()) {
+            top.frostor.carpet.FrostorsCarpetAddition.LOGGER.debug(
+                    "[EasyPlace] Suppressed rail neighborChanged at {}",
+                    pos
+            );
+            ci.cancel();
+        }
+    }
+
     @Inject(
             method = "updateState(Lnet/minecraft/world/level/block/state/BlockState;Lnet/minecraft/world/level/Level;Lnet/minecraft/core/BlockPos;Z)Lnet/minecraft/world/level/block/state/BlockState;",
             at = @At("HEAD"),
@@ -24,7 +46,7 @@ public abstract class BaseRailBlockMixin {
             boolean movedByPiston,
             CallbackInfoReturnable<BlockState> cir
     ) {
-        if(EasyPlaceRailUpdateGuard.shouldSuppressUpdate(level, pos)) {
+        if(EasyPlaceRailUpdateGuard.shouldSuppressUpdate()) {
             top.frostor.carpet.FrostorsCarpetAddition.LOGGER.debug(
                     "[EasyPlace] Suppressed rail updateState at {}",
                     pos
@@ -45,7 +67,7 @@ public abstract class BaseRailBlockMixin {
             boolean forceUpdate,
             CallbackInfoReturnable<BlockState> cir
     ) {
-        if(EasyPlaceRailUpdateGuard.shouldSuppressUpdate(level, pos)) {
+        if(EasyPlaceRailUpdateGuard.shouldSuppressUpdate()) {
             top.frostor.carpet.FrostorsCarpetAddition.LOGGER.debug(
                     "[EasyPlace] Suppressed rail updateDir at {}",
                     pos
