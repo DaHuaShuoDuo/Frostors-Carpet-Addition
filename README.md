@@ -86,7 +86,8 @@ container、sign、redstone 和 special 等适配器，通用纯状态操作集�
 适配器已经移除。V2-Extra Payload 标记和协议版本仍为 1，其余字段布局未改变。
 多面方块的面索引顺序固定为 `DOWN, UP, NORTH, SOUTH, WEST, EAST`，藤蔓从同一顺序
 过滤 `DOWN` 得到 `UP, NORTH, SOUTH, WEST, EAST`。使用历史面顺序构建的客户端或
-服务端必须升级到匹配版本，混用版本时多面方块和藤蔓可能按错误方向解码。实现边界和迁移记录见
+服务端必须升级到匹配版本，混用版本时多面方块和藤蔓可能按错误方向解码。旧 `main`
+快照保存在双方的 `legacy` 标签中，仅用于历史兼容，不再维护。实现边界和迁移记录见
 [`EASY_PLACE_REGISTRY_PLAN.md`](https://github.com/DaHuaShuoDuo/Frostors-Carpet-Addition/blob/main/EASY_PLACE_REGISTRY_PLAN.md)。
 
 ### Player Ladder
@@ -103,7 +104,7 @@ container、sign、redstone 和 special 等适配器，通用纯状态操作集�
 
 ### 客户端兼容与公开协议
 
-FCA 不包含自定义大末影箱终端 GUI，也不注册自定义终端 `MenuType`。TriWasa 等兼容客户端可以通过 protocol v3 的 `BigEnderChestProtocol.Payload` 和 `EasyPlaceExtraPayload` 使用 FCA 定义的公开 Payload、消息 DTO 与 Codec。大末影箱终端需要与 FCA `0.2.0-beta.3` 匹配的 TriWasa 版本；原版客户端无需安装 FCA 或 TriWasa。FCA 同进程加载时，客户端直接复用这些类型，避免在同一通道注册不同 Payload 类。
+FCA 不包含自定义大末影箱终端 GUI，也不注册自定义终端 `MenuType`。TriWasa 等兼容客户端可以通过 protocol v3 的 `BigEnderChestProtocol.Payload` 和 `EasyPlaceExtraPayload` 使用 FCA 定义的公开 Payload、消息 DTO 与 Codec。大末影箱终端需要与 FCA `0.2.1-beta.1` 匹配的 TriWasa 版本；原版客户端无需安装 FCA 或 TriWasa。FCA 同进程加载时，客户端直接复用这些类型，避免在同一通道注册不同 Payload 类。
 
 ### 在线资料回退
 
