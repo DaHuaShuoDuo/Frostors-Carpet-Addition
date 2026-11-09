@@ -1,6 +1,6 @@
 # Easy Place Registry Refactor Plan
 
-Status: Phase 1-3 implemented on `codex/easy-place-registry`; Phase 4-6 pending
+Status: Phase 1-4 implemented on `codex/easy-place-registry`; Phase 5-6 pending
 
 Last updated: 2026-11-09
 
@@ -405,3 +405,27 @@ Before touching code, a future agent must:
 - The newly migrated families and the client facade now use the registry
   before the legacy fallback. Both repositories build and test for 26.2 and
   26.3.
+
+### 2026-11-09 - Phase 4
+
+- Added quantity adapters for candles, flower beds, leaf litter, sea pickles,
+  snow layers, and turtle eggs. Client wire encoding and server incremental
+  upper-bound validation are unchanged.
+- Corrected the shared server quantity parser so `SegmentableBlock` amounts use
+  the low two wire bits; facing remains in bits 2-3. This restores increment
+  checks for flower beds and leaf litter and prevents failed retry loops in
+  both easy place and printer placement.
+- Added rail adapters for normal and powered rails. Client no-update bits and
+  server shape restoration are unchanged; placement-wide rail update
+  suppression remains outside the state adapters and in the existing policy
+  hooks.
+- Added huge-mushroom adapters for the full six-face mask.
+- Added chest adapters. Client encoding retains the explicit type marker and
+  protocol indices; server decoding still delegates pairing and reconciliation
+  to `EasyPlaceChestSync`, including its controlled block updates.
+- Rails now have focused encode/decode and server restoration tests. Existing
+  quantity, mushroom, chest type, hanging-sign, and multiface tests continue to
+  pass. Chest pair normalization, rails' neighbor-update suppression, and
+  quantity placement still require their existing runtime GameTest/manual
+  coverage.
+- Both repositories build and test for 26.2 and 26.3.

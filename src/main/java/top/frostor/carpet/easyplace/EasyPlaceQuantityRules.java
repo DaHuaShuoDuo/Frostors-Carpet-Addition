@@ -24,7 +24,7 @@ public final class EasyPlaceQuantityRules {
 
     public static int requestedAmount(Block block, int rawValue) {
         if(block instanceof SegmentableBlock) {
-            return ((rawValue >>> 2) & 0x3) + 1;
+            return (rawValue & 0x3) + 1;
         }
         if(block instanceof SnowLayerBlock) {
             return (rawValue & 0x7) + 1;

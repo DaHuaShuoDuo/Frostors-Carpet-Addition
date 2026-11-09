@@ -9,6 +9,8 @@ import net.minecraft.world.level.block.FenceGateBlock;
 import net.minecraft.world.level.block.FlowerBedBlock;
 import net.minecraft.world.level.block.HugeMushroomBlock;
 import net.minecraft.world.level.block.LeafLitterBlock;
+import net.minecraft.world.level.block.PoweredRailBlock;
+import net.minecraft.world.level.block.RailBlock;
 import net.minecraft.world.level.block.VineBlock;
 import net.minecraft.world.level.block.FaceAttachedHorizontalDirectionalBlock;
 import net.minecraft.world.level.block.LeverBlock;
@@ -17,6 +19,7 @@ import net.minecraft.world.level.block.state.properties.IntegerProperty;
 import net.minecraft.world.level.block.SegmentableBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
+import net.minecraft.world.level.block.state.properties.RailShape;
 import top.frostor.carpet.easyplace.registry.EasyPlaceRegistryTest;
 
 public final class EasyPlaceExtraProtocolTest {
@@ -188,8 +191,10 @@ public final class EasyPlaceExtraProtocolTest {
         );
         checkHugeMushroomStates();
         checkRailUpdateGuardScope();
+        checkRailStateRestoration();
         checkFenceGateOpenState();
         checkFaceAttachedStates();
+        checkQuantityAdapterParity();
         checkSegmentableFacingRetention();
 
         checkQuantityIncrement(Blocks.CANDLE);
@@ -324,6 +329,48 @@ public final class EasyPlaceExtraProtocolTest {
                 "lever protocol must preserve face, facing, and powered state"
         );
     }
+
+    private static void checkQuantityAdapterParity() {
+        Block[] blocks = {Blocks.PINK_PETALS, Blocks.LEAF_LITTER};
+        for(Block block : blocks) {
+            for(Direction facing : new Direction[]{
+                    Direction.NORTH, Direction.SOUTH, Direction.WEST, Direction.EAST
+            }) {
+                for(int amount = 1; amount <= 4; amount++) {
+                    BlockState state = block.defaultBlockState()
+                            .setValue(FlowerBedBlock.FACING, facing);
+                    state = state.setValue(
+                            EasyPlaceQuantityRules.getCountProperty(block),
+                            amount
+                    );
+                    for(int rawValue = 0; rawValue < 0x80; rawValue++) {
+                        BlockState currentResult = EasyPlaceStateSync.apply(block, state, null, rawValue);
+                        BlockState legacyResult = LegacyEasyPlaceStateSync.apply(
+                                block,
+                                state,
+                                null,
+                                rawValue
+                        );
+                        check(
+                                java.util.Objects.equals(currentResult, legacyResult),
+                                "server quantity adapter mismatch for "
+                                        + block
+                                        + " facing="
+                                        + facing
+                                        + " amount="
+                                        + amount
+                                        + " raw=0x"
+                                        + Integer.toHexString(rawValue)
+                                        + " current="
+                                        + currentResult
+                                        + " legacy="
+                                        + legacyResult
+                        );
+                    }
+                }
+            }
+        }
+    }
     private static void checkRailUpdateGuardScope() {
         EasyPlaceRailUpdateGuard.beginPlacement();
         try {
@@ -348,11 +395,42 @@ public final class EasyPlaceExtraProtocolTest {
             EasyPlaceRailUpdateGuard.endPlacement();
         }
     }
+
+    private static void checkRailStateRestoration() {
+        RailShape railShape = RailShape.SOUTH_EAST;
+        BlockState rail = Blocks.RAIL.defaultBlockState().setValue(RailBlock.SHAPE, railShape);
+        BlockState restoredRail = EasyPlaceStateSync.apply(
+                Blocks.RAIL,
+                Blocks.RAIL.defaultBlockState(),
+                null,
+                railShape.ordinal()
+        );
+        check(
+                restoredRail != null
+                        && restoredRail.getValue(RailBlock.SHAPE) == railShape,
+                "normal rails must restore the projected shape through the rail adapter"
+        );
+
+        RailShape poweredRailShape = RailShape.NORTH_SOUTH;
+        BlockState poweredRail = Blocks.POWERED_RAIL.defaultBlockState()
+                .setValue(PoweredRailBlock.SHAPE, poweredRailShape);
+        BlockState restoredPoweredRail = EasyPlaceStateSync.apply(
+                Blocks.POWERED_RAIL,
+                Blocks.POWERED_RAIL.defaultBlockState(),
+                null,
+                poweredRailShape.ordinal() | 0x8
+        );
+        check(
+                restoredPoweredRail != null
+                && restoredPoweredRail.getValue(PoweredRailBlock.SHAPE) == poweredRailShape,
+                "powered rails must preserve shape while ignoring the no-update wire bit"
+        );
+    }
     private static void checkQuantityIncrement(Block block) {
         IntegerProperty property = EasyPlaceQuantityRules.getCountProperty(block);
         check(property != null, block + " must expose a supported quantity property");
         BlockState one = block.defaultBlockState().setValue(property, 1);
-        int nextAmountRaw = block instanceof SegmentableBlock ? 0x4 : 0x1;
+        int nextAmountRaw = 0x1;
         check(
                 EasyPlaceQuantityRules.canIncrement(one, block, nextAmountRaw),
                 block + " must allow the next quantity level"

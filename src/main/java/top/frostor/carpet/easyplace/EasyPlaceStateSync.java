@@ -14,8 +14,12 @@ import top.frostor.carpet.easyplace.adapter.directional.GenericDirectionalStateR
 import top.frostor.carpet.easyplace.adapter.directional.StairStateRestorer;
 import top.frostor.carpet.easyplace.adapter.directional.TrapDoorStateRestorer;
 import top.frostor.carpet.easyplace.adapter.attachment.FaceAttachedStateRestorer;
+import top.frostor.carpet.easyplace.adapter.container.ChestStateRestorer;
 import top.frostor.carpet.easyplace.adapter.legacy.LegacyStateRestorer;
 import top.frostor.carpet.easyplace.adapter.multiface.MultiFaceStateRestorer;
+import top.frostor.carpet.easyplace.adapter.mushroom.MushroomStateRestorer;
+import top.frostor.carpet.easyplace.adapter.quantity.QuantityStateRestorer;
+import top.frostor.carpet.easyplace.adapter.rail.RailStateRestorer;
 import top.frostor.carpet.easyplace.adapter.sign.HangingSignStateRestorer;
 import top.frostor.carpet.easyplace.adapter.sign.SignStateRestorer;
 import top.frostor.carpet.easyplace.adapter.special.AdministrativeStateRestorer;
@@ -94,6 +98,25 @@ public final class EasyPlaceStateSync {
                 657,
                 MultiFaceStateRestorer::matches,
                 new MultiFaceStateRestorer()
+        );
+        registry.register(
+                "quantity",
+                656,
+                QuantityStateRestorer::matches,
+                new QuantityStateRestorer()
+        );
+        registry.register("rail", 655, RailStateRestorer::matches, new RailStateRestorer());
+        registry.register(
+                "mushroom",
+                654,
+                MushroomStateRestorer::matches,
+                new MushroomStateRestorer()
+        );
+        registry.register(
+                "container",
+                653,
+                ChestStateRestorer::matches,
+                new ChestStateRestorer()
         );
         registry.register(
                 "administrative",
