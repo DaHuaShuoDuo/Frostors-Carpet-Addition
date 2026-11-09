@@ -12,10 +12,10 @@ Canonical repositories:
 
 Current branch for both repositories: `codex/easy-place-registry`.
 
-Current migration checkpoints:
+Completed checkpoints:
 
-- FCA commit `c543cf1`
-- TriWasa commit `2ac269a`
+- Registry migration: FCA `c543cf1`, TriWasa `2ac269a`
+- Family test split: FCA `bc4accc`, TriWasa `f3dc45f`
 
 This file is the canonical cross-repository plan. TriWasa contains a short
 locator file that points here. If the plan changes, update this file first and
