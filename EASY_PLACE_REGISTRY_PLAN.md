@@ -1,6 +1,7 @@
 # Easy Place Registry Refactor Plan
 
-Status: Phase 1-4 implemented on `codex/easy-place-registry`; Phase 5-6 pending
+Status: Phase 1-6 implemented on `codex/easy-place-registry`; runtime manual
+verification pending
 
 Last updated: 2026-11-09
 
@@ -429,3 +430,21 @@ Before touching code, a future agent must:
   quantity placement still require their existing runtime GameTest/manual
   coverage.
 - Both repositories build and test for 26.2 and 26.3.
+
+### 2026-11-09 - Phase 5-6
+
+- Migrated the remaining state families: bell, campfire, cake, copper bulb,
+  copper golem statue, crafter, daylight detector, detector rail, lantern,
+  redstone torches/wire, server-side beds, and a generic fallback owner.
+- Extracted shared pure state helpers into `EasyPlaceStateSupport` on both
+  sides. Facades now delegate regular state work to frozen registries and no
+  longer depend on a monolithic state chain.
+- Removed `LegacyEasyPlaceStateSync`, `LegacyEasyPlaceStateCodec`, both legacy
+  adapters, and the now-redundant generic directional adapter. No repository
+  reference to a legacy Easy Place state mapper remains.
+- Client and server adapters preserve the existing wire layout and authority
+  boundaries. Rail update suppression, item payload handling, chest placement
+  reconciliation, placement eligibility, and hanging-sign target transforms
+  remain in their existing policy/Mixin layers.
+- Explicit tests cover the remaining state families without comparing against
+  deleted legacy code. Both repositories build and test for 26.2 and 26.3.

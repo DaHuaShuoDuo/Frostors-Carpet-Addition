@@ -5,12 +5,20 @@ import net.minecraft.SharedConstants;
 import net.minecraft.server.Bootstrap;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.BellBlock;
+import net.minecraft.world.level.block.CampfireBlock;
+import net.minecraft.world.level.block.CopperBulbBlock;
+import net.minecraft.world.level.block.CopperGolemStatueBlock;
+import net.minecraft.world.level.block.CrafterBlock;
 import net.minecraft.world.level.block.FenceGateBlock;
 import net.minecraft.world.level.block.FlowerBedBlock;
+import net.minecraft.world.level.block.DetectorRailBlock;
 import net.minecraft.world.level.block.HugeMushroomBlock;
+import net.minecraft.world.level.block.LanternBlock;
 import net.minecraft.world.level.block.LeafLitterBlock;
 import net.minecraft.world.level.block.PoweredRailBlock;
 import net.minecraft.world.level.block.RailBlock;
+import net.minecraft.world.level.block.RedstoneWallTorchBlock;
 import net.minecraft.world.level.block.VineBlock;
 import net.minecraft.world.level.block.FaceAttachedHorizontalDirectionalBlock;
 import net.minecraft.world.level.block.LeverBlock;
@@ -19,6 +27,8 @@ import net.minecraft.world.level.block.state.properties.IntegerProperty;
 import net.minecraft.world.level.block.SegmentableBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
+import net.minecraft.world.level.block.state.properties.BellAttachType;
+import net.minecraft.world.level.block.state.properties.RedstoneSide;
 import net.minecraft.world.level.block.state.properties.RailShape;
 import top.frostor.carpet.easyplace.registry.EasyPlaceRegistryTest;
 
@@ -192,9 +202,9 @@ public final class EasyPlaceExtraProtocolTest {
         checkHugeMushroomStates();
         checkRailUpdateGuardScope();
         checkRailStateRestoration();
+        checkSpecialStateFamilies();
         checkFenceGateOpenState();
         checkFaceAttachedStates();
-        checkQuantityAdapterParity();
         checkSegmentableFacingRetention();
 
         checkQuantityIncrement(Blocks.CANDLE);
@@ -330,47 +340,6 @@ public final class EasyPlaceExtraProtocolTest {
         );
     }
 
-    private static void checkQuantityAdapterParity() {
-        Block[] blocks = {Blocks.PINK_PETALS, Blocks.LEAF_LITTER};
-        for(Block block : blocks) {
-            for(Direction facing : new Direction[]{
-                    Direction.NORTH, Direction.SOUTH, Direction.WEST, Direction.EAST
-            }) {
-                for(int amount = 1; amount <= 4; amount++) {
-                    BlockState state = block.defaultBlockState()
-                            .setValue(FlowerBedBlock.FACING, facing);
-                    state = state.setValue(
-                            EasyPlaceQuantityRules.getCountProperty(block),
-                            amount
-                    );
-                    for(int rawValue = 0; rawValue < 0x80; rawValue++) {
-                        BlockState currentResult = EasyPlaceStateSync.apply(block, state, null, rawValue);
-                        BlockState legacyResult = LegacyEasyPlaceStateSync.apply(
-                                block,
-                                state,
-                                null,
-                                rawValue
-                        );
-                        check(
-                                java.util.Objects.equals(currentResult, legacyResult),
-                                "server quantity adapter mismatch for "
-                                        + block
-                                        + " facing="
-                                        + facing
-                                        + " amount="
-                                        + amount
-                                        + " raw=0x"
-                                        + Integer.toHexString(rawValue)
-                                        + " current="
-                                        + currentResult
-                                        + " legacy="
-                                        + legacyResult
-                        );
-                    }
-                }
-            }
-        }
-    }
     private static void checkRailUpdateGuardScope() {
         EasyPlaceRailUpdateGuard.beginPlacement();
         try {
@@ -424,6 +393,127 @@ public final class EasyPlaceExtraProtocolTest {
                 restoredPoweredRail != null
                 && restoredPoweredRail.getValue(PoweredRailBlock.SHAPE) == poweredRailShape,
                 "powered rails must preserve shape while ignoring the no-update wire bit"
+        );
+    }
+
+    private static void checkSpecialStateFamilies() {
+        BlockState bell = EasyPlaceStateSync.apply(
+                Blocks.BELL,
+                Blocks.BELL.defaultBlockState(),
+                null,
+                0x12
+        );
+        check(
+                bell != null
+                        && bell.getValue(BellBlock.ATTACHMENT) == BellAttachType.values()[1]
+                        && bell.getValue(BellBlock.FACING) == Direction.NORTH,
+                "bells must restore facing and attachment"
+        );
+
+        BlockState campfire = EasyPlaceStateSync.apply(
+                Blocks.CAMPFIRE,
+                Blocks.CAMPFIRE.defaultBlockState(),
+                null,
+                0x10
+        );
+        check(campfire != null && campfire.getValue(CampfireBlock.LIT), "campfires must restore lit state");
+
+        Block copperBulbBlock = Blocks.COPPER_BULB.asList().getFirst();
+        BlockState copperBulb = EasyPlaceStateSync.apply(
+                copperBulbBlock,
+                copperBulbBlock.defaultBlockState(),
+                null,
+                0x3
+        );
+        check(
+                copperBulb != null
+                        && copperBulb.getValue(CopperBulbBlock.LIT)
+                        && copperBulb.getValue(CopperBulbBlock.POWERED),
+                "copper bulbs must restore lit and powered state"
+        );
+
+        Block copperGolemBlock = Blocks.COPPER_GOLEM_STATUE.asList().getFirst();
+        CopperGolemStatueBlock.Pose pose = CopperGolemStatueBlock.Pose.values()[2];
+        BlockState copperGolem = EasyPlaceStateSync.apply(
+                copperGolemBlock,
+                copperGolemBlock.defaultBlockState(),
+                null,
+                pose.ordinal() << 4
+        );
+        check(
+                copperGolem != null
+                        && copperGolem.getValue(BlockStateProperties.COPPER_GOLEM_POSE) == pose,
+                "copper golem statues must restore pose"
+        );
+
+        BlockState crafter = EasyPlaceStateSync.apply(
+                Blocks.CRAFTER,
+                Blocks.CRAFTER.defaultBlockState(),
+                null,
+                1
+        );
+        check(
+                crafter != null
+                        && crafter.getValue(BlockStateProperties.ORIENTATION)
+                        == net.minecraft.core.FrontAndTop.values()[1],
+                "crafters must restore orientation"
+        );
+
+        BlockState daylight = EasyPlaceStateSync.apply(
+                Blocks.DAYLIGHT_DETECTOR,
+                Blocks.DAYLIGHT_DETECTOR.defaultBlockState(),
+                null,
+                1
+        );
+        check(
+                daylight != null && daylight.getValue(BlockStateProperties.INVERTED),
+                "daylight detectors must restore inverted state"
+        );
+
+        RailShape detectorShape = RailShape.values()[3];
+        BlockState detectorRail = EasyPlaceStateSync.apply(
+                Blocks.DETECTOR_RAIL,
+                Blocks.DETECTOR_RAIL.defaultBlockState(),
+                null,
+                detectorShape.ordinal()
+        );
+        check(
+                detectorRail != null && detectorRail.getValue(DetectorRailBlock.SHAPE) == detectorShape,
+                "detector rails must restore shape"
+        );
+
+        BlockState lantern = EasyPlaceStateSync.apply(
+                Blocks.LANTERN,
+                Blocks.LANTERN.defaultBlockState(),
+                null,
+                1
+        );
+        check(lantern != null && lantern.getValue(LanternBlock.HANGING), "lanterns must restore hanging state");
+
+        BlockState wallTorch = EasyPlaceStateSync.apply(
+                Blocks.REDSTONE_WALL_TORCH,
+                Blocks.REDSTONE_WALL_TORCH.defaultBlockState(),
+                null,
+                1
+        );
+        check(
+                wallTorch != null && wallTorch.getValue(RedstoneWallTorchBlock.LIT),
+                "redstone wall torches must restore lit state"
+        );
+
+        BlockState wire = EasyPlaceStateSync.apply(
+                Blocks.REDSTONE_WIRE,
+                Blocks.REDSTONE_WIRE.defaultBlockState(),
+                null,
+                1
+        );
+        check(
+                wire != null
+                        && wire.getValue(BlockStateProperties.NORTH_REDSTONE) == RedstoneSide.NONE
+                        && wire.getValue(BlockStateProperties.EAST_REDSTONE) == RedstoneSide.NONE
+                        && wire.getValue(BlockStateProperties.SOUTH_REDSTONE) == RedstoneSide.NONE
+                        && wire.getValue(BlockStateProperties.WEST_REDSTONE) == RedstoneSide.NONE,
+                "redstone wire must restore the disconnected state"
         );
     }
     private static void checkQuantityIncrement(Block block) {

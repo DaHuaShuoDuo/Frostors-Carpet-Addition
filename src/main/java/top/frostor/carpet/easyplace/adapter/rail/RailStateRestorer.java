@@ -5,7 +5,7 @@ import net.minecraft.world.level.block.RailBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.Property;
 import net.minecraft.world.level.block.state.properties.RailShape;
-import top.frostor.carpet.easyplace.LegacyEasyPlaceStateSync;
+import top.frostor.carpet.easyplace.EasyPlaceStateSupport;
 import top.frostor.carpet.easyplace.registry.EasyPlaceRestoreContext;
 import top.frostor.carpet.easyplace.registry.EasyPlaceStateRestorer;
 
@@ -21,7 +21,7 @@ public final class RailStateRestorer implements EasyPlaceStateRestorer {
     @Override
     public BlockState restore(EasyPlaceRestoreContext context) {
         int mask = context.block() instanceof PoweredRailBlock ? 0x7 : 0xf;
-        return LegacyEasyPlaceStateSync.replaceSlot(
+        return EasyPlaceStateSupport.replaceSlot(
                 context.placementState(),
                 railShapeProperty(context.placementState()),
                 railShape(context.placementState(), context.rawValue() & mask)

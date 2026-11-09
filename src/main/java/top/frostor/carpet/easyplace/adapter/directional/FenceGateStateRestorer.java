@@ -2,7 +2,7 @@ package top.frostor.carpet.easyplace.adapter.directional;
 
 import net.minecraft.world.level.block.FenceGateBlock;
 import net.minecraft.world.level.block.state.BlockState;
-import top.frostor.carpet.easyplace.LegacyEasyPlaceStateSync;
+import top.frostor.carpet.easyplace.EasyPlaceStateSupport;
 import top.frostor.carpet.easyplace.registry.EasyPlaceRestoreContext;
 import top.frostor.carpet.easyplace.registry.EasyPlaceStateRestorer;
 
@@ -13,12 +13,12 @@ public final class FenceGateStateRestorer implements EasyPlaceStateRestorer {
 
     @Override
     public BlockState restore(EasyPlaceRestoreContext context) {
-        BlockState generic = LegacyEasyPlaceStateSync.applyGeneric(
+        BlockState generic = EasyPlaceStateSupport.applyGeneric(
                 context.placementState(),
                 context.rawValue(),
                 context.placeContext()
         );
-        return LegacyEasyPlaceStateSync.replaceSlot(
+        return EasyPlaceStateSupport.replaceSlot(
                 generic,
                 FenceGateBlock.OPEN,
                 (context.rawValue() & 0x10) != 0

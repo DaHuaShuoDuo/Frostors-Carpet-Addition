@@ -6,7 +6,7 @@ import net.minecraft.world.level.block.SignBlock;
 import net.minecraft.world.level.block.SkullBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
-import top.frostor.carpet.easyplace.LegacyEasyPlaceStateSync;
+import top.frostor.carpet.easyplace.EasyPlaceStateSupport;
 import top.frostor.carpet.easyplace.registry.EasyPlaceRestoreContext;
 import top.frostor.carpet.easyplace.registry.EasyPlaceStateRestorer;
 
@@ -24,7 +24,7 @@ public final class SignStateRestorer implements EasyPlaceStateRestorer {
         int rawValue = context.rawValue();
         if(context.block() instanceof AbstractBannerBlock) {
             return state.hasProperty(BlockStateProperties.ROTATION_16)
-                    ? LegacyEasyPlaceStateSync.replaceSlot(
+                    ? EasyPlaceStateSupport.replaceSlot(
                     state,
                     BlockStateProperties.ROTATION_16,
                     rawValue & 0xf
@@ -33,7 +33,7 @@ public final class SignStateRestorer implements EasyPlaceStateRestorer {
         }
         if(context.block() instanceof SignBlock) {
             return state.hasProperty(BlockStateProperties.ROTATION_16)
-                    ? LegacyEasyPlaceStateSync.replaceSlot(
+                    ? EasyPlaceStateSupport.replaceSlot(
                     state,
                     BlockStateProperties.ROTATION_16,
                     rawValue & 0xf
@@ -41,7 +41,7 @@ public final class SignStateRestorer implements EasyPlaceStateRestorer {
                     : state;
         }
         return state.hasProperty(SkullBlock.ROTATION)
-                ? LegacyEasyPlaceStateSync.replaceSlot(state, SkullBlock.ROTATION, rawValue & 0xf)
+                ? EasyPlaceStateSupport.replaceSlot(state, SkullBlock.ROTATION, rawValue & 0xf)
                 : state;
     }
 }

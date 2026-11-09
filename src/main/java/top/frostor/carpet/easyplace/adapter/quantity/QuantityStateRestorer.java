@@ -7,7 +7,7 @@ import net.minecraft.world.level.block.SegmentableBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.IntegerProperty;
 import top.frostor.carpet.easyplace.EasyPlaceQuantityRules;
-import top.frostor.carpet.easyplace.LegacyEasyPlaceStateSync;
+import top.frostor.carpet.easyplace.EasyPlaceStateSupport;
 import top.frostor.carpet.easyplace.registry.EasyPlaceRestoreContext;
 import top.frostor.carpet.easyplace.registry.EasyPlaceStateRestorer;
 import org.jetbrains.annotations.Nullable;
@@ -38,6 +38,6 @@ public final class QuantityStateRestorer implements EasyPlaceStateRestorer {
                     VERTICAL_DIRECTIONS[(context.rawValue() & 0xc) >>> 2]
             );
         }
-        return LegacyEasyPlaceStateSync.validateIncremental(state, property, requestedAmount);
+        return EasyPlaceStateSupport.validateIncremental(state, property, requestedAmount);
     }
 }

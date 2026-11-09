@@ -10,16 +10,26 @@ import net.minecraft.world.level.block.state.properties.Property;
 import org.jetbrains.annotations.Nullable;
 import top.frostor.carpet.easyplace.adapter.directional.DoorStateRestorer;
 import top.frostor.carpet.easyplace.adapter.directional.FenceGateStateRestorer;
-import top.frostor.carpet.easyplace.adapter.directional.GenericDirectionalStateRestorer;
 import top.frostor.carpet.easyplace.adapter.directional.StairStateRestorer;
 import top.frostor.carpet.easyplace.adapter.directional.TrapDoorStateRestorer;
 import top.frostor.carpet.easyplace.adapter.attachment.FaceAttachedStateRestorer;
+import top.frostor.carpet.easyplace.adapter.cake.CakeStateRestorer;
+import top.frostor.carpet.easyplace.adapter.campfire.CampfireStateRestorer;
 import top.frostor.carpet.easyplace.adapter.container.ChestStateRestorer;
-import top.frostor.carpet.easyplace.adapter.legacy.LegacyStateRestorer;
+import top.frostor.carpet.easyplace.adapter.container.BedStateRestorer;
+import top.frostor.carpet.easyplace.adapter.copper.CopperBulbStateRestorer;
+import top.frostor.carpet.easyplace.adapter.copper.CopperGolemStateRestorer;
+import top.frostor.carpet.easyplace.adapter.crafter.CrafterStateRestorer;
+import top.frostor.carpet.easyplace.adapter.daylight.DaylightDetectorStateRestorer;
+import top.frostor.carpet.easyplace.adapter.generic.GenericFallbackStateRestorer;
+import top.frostor.carpet.easyplace.adapter.lantern.LanternStateRestorer;
 import top.frostor.carpet.easyplace.adapter.multiface.MultiFaceStateRestorer;
 import top.frostor.carpet.easyplace.adapter.mushroom.MushroomStateRestorer;
 import top.frostor.carpet.easyplace.adapter.quantity.QuantityStateRestorer;
+import top.frostor.carpet.easyplace.adapter.rail.DetectorRailStateRestorer;
 import top.frostor.carpet.easyplace.adapter.rail.RailStateRestorer;
+import top.frostor.carpet.easyplace.adapter.redstone.RedstoneStateRestorer;
+import top.frostor.carpet.easyplace.adapter.special.BellStateRestorer;
 import top.frostor.carpet.easyplace.adapter.sign.HangingSignStateRestorer;
 import top.frostor.carpet.easyplace.adapter.sign.SignStateRestorer;
 import top.frostor.carpet.easyplace.adapter.special.AdministrativeStateRestorer;
@@ -58,12 +68,12 @@ public final class EasyPlaceStateSync {
                 : block.getStateForPlacement(context);
         if(state == null && wall) state = wallBlock.defaultBlockState();
         if(state == null) return null;
-        state = setFirstDirection(state, facing);
+        state = EasyPlaceStateSupport.setFirstDirection(state, facing);
         return apply(block, state, context, stateValue);
     }
 
     static BlockState applyGeneric(BlockState state, int protocolValue, BlockPlaceContext context) {
-        return LegacyEasyPlaceStateSync.applyGeneric(state, protocolValue, context);
+        return EasyPlaceStateSupport.applyGeneric(state, protocolValue, context);
     }
 
     static @Nullable BlockState validateIncremental(
@@ -71,7 +81,7 @@ public final class EasyPlaceStateSync {
             Property<Integer> property,
             int requestedMaximum
     ) {
-        return LegacyEasyPlaceStateSync.validateIncremental(state, property, requestedMaximum);
+        return EasyPlaceStateSupport.validateIncremental(state, property, requestedMaximum);
     }
 
     private static EasyPlaceStateRestorerRegistry createRegistry() {
@@ -119,30 +129,59 @@ public final class EasyPlaceStateSync {
                 new ChestStateRestorer()
         );
         registry.register(
+                "redstone",
+                649,
+                RedstoneStateRestorer::matches,
+                new RedstoneStateRestorer()
+        );
+        registry.register("bell", 648, BellStateRestorer::matches, new BellStateRestorer());
+        registry.register(
+                "campfire",
+                647,
+                CampfireStateRestorer::matches,
+                new CampfireStateRestorer()
+        );
+        registry.register("cake", 646, CakeStateRestorer::matches, new CakeStateRestorer());
+        registry.register(
+                "copper_bulb",
+                645,
+                CopperBulbStateRestorer::matches,
+                new CopperBulbStateRestorer()
+        );
+        registry.register(
+                "copper_golem",
+                644,
+                CopperGolemStateRestorer::matches,
+                new CopperGolemStateRestorer()
+        );
+        registry.register("crafter", 643, CrafterStateRestorer::matches, new CrafterStateRestorer());
+        registry.register(
+                "daylight_detector",
+                642,
+                DaylightDetectorStateRestorer::matches,
+                new DaylightDetectorStateRestorer()
+        );
+        registry.register(
+                "detector_rail",
+                641,
+                DetectorRailStateRestorer::matches,
+                new DetectorRailStateRestorer()
+        );
+        registry.register("lantern", 640, LanternStateRestorer::matches, new LanternStateRestorer());
+        registry.register("bed", 639, BedStateRestorer::matches, new BedStateRestorer());
+        registry.register(
                 "administrative",
                 650,
                 AdministrativeStateRestorer::matches,
                 new AdministrativeStateRestorer()
         );
         registry.register(
-                "generic_directional",
-                100,
-                GenericDirectionalStateRestorer::matches,
-                new GenericDirectionalStateRestorer()
+                "generic_fallback",
+                50,
+                GenericFallbackStateRestorer::matches,
+                new GenericFallbackStateRestorer()
         );
-        registry.register("legacy", 0, context -> true, new LegacyStateRestorer());
         registry.freeze();
         return registry;
-    }
-
-    @SuppressWarnings({"rawtypes", "unchecked"})
-    private static BlockState setFirstDirection(BlockState state, Direction direction) {
-        for(Property<?> property : state.getProperties()) {
-            if(property.getPossibleValues().stream().anyMatch(value -> value instanceof Direction)
-                    && property.getPossibleValues().contains(direction)) {
-                return state.setValue((Property) property, direction);
-            }
-        }
-        return state;
     }
 }

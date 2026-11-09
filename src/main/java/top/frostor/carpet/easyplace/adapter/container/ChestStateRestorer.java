@@ -5,7 +5,7 @@ import net.minecraft.world.item.context.BlockPlaceContext;
 import net.minecraft.world.level.block.ChestBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import top.frostor.carpet.easyplace.EasyPlaceChestSync;
-import top.frostor.carpet.easyplace.LegacyEasyPlaceStateSync;
+import top.frostor.carpet.easyplace.EasyPlaceStateSupport;
 import top.frostor.carpet.easyplace.registry.EasyPlaceRestoreContext;
 import top.frostor.carpet.easyplace.registry.EasyPlaceStateRestorer;
 import org.jetbrains.annotations.Nullable;
@@ -19,7 +19,7 @@ public final class ChestStateRestorer implements EasyPlaceStateRestorer {
     public @Nullable BlockState restore(EasyPlaceRestoreContext context) {
         BlockPlaceContext placeContext = context.placeContext();
         if(placeContext == null) return null;
-        BlockState directed = LegacyEasyPlaceStateSync.applyGeneric(
+        BlockState directed = EasyPlaceStateSupport.applyGeneric(
                 context.placementState(),
                 context.rawValue(),
                 placeContext
