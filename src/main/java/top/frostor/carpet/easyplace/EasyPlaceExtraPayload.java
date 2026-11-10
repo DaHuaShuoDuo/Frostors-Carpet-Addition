@@ -11,7 +11,7 @@ import net.minecraft.resources.Identifier;
  * Stable public payload API for the V2-Extra handshake.
  *
  * <p>FCA owns this type on integrated clients and dedicated servers. Client tools may compile
- * against it, but must provide their own wire-compatible fallback for servers without FCA.</p>
+ * against it, but must provide their own wire-compatible payload when connecting without FCA.</p>
  */
 public record EasyPlaceExtraPayload(int packetId, CompoundTag data) implements CustomPacketPayload {
     public static final Identifier CHANNEL = Identifier.fromNamespaceAndPath("earlycompat", "network");

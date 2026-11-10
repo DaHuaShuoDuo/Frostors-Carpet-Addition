@@ -169,9 +169,10 @@ Carpet 会把枚举候选显示为小写，并在解析输入时先转为大写�
 - FCA 是共享协议 API 的提供方。`EasyPlaceExtraPayload` 和
   `BigEnderChestProtocol.Payload` 由 FCA 定义频道、消息 DTO 和 Codec；TriWasa
   通过 `compileOnly` 依赖这些公开类型，并在 FCA 同进程加载时直接复用。
-- TriWasa 的独立 Payload 只用于客户端未安装 FCA、连接专用服务器时的线兼容回退。
-  FCA 不应注册 TriWasa 的回退 Payload，也不得通过反射在两种 Payload 类之间复制字段；
-  任何新增能力都先扩展 FCA 的公开协议 API，再更新 TriWasa 适配。
+- TriWasa 的独立 Payload 只用于客户端未安装 FCA、连接专用服务器时的线兼容通信；
+  不得据此降级接受缺少当前协议字段的旧版 ACK。FCA 不应注册 TriWasa 的兼容 Payload，
+  也不得通过反射在两种 Payload 类之间复制字段；任何新增能力都先扩展 FCA 的公开协议
+  API，再更新 TriWasa 适配。
 - 协议值只从服务端方块放置上下文中的命中位置解码，最终状态仍须通过 `BlockItem.canPlace`
   校验，不能信任客户端直接写入任意方块状态。
 - 方块状态映射集中在 `easyplace` 包。`EasyPlaceStateSync` 是稳定 facade，实际 owner
@@ -199,8 +200,10 @@ Carpet 会把枚举候选显示为小写，并在解析输入时先转为大写�
   辅助 Z 通道的 bit0 表示 `UP`。`WATERLOGGED` 必须保持服务端放置状态，不能编码或强写。
   墙结构重算由独立 `WALL` family 在 `WallBlock.updateShape` 的 `RETURN` 阶段抑制，
   保留水 tick 等原版副作用；不得在 `HEAD` 直接取消。
-- 放置期更新抑制 guard 按 `RAIL` 和 `WALL` family 分别记录并独立清理。嵌套放置和
-  上一层结束后不得让一个方块族隐式压制另一个方块族。
+- 放置期更新抑制 guard 的 family 集合与 wall neighbor match mask 必须存放在每个
+  `PlacementScope` 内；`request(...)`、位置更新和 match mask 更新只能修改栈顶 scope。
+  嵌套 placement 期间外层请求仍然有效，但内层新增的 `RAIL`、`WALL`、`OBSERVER`、
+  `TNT`、`DETECTOR_RAIL` 请求及 mask 在 `endPlacement()` 后不得泄漏到外层。
 - 辅助 Z 通道的 bit9 和 bit10 分别表示本次放置请求 `RAIL`、`WALL` 邻域保护，bit11-16
   表示六个方向中哪些相邻墙与投影预期一致；低 9 位继续留给 crafter slot mask。FCA
   只能按客户端显式标志 request family；guard 的空间
@@ -240,8 +243,8 @@ Carpet 会把枚举候选显示为小写，并在解析输入时先转为大写�
   V2-Extra 握手的玩家放宽该校验，同时保留玩家触及范围和最终 `canPlace` 校验。该
   放宽必须独立生效，不能依赖 `antiCheatDisabled`。
 - HELLO 应答和规则开启时的能力广播必须携带 `protocol_version`、显式能力布尔值以及
-  `capabilities` 列表。客户端可把缺少新字段的 ACK 视为旧版兼容，但服务端不得退化为
-  只发送 `mod_version`。
+  `capabilities` 列表。TriWasa 必须校验 `protocol_version` 和能力布尔值，缺少字段
+  或版本不匹配时不得启用协议；服务端也不得退化为只发送 `mod_version`。
 - 该服务端实现改编自 EarlyCompat，来源为 CC0-1.0；修改协议或状态表时同步维护
   `THIRD_PARTY_NOTICES.md`。不要移植 Litematica、MaLiLib、Fanetlib 或客户端服务。
 

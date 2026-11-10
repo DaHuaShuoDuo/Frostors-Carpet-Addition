@@ -49,8 +49,6 @@ public final class EasyPlaceUpdateSuppressionGuard {
     }
 
     private static final ThreadLocal<Integer> PLACE_DEPTH = ThreadLocal.withInitial(() -> 0);
-    private static final ThreadLocal<EnumSet<Family>> SUPPRESSED_FAMILIES =
-            ThreadLocal.withInitial(() -> EnumSet.noneOf(Family.class));
     private static final ThreadLocal<Deque<PlacementScope>> PLACEMENT_SCOPES =
             ThreadLocal.withInitial(ArrayDeque::new);
 
@@ -60,10 +58,9 @@ public final class EasyPlaceUpdateSuppressionGuard {
     public static void beginPlacement(BlockPos placementPos) {
         int depth = PLACE_DEPTH.get();
         if(depth == 0) {
-            SUPPRESSED_FAMILIES.remove();
             PLACEMENT_SCOPES.remove();
         }
-        PLACEMENT_SCOPES.get().push(new PlacementScope(placementPos, 0));
+        PLACEMENT_SCOPES.get().push(new PlacementScope(placementPos));
         PLACE_DEPTH.set(depth + 1);
     }
 
@@ -71,7 +68,6 @@ public final class EasyPlaceUpdateSuppressionGuard {
         int depth = PLACE_DEPTH.get() - 1;
         if(depth <= 0) {
             PLACE_DEPTH.remove();
-            SUPPRESSED_FAMILIES.remove();
             PLACEMENT_SCOPES.remove();
         } else {
             PLACEMENT_SCOPES.get().pop();
@@ -81,7 +77,7 @@ public final class EasyPlaceUpdateSuppressionGuard {
 
     public static void request(Family family) {
         if(PLACE_DEPTH.get() > 0) {
-            SUPPRESSED_FAMILIES.get().add(family);
+            PLACEMENT_SCOPES.get().peek().suppressedFamilies.add(family);
         }
     }
 
@@ -89,31 +85,27 @@ public final class EasyPlaceUpdateSuppressionGuard {
         if(PLACE_DEPTH.get() <= 0) {
             return;
         }
-        Deque<PlacementScope> placementScopes = PLACEMENT_SCOPES.get();
-        PlacementScope previous = placementScopes.pop();
-        placementScopes.push(new PlacementScope(placementPos, previous.wallNeighborMatchMask()));
+        PLACEMENT_SCOPES.get().peek().placementPos = placementPos;
     }
 
     public static void requestWallNeighborMatches(int wallNeighborMatchMask) {
         if(PLACE_DEPTH.get() <= 0) {
             return;
         }
-        Deque<PlacementScope> placementScopes = PLACEMENT_SCOPES.get();
-        PlacementScope previous = placementScopes.pop();
-        placementScopes.push(new PlacementScope(
-                previous.placementPos(),
-                wallNeighborMatchMask & 0x3f
-        ));
+        PLACEMENT_SCOPES.get().peek().wallNeighborMatchMask = wallNeighborMatchMask & 0x3f;
     }
 
     public static boolean shouldSuppress(Family family, BlockPos pos) {
-        if(PLACE_DEPTH.get() <= 0 || !SUPPRESSED_FAMILIES.get().contains(family)) {
+        if(PLACE_DEPTH.get() <= 0) {
             return false;
         }
         for(PlacementScope scope : PLACEMENT_SCOPES.get()) {
+            if(!scope.suppressedFamilies.contains(family)) {
+                continue;
+            }
             if(family == Family.WALL
                     ? coversWallNeighbors(scope, pos)
-                    : family.covers(scope.placementPos(), pos)) {
+                    : family.covers(scope.placementPos, pos)) {
                 return true;
             }
         }
@@ -121,15 +113,18 @@ public final class EasyPlaceUpdateSuppressionGuard {
     }
 
     public static boolean shouldSuppressTnt(Level level, BlockPos pos) {
-        if(PLACE_DEPTH.get() <= 0 || !SUPPRESSED_FAMILIES.get().contains(Family.TNT)) {
+        if(PLACE_DEPTH.get() <= 0) {
             return false;
         }
-        if(shouldSuppress(Family.TNT, pos)) {
-            return true;
-        }
         for(PlacementScope scope : PLACEMENT_SCOPES.get()) {
+            if(!scope.suppressedFamilies.contains(Family.TNT)) {
+                continue;
+            }
+            if(Family.TNT.covers(scope.placementPos, pos)) {
+                return true;
+            }
             if(hasPoweredConductorRelay(
-                    scope.placementPos(),
+                    scope.placementPos,
                     pos,
                     relayPos -> {
                         BlockState relayState = level.getBlockState(relayPos);
@@ -167,17 +162,24 @@ public final class EasyPlaceUpdateSuppressionGuard {
     }
 
     private static boolean coversWallNeighbors(PlacementScope scope, BlockPos pos) {
-        if(pos.equals(scope.placementPos())) {
+        if(pos.equals(scope.placementPos)) {
             return true;
         }
         for(Direction direction : Direction.values()) {
-            if(pos.equals(scope.placementPos().relative(direction))) {
-                return (scope.wallNeighborMatchMask() & (1 << direction.ordinal())) != 0;
+            if(pos.equals(scope.placementPos.relative(direction))) {
+                return (scope.wallNeighborMatchMask & (1 << direction.ordinal())) != 0;
             }
         }
         return false;
     }
 
-    private record PlacementScope(BlockPos placementPos, int wallNeighborMatchMask) {
+    private static final class PlacementScope {
+        private final EnumSet<Family> suppressedFamilies = EnumSet.noneOf(Family.class);
+        private BlockPos placementPos;
+        private int wallNeighborMatchMask;
+
+        private PlacementScope(BlockPos placementPos) {
+            this.placementPos = placementPos;
+        }
     }
 }

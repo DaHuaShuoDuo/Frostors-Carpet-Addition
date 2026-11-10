@@ -245,19 +245,54 @@ public final class EasyPlaceUpdateSuppressionGuardTest extends EasyPlaceTestSupp
 
     private void checkNestingAndCleanup() {
         BlockPos nestedOrigin = ORIGIN.above();
+        int outerWallMask = 1 << Direction.NORTH.ordinal();
+        int innerWallMask = 1 << Direction.UP.ordinal();
         EasyPlaceUpdateSuppressionGuard.beginPlacement(ORIGIN);
         try {
             EasyPlaceUpdateSuppressionGuard.request(Family.RAIL);
+            EasyPlaceUpdateSuppressionGuard.request(Family.WALL);
+            EasyPlaceUpdateSuppressionGuard.requestWallNeighborMatches(outerWallMask);
             EasyPlaceUpdateSuppressionGuard.beginPlacement(nestedOrigin);
             try {
+                check(
+                        EasyPlaceUpdateSuppressionGuard.shouldSuppress(Family.RAIL, ORIGIN),
+                        "inner placements must retain the outer placement's active families"
+                );
                 EasyPlaceUpdateSuppressionGuard.request(Family.WALL);
+                EasyPlaceUpdateSuppressionGuard.request(Family.OBSERVER);
+                EasyPlaceUpdateSuppressionGuard.request(Family.TNT);
+                EasyPlaceUpdateSuppressionGuard.request(Family.DETECTOR_RAIL);
+                EasyPlaceUpdateSuppressionGuard.requestWallNeighborMatches(innerWallMask);
+                check(
+                        EasyPlaceUpdateSuppressionGuard.shouldSuppress(Family.WALL, nestedOrigin),
+                        "inner wall requests must apply to the inner placement"
+                );
             } finally {
                 EasyPlaceUpdateSuppressionGuard.endPlacement();
             }
             check(
                     EasyPlaceUpdateSuppressionGuard.shouldSuppress(Family.RAIL, ORIGIN)
                             && EasyPlaceUpdateSuppressionGuard.shouldSuppress(Family.WALL, ORIGIN),
-                    "nested placement cleanup must retain the outer placement's active families"
+                    "nested placement cleanup must retain only the outer placement's families"
+            );
+            check(
+                    EasyPlaceUpdateSuppressionGuard.shouldSuppress(
+                            Family.WALL,
+                            ORIGIN.north()
+                    ) && !EasyPlaceUpdateSuppressionGuard.shouldSuppress(
+                            Family.WALL,
+                            ORIGIN.above()
+                    ),
+                    "nested wall match masks must not replace the outer placement's mask"
+            );
+            check(
+                    !EasyPlaceUpdateSuppressionGuard.shouldSuppress(Family.OBSERVER, ORIGIN)
+                            && !EasyPlaceUpdateSuppressionGuard.shouldSuppress(Family.TNT, ORIGIN)
+                            && !EasyPlaceUpdateSuppressionGuard.shouldSuppress(
+                                    Family.DETECTOR_RAIL,
+                                    ORIGIN
+                            ),
+                    "inner-only family requests must not leak into the outer placement"
             );
             check(
                     !EasyPlaceUpdateSuppressionGuard.shouldSuppress(
