@@ -203,13 +203,18 @@ Carpet 会把枚举候选显示为小写，并在解析输入时先转为大写�
 - 放置期更新抑制 guard 的 family 集合与 wall neighbor match mask 必须存放在每个
   `PlacementScope` 内；`request(...)`、位置更新和 match mask 更新只能修改栈顶 scope。
   嵌套 placement 期间外层请求仍然有效，但内层新增的 `RAIL`、`WALL`、`OBSERVER`、
-  `TNT`、`DETECTOR_RAIL` 请求及 mask 在 `endPlacement()` 后不得泄漏到外层。
+  `TNT` 请求及 mask 在 `endPlacement()` 后不得泄漏到外层。
+- `BlockItem.place` 的 Easy Place 生命周期必须通过 MixinExtras `@WrapMethod` 和
+  `try/finally` 管理，禁止只依赖 `HEAD`/`RETURN` 注入。异常从
+  `getPlacementState`、`canPlace`、`setBlock`、`onPlace` 或后续放置逻辑抛出时，
+  guard scope 与 item-stack 临时组件仍必须成对清理。
 - 辅助 Z 通道的 bit9 和 bit10 分别表示本次放置请求 `RAIL`、`WALL` 邻域保护，bit11-16
-  表示六个方向中哪些相邻墙与投影预期一致；低 9 位继续留给 crafter slot mask。FCA
+  表示六个方向中哪些相邻墙与投影预期一致，bit19-24 表示哪些相邻铁轨与投影预期一致，
+  bit25 表示目标铁轨红石状态保护请求；低 9 位继续留给 crafter slot mask。FCA
   只能按客户端显式标志 request family；guard 的空间
   范围由 family 定义：`RAIL` 覆盖实际放置位置、四个水平邻居和上方邻居，不包括下方；
-  `WALL` 始终保护本次放置位置，邻居位置只在对应 match bit 存在时保护。不得退化为整个
-  placement 调用内的全局方块族抑制，也不得扩展到斜角或两格以外位置。
+  `WALL` 和 `RAIL` 始终保护本次放置位置，邻居位置只在对应 match bit 存在时保护。
+  不得退化为整个 placement 调用内的全局方块族抑制，也不得扩展到斜角或两格以外位置。
 - 相邻墙与投影预期的比较必须忽略 `WATERLOGGED`；其余方块种类、四侧 `WallSide` 和
   `UP` 任一不符，都必须清除该方向的 wall neighbor match bit。竖向连续墙中的不符墙
   因此不得因相邻的 Easy Place 墙而获得冻结保护。
@@ -223,13 +228,14 @@ Carpet 会把枚举候选显示为小写，并在解析输入时先转为大写�
 - 辅助 Z 通道 bit18 表示 TriWasa `easyPlaceTntProtection` 请求 TNT 保护。FCA 只能在
   bit18 存在时 request `TNT`，并在 `TntBlock.onPlace` 与 `TntBlock.neighborChanged`
   的 `HEAD` 取消红石点燃路径；不得拦截 `prime(...)` 本体的手动点火、投射物或爆炸引燃。
-- 探测铁轨 raw 通道 bit4 表示投影中的 `POWERED=true`，由 TriWasa
-  `easyPlaceDetectorRailProtection` 单独控制，默认开启且与
-  `easyPlaceRailBlockNoShapeUpdate` 独立。FCA 只能在 bit4 存在时 request
-  `DETECTOR_RAIL`；该 family 只保护本次实际放置位置，并在
-  `DetectorRailBlock.onPlace` 的 `HEAD` 取消探测铁轨初次位置更新，避免无矿车时
-  `checkPressed` 立即将激活状态清除。关闭开关时不得发送 bit4，也不得从通用 `RAIL`
-  标志推断探测铁轨的激活状态。
+- 铁轨 raw 通道 bit4 表示投影中的 `POWERED`，由 TriWasa 的统一
+  `easyPlaceRailProtection` 控制；Z 通道 bit25 请求目标位置状态保护。FCA 的 `RAIL`
+  family 负责形状/PP 更新和邻轨 match mask，`RAIL_STATE` family 只覆盖实际放置位置。
+  `PoweredRailBlock.updateState` 与 `DetectorRailBlock.checkPressed` 在 `RAIL_STATE`
+  覆盖时取消，分别保护 `PoweredRailBlock` 与探测铁轨的初始激活状态。26.x 中动力铁轨
+  和激活铁轨都是 `PoweredRailBlock` 的不同方块实例，因此同一 Mixin、`instanceof`
+  判断和 `POWERED` 编解码必须同时覆盖二者；没有独立 `ActivatorRailBlock`。普通铁轨
+  没有红石状态。关闭统一开关时不得发送 bit9、bit25、rail match mask 或 bit4。
 - TNT 保护请求必须在 `BlockItem.place` 的公共路径中、`getPlacementState` 调用前完成，
   不能依赖目标 state 或普通 `BlockItem` 专用 Mixin。`StandingAndWallBlockItem` 及其
   珊瑚扇、墙挂/站立两用物品同样必须启用该次 TNT 邻域保护。

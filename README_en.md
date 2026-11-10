@@ -96,16 +96,17 @@ encoded and remains authoritative from the server's placement state. Wall
 placement independently suppresses structural `updateShape` recalculation
 while preserving vanilla side effects such as water-tick scheduling.
 During any V2-Extra block placement, rail structural recalculation is suppressed
-at the actual placement position, its four horizontal neighbors, and the
-position above it, but not below it. Wall protection always covers the current
-placement position; adjacent walls are protected only when their actual state
-matches the projection. Comparison ignores `WATERLOGGED`, while block type, side
-connections, and `UP` mismatches exclude that neighbor. Diagonal positions,
-blocks two or more steps away, and ordinary non-Easy-Place placements remain
-unaffected.
-TriWasa controls these protections independently with the
-`easyPlaceRailBlockNoShapeUpdate` and `easyPlaceWallBlockNoShapeUpdate` child
-switches, both enabled by default.
+at the actual placement position. Its four horizontal neighbors and the
+position above it are protected only when their actual state matches the
+projection. Wall protection always covers the current placement position;
+adjacent walls are protected only when their actual state matches the
+projection. Comparisons ignore `WATERLOGGED`, while block type and relevant
+state mismatches exclude that neighbor. Rail neighbor matching compares only
+rail type and shape, never redstone state. Diagonal positions, blocks two or
+more steps away, and ordinary non-Easy-Place placements remain unaffected.
+TriWasa controls these protections independently with the unified
+`easyPlaceRailProtection` and `easyPlaceWallBlockNoShapeUpdate` child switches,
+both enabled by default.
 Observer projections restore only `FACING`; `POWERED` is always placed inactive.
 An easy-place change on an existing observer's detection face does not schedule
 its pulse tick, while changes on other faces retain vanilla observer behavior.
@@ -124,14 +125,16 @@ If an immediately active placed component shares a powered redstone conductor
 neighbor update is also suppressed during the current placement. Redstone wire,
 redstone torches, detector rails, and other immediate components use the same
 conductor test. This remains limited to a synchronous single relay.
-Powered detector rails in the projection use the separate
-`easyPlaceDetectorRailProtection` child switch, enabled by default. The client
-marks `POWERED=true` with raw bit 4; FCA restores that state and cancels the
-detector rail's own initial placement update so it is not immediately cleared
-when no minecart is present. This switch is independent of
-`easyPlaceRailBlockNoShapeUpdate`, which continues to control only rail shape
-protection. Disabling detector rail protection omits raw bit 4 and must not
-infer powered state from the generic rail flag.
+Powered rails, activator rails, and detector rails use TriWasa's unified
+`easyPlaceRailProtection` child switch, enabled by default. The client stores
+their initial `POWERED` value in raw bit 4, requests rail shape protection with
+bit 9, and requests target-position redstone-state protection with bit 25;
+neighbor matches use auxiliary bits 19-24. FCA handles shape/PP updates through
+`RAIL` and exact-position redstone state through `RAIL_STATE`. In 26.x, powered
+rails and activator rails are both instances of `PoweredRailBlock`, while
+detector rails use the separate `DetectorRailBlock` implementation. Neighbor
+rail matching never compares redstone state, and ordinary rails have no
+redstone state.
 
 Server-side state handling uses explicit behavior-family registries that freeze
 after initialization. The stable `EasyPlaceStateSync.apply(...)` entry point

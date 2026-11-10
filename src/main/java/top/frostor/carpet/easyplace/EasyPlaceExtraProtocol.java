@@ -15,7 +15,10 @@ public final class EasyPlaceExtraProtocol {
     public static final int WALL_NEIGHBOR_MATCH_MASK = 0x3f << 11;
     public static final int OBSERVER_UPDATE_SUPPRESSION = 1 << 17;
     public static final int TNT_UPDATE_SUPPRESSION = 1 << 18;
-    public static final int DETECTOR_RAIL_POWERED_MASK = 1 << 4;
+    public static final int RAIL_NEIGHBOR_MATCH_BASE = 1 << 19;
+    public static final int RAIL_NEIGHBOR_MATCH_MASK = 0x3f << 19;
+    public static final int RAIL_STATE_UPDATE_SUPPRESSION = 1 << 25;
+    public static final int RAIL_POWERED_MASK = 1 << 4;
 
     private EasyPlaceExtraProtocol() {
     }
@@ -66,5 +69,14 @@ public final class EasyPlaceExtraProtocol {
 
     public static boolean requestsTntUpdateSuppression(int auxiliaryValue) {
         return auxiliaryValue >= 0 && (auxiliaryValue & TNT_UPDATE_SUPPRESSION) != 0;
+    }
+
+    public static int railNeighborMatchMask(int auxiliaryValue) {
+        if(auxiliaryValue < 0) return 0;
+        return (auxiliaryValue & RAIL_NEIGHBOR_MATCH_MASK) >>> 19;
+    }
+
+    public static boolean requestsRailStateUpdateSuppression(int auxiliaryValue) {
+        return auxiliaryValue >= 0 && (auxiliaryValue & RAIL_STATE_UPDATE_SUPPRESSION) != 0;
     }
 }

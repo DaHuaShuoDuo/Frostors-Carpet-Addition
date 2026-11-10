@@ -36,6 +36,10 @@ public final class EasyPlaceItemStackSync {
         }
     }
 
+    static boolean isPlacementActive() {
+        return PLACE_DEPTH.get() > 0;
+    }
+
     public static void applyCrafterSlots(Block block, ItemStack stack, int disabledMask) {
         if(PLACE_DEPTH.get() <= 0
                 || !(block instanceof CrafterBlock)

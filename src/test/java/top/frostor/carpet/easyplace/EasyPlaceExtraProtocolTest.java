@@ -19,6 +19,7 @@ public final class EasyPlaceExtraProtocolTest {
                 + EasyPlaceQuantityStateTest.run()
                 + EasyPlaceMushroomStateTest.run()
                 + EasyPlaceRailStateTest.run()
+                + EasyPlacePlacementLifecycleTest.run()
                 + EasyPlaceUpdateSuppressionGuardTest.run()
                 + EasyPlaceWallStateTest.run()
                 + EasyPlaceObserverStateTest.run()

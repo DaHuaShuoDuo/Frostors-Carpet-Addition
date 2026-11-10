@@ -117,7 +117,7 @@ public final class EasyPlaceSpecialStateTest extends EasyPlaceTestSupport {
                 Blocks.DETECTOR_RAIL,
                 Blocks.DETECTOR_RAIL.defaultBlockState(),
                 null,
-                detectorShape.ordinal() | EasyPlaceExtraProtocol.DETECTOR_RAIL_POWERED_MASK
+                detectorShape.ordinal() | EasyPlaceExtraProtocol.RAIL_POWERED_MASK
         );
         check(
                 poweredDetectorRail != null

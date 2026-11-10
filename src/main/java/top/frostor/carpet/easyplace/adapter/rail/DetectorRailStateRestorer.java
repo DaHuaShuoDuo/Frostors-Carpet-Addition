@@ -23,7 +23,7 @@ public final class DetectorRailStateRestorer implements EasyPlaceStateRestorer {
         if(state == null) return null;
         return state.setValue(
                 DetectorRailBlock.POWERED,
-                (context.rawValue() & EasyPlaceExtraProtocol.DETECTOR_RAIL_POWERED_MASK) != 0
+                (context.rawValue() & EasyPlaceExtraProtocol.RAIL_POWERED_MASK) != 0
         );
     }
 }

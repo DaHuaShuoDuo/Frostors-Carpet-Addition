@@ -2,6 +2,7 @@ package top.frostor.carpet.easyplace.mixin;
 
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
+import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
 import com.llamalad7.mixinextras.sugar.Local;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerPlayer;
@@ -12,7 +13,6 @@ import net.minecraft.world.level.LevelReader;
 import net.minecraft.world.level.block.BaseRailBlock;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.CandleBlock;
-import net.minecraft.world.level.block.DetectorRailBlock;
 import net.minecraft.world.level.block.WallBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import org.spongepowered.asm.mixin.Mixin;
@@ -24,6 +24,7 @@ import top.frostor.carpet.easyplace.EasyPlaceExtraProtocol;
 import top.frostor.carpet.easyplace.EasyPlaceExtraServer;
 import top.frostor.carpet.easyplace.EasyPlaceChestSync;
 import top.frostor.carpet.easyplace.EasyPlaceItemStackSync;
+import top.frostor.carpet.easyplace.EasyPlacePlacementLifecycle;
 import top.frostor.carpet.easyplace.EasyPlaceQuantityRules;
 import top.frostor.carpet.easyplace.EasyPlaceStateSync;
 import top.frostor.carpet.easyplace.EasyPlaceUpdateSuppressionGuard;
@@ -97,23 +98,16 @@ public abstract class BlockItemMixin {
                 );
     }
 
-    @Inject(method = "place", at = @At("HEAD"))
-    private void frostorsCarpet$beginEasyPlace(
+    @WrapMethod(method = "place")
+    private net.minecraft.world.InteractionResult easyPlace$wrapPlacementLifecycle(
             BlockPlaceContext context,
-            CallbackInfoReturnable<net.minecraft.world.InteractionResult> cir
+            Operation<net.minecraft.world.InteractionResult> original
     ) {
-        EasyPlaceUpdateSuppressionGuard.beginPlacement(context.getClickedPos());
-        EasyPlaceItemStackSync.beginPlacement();
-    }
-
-    @Inject(method = "place", at = @At("RETURN"))
-    private void frostorsCarpet$endEasyPlace(
-            BlockPlaceContext context,
-            CallbackInfoReturnable<net.minecraft.world.InteractionResult> cir
-    ) {
-        EasyPlaceItemStackSync.endPlacement();
-        EasyPlaceUpdateSuppressionGuard.endPlacement();
-        if(cir.getReturnValue().consumesAction()
+        net.minecraft.world.InteractionResult result = EasyPlacePlacementLifecycle.run(
+                context.getClickedPos(),
+                () -> original.call(context)
+        );
+        if(result.consumesAction()
                 && !context.getLevel().isClientSide()
                 && context.getPlayer() instanceof ServerPlayer player
                 && EasyPlaceExtraServer.isSupported(player)
@@ -124,6 +118,7 @@ public abstract class BlockItemMixin {
                     context.getClickedPos()
             );
         }
+        return result;
     }
 
     @WrapOperation(
@@ -189,12 +184,6 @@ public abstract class BlockItemMixin {
             return null;
         }
 
-        if(adjusted.getBlock() instanceof DetectorRailBlock
-                && (rawValue & EasyPlaceExtraProtocol.DETECTOR_RAIL_POWERED_MASK) != 0) {
-            EasyPlaceUpdateSuppressionGuard.request(
-                    EasyPlaceUpdateSuppressionGuard.Family.DETECTOR_RAIL
-            );
-        }
         boolean preserveRail = EasyPlaceExtraProtocol.requestsRailUpdateSuppression(auxiliaryValue);
         boolean preserveWall = EasyPlaceExtraProtocol.requestsWallUpdateSuppression(auxiliaryValue);
         if(rail && preserveRail) {
@@ -248,6 +237,9 @@ public abstract class BlockItemMixin {
         EasyPlaceUpdateSuppressionGuard.updatePlacementPosition(placementContext.getClickedPos());
         if(EasyPlaceExtraProtocol.requestsRailUpdateSuppression(auxiliaryValue)) {
             EasyPlaceUpdateSuppressionGuard.request(EasyPlaceUpdateSuppressionGuard.Family.RAIL);
+            EasyPlaceUpdateSuppressionGuard.requestRailNeighborMatches(
+                    EasyPlaceExtraProtocol.railNeighborMatchMask(auxiliaryValue)
+            );
         }
         if(EasyPlaceExtraProtocol.requestsWallUpdateSuppression(auxiliaryValue)) {
             EasyPlaceUpdateSuppressionGuard.request(EasyPlaceUpdateSuppressionGuard.Family.WALL);
@@ -260,6 +252,11 @@ public abstract class BlockItemMixin {
         }
         if(EasyPlaceExtraProtocol.requestsTntUpdateSuppression(auxiliaryValue)) {
             EasyPlaceUpdateSuppressionGuard.request(EasyPlaceUpdateSuppressionGuard.Family.TNT);
+        }
+        if(EasyPlaceExtraProtocol.requestsRailStateUpdateSuppression(auxiliaryValue)) {
+            EasyPlaceUpdateSuppressionGuard.request(
+                    EasyPlaceUpdateSuppressionGuard.Family.RAIL_STATE
+            );
         }
     }
 }

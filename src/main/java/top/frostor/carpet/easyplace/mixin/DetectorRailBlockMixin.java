@@ -12,17 +12,19 @@ import top.frostor.carpet.easyplace.EasyPlaceUpdateSuppressionGuard;
 
 @Mixin(DetectorRailBlock.class)
 public abstract class DetectorRailBlockMixin {
-    @Inject(method = "onPlace", at = @At("HEAD"), cancellable = true)
+    @Inject(
+            method = "checkPressed(Lnet/minecraft/world/level/Level;Lnet/minecraft/core/BlockPos;Lnet/minecraft/world/level/block/state/BlockState;)V",
+            at = @At("HEAD"),
+            cancellable = true
+    )
     private void easyPlace$preserveDetectorRailPower(
-            BlockState state,
             Level level,
             BlockPos pos,
-            BlockState oldState,
-            boolean movedByPiston,
+            BlockState state,
             CallbackInfo ci
     ) {
         if(EasyPlaceUpdateSuppressionGuard.shouldSuppress(
-                EasyPlaceUpdateSuppressionGuard.Family.DETECTOR_RAIL,
+                EasyPlaceUpdateSuppressionGuard.Family.RAIL_STATE,
                 pos
         )) {
             ci.cancel();

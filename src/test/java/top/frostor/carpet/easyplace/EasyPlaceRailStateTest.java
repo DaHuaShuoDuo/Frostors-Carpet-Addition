@@ -13,6 +13,7 @@ public final class EasyPlaceRailStateTest extends EasyPlaceTestSupport {
     public static int run() {
         EasyPlaceRailStateTest test = new EasyPlaceRailStateTest();
         test.checkRailStateRestoration();
+        test.checkActivatorRailStateRestoration();
         return test.checks();
     }
 
@@ -35,12 +36,39 @@ public final class EasyPlaceRailStateTest extends EasyPlaceTestSupport {
                 Blocks.POWERED_RAIL,
                 Blocks.POWERED_RAIL.defaultBlockState(),
                 null,
-                poweredRailShape.ordinal() | 0x8
+                poweredRailShape.ordinal()
+                        | 0x8
+                        | EasyPlaceExtraProtocol.RAIL_POWERED_MASK
         );
         check(
                 restoredPoweredRail != null
-                        && restoredPoweredRail.getValue(PoweredRailBlock.SHAPE) == poweredRailShape,
-                "powered rails must preserve shape while ignoring the no-update wire bit"
+                        && restoredPoweredRail.getValue(PoweredRailBlock.SHAPE) == poweredRailShape
+                        && restoredPoweredRail.getValue(PoweredRailBlock.POWERED),
+                "powered rails must preserve shape and redstone state"
+        );
+    }
+
+    private void checkActivatorRailStateRestoration() {
+        check(
+                Blocks.ACTIVATOR_RAIL instanceof PoweredRailBlock,
+                "activator rails must use the shared PoweredRailBlock implementation"
+        );
+
+        RailShape activatorRailShape = RailShape.EAST_WEST;
+        BlockState restoredActivatorRail = EasyPlaceStateSync.apply(
+                Blocks.ACTIVATOR_RAIL,
+                Blocks.ACTIVATOR_RAIL.defaultBlockState(),
+                null,
+                activatorRailShape.ordinal()
+                        | 0x8
+                        | EasyPlaceExtraProtocol.RAIL_POWERED_MASK
+        );
+        check(
+                restoredActivatorRail != null
+                        && restoredActivatorRail.getValue(PoweredRailBlock.SHAPE)
+                        == activatorRailShape
+                        && restoredActivatorRail.getValue(PoweredRailBlock.POWERED),
+                "activator rails must preserve shape and redstone state"
         );
     }
 }
