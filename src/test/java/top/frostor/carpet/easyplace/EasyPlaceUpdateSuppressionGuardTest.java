@@ -14,10 +14,41 @@ public final class EasyPlaceUpdateSuppressionGuardTest extends EasyPlaceTestSupp
         EasyPlaceUpdateSuppressionGuardTest test = new EasyPlaceUpdateSuppressionGuardTest();
         test.checkFamilyIsolation();
         test.checkSpatialScope();
+        test.checkDetectorRailScope();
         test.checkWallNeighborMatchMask();
+        test.checkPoweredConductorRelay();
         test.checkPlacementPositionUpdate();
         test.checkNestingAndCleanup();
         return test.checks();
+    }
+
+    private void checkDetectorRailScope() {
+        EasyPlaceUpdateSuppressionGuard.beginPlacement(ORIGIN);
+        try {
+            EasyPlaceUpdateSuppressionGuard.request(Family.DETECTOR_RAIL);
+            check(
+                    EasyPlaceUpdateSuppressionGuard.shouldSuppress(Family.DETECTOR_RAIL, ORIGIN),
+                    "powered detector rail protection must cover the placed position"
+            );
+            for(Direction direction : Direction.values()) {
+                check(
+                        !EasyPlaceUpdateSuppressionGuard.shouldSuppress(
+                                Family.DETECTOR_RAIL,
+                                ORIGIN.relative(direction)
+                        ),
+                        "detector rail protection must not cover face neighbors"
+                );
+            }
+            check(
+                    !EasyPlaceUpdateSuppressionGuard.shouldSuppress(
+                            Family.DETECTOR_RAIL,
+                            ORIGIN.offset(1, 0, 1)
+                    ),
+                    "detector rail protection must not cover diagonal positions"
+            );
+        } finally {
+            EasyPlaceUpdateSuppressionGuard.endPlacement();
+        }
     }
 
     private void checkFamilyIsolation() {
@@ -64,6 +95,7 @@ public final class EasyPlaceUpdateSuppressionGuardTest extends EasyPlaceTestSupp
             EasyPlaceUpdateSuppressionGuard.request(Family.RAIL);
             EasyPlaceUpdateSuppressionGuard.request(Family.WALL);
             EasyPlaceUpdateSuppressionGuard.request(Family.OBSERVER);
+            EasyPlaceUpdateSuppressionGuard.request(Family.TNT);
             EasyPlaceUpdateSuppressionGuard.requestWallNeighborMatches(0x3f);
             check(
                     EasyPlaceUpdateSuppressionGuard.shouldSuppress(Family.RAIL, ORIGIN)
@@ -85,6 +117,10 @@ public final class EasyPlaceUpdateSuppressionGuardTest extends EasyPlaceTestSupp
                 check(
                         EasyPlaceUpdateSuppressionGuard.shouldSuppress(Family.OBSERVER, neighbor),
                         "observer scope must cover all six face neighbors"
+                );
+                check(
+                        EasyPlaceUpdateSuppressionGuard.shouldSuppress(Family.TNT, neighbor),
+                        "TNT scope must cover all six face neighbors"
                 );
             }
             check(
@@ -137,6 +173,49 @@ public final class EasyPlaceUpdateSuppressionGuardTest extends EasyPlaceTestSupp
         } finally {
             EasyPlaceUpdateSuppressionGuard.endPlacement();
         }
+    }
+
+    private void checkPoweredConductorRelay() {
+        BlockPos origin = ORIGIN;
+        BlockPos relay = origin.east();
+        BlockPos tnt = relay.east();
+        check(
+                EasyPlaceUpdateSuppressionGuard.hasPoweredConductorRelay(
+                        origin,
+                        tnt,
+                        pos -> pos.equals(relay),
+                        (pos, directionFromTnt) ->
+                                pos.equals(relay) && directionFromTnt == Direction.WEST
+                ),
+                "any powered redstone-conductor relay must protect the second-hop TNT"
+        );
+        check(
+                !EasyPlaceUpdateSuppressionGuard.hasPoweredConductorRelay(
+                        origin,
+                        tnt,
+                        pos -> false,
+                        (pos, direction) -> true
+                ),
+                "a non-conductor must not relay protection"
+        );
+        check(
+                !EasyPlaceUpdateSuppressionGuard.hasPoweredConductorRelay(
+                        origin,
+                        tnt,
+                        pos -> pos.equals(relay),
+                        (pos, direction) -> false
+                ),
+                "an unpowered conductor must not relay protection"
+        );
+        check(
+                !EasyPlaceUpdateSuppressionGuard.hasPoweredConductorRelay(
+                        origin,
+                        origin.east(2).north(),
+                        pos -> pos.equals(relay),
+                        (pos, direction) -> true
+                ),
+                "the TNT must share the relay as a face neighbor"
+        );
     }
 
     private void checkPlacementPositionUpdate() {

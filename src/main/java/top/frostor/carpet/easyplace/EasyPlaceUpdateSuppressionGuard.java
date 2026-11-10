@@ -2,11 +2,15 @@ package top.frostor.carpet.easyplace;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.state.BlockState;
 
 import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.EnumSet;
 import java.util.Set;
+import java.util.function.BiPredicate;
+import java.util.function.Predicate;
 
 /**
  * Suppresses structural recalculation for block families during one Easy Place item placement.
@@ -21,7 +25,9 @@ public final class EasyPlaceUpdateSuppressionGuard {
                 Direction.UP
         )),
         WALL(EnumSet.allOf(Direction.class)),
-        OBSERVER(EnumSet.allOf(Direction.class));
+        OBSERVER(EnumSet.allOf(Direction.class)),
+        TNT(EnumSet.allOf(Direction.class)),
+        DETECTOR_RAIL(EnumSet.noneOf(Direction.class));
 
         private final Set<Direction> coveredDirections;
 
@@ -109,6 +115,52 @@ public final class EasyPlaceUpdateSuppressionGuard {
                     ? coversWallNeighbors(scope, pos)
                     : family.covers(scope.placementPos(), pos)) {
                 return true;
+            }
+        }
+        return false;
+    }
+
+    public static boolean shouldSuppressTnt(Level level, BlockPos pos) {
+        if(PLACE_DEPTH.get() <= 0 || !SUPPRESSED_FAMILIES.get().contains(Family.TNT)) {
+            return false;
+        }
+        if(shouldSuppress(Family.TNT, pos)) {
+            return true;
+        }
+        for(PlacementScope scope : PLACEMENT_SCOPES.get()) {
+            if(hasPoweredConductorRelay(
+                    scope.placementPos(),
+                    pos,
+                    relayPos -> {
+                        BlockState relayState = level.getBlockState(relayPos);
+                        return relayState.isRedstoneConductor(level, relayPos);
+                    },
+                    (relayPos, tntToRelay) -> level.getSignal(relayPos, tntToRelay) > 0
+            )) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    static boolean hasPoweredConductorRelay(
+            BlockPos placementPos,
+            BlockPos tntPos,
+            Predicate<BlockPos> isRedstoneConductor,
+            BiPredicate<BlockPos, Direction> hasSignalTowardTnt
+    ) {
+        for(Direction originToRelay : Direction.values()) {
+            BlockPos relayPos = placementPos.relative(originToRelay);
+            if(relayPos.equals(tntPos) || !isRedstoneConductor.test(relayPos)) {
+                continue;
+            }
+            for(Direction relayToTnt : Direction.values()) {
+                if(!tntPos.equals(relayPos.relative(relayToTnt))) {
+                    continue;
+                }
+                if(hasSignalTowardTnt.test(relayPos, relayToTnt.getOpposite())) {
+                    return true;
+                }
             }
         }
         return false;

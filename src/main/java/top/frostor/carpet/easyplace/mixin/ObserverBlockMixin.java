@@ -20,7 +20,7 @@ public abstract class ObserverBlockMixin {
             at = @At("HEAD"),
             cancellable = true
     )
-    private void frostorsCarpet$preventEasyPlaceObserverPulse(
+    private void easyPlace$preventObserverPulse(
             BlockState state,
             LevelReader level,
             ScheduledTickAccess scheduledTickAccess,

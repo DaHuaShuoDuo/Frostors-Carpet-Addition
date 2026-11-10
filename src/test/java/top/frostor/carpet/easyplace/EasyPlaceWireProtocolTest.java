@@ -55,6 +55,21 @@ public final class EasyPlaceWireProtocolTest extends EasyPlaceTestSupport {
                         && !EasyPlaceExtraProtocol.requestsObserverUpdateSuppression(-1),
                 "observer suppression must require an explicit positive auxiliary flag"
         );
+        int tntAuxiliary = EasyPlaceExtraProtocol.TNT_UPDATE_SUPPRESSION;
+        test.check(
+                EasyPlaceExtraProtocol.requestsTntUpdateSuppression(tntAuxiliary)
+                        && !EasyPlaceExtraProtocol.requestsTntUpdateSuppression(-1),
+                "TNT suppression must require an explicit positive auxiliary flag"
+        );
+        int detectorRailShape = 0x5;
+        int poweredDetectorRail = detectorRailShape
+                | EasyPlaceExtraProtocol.DETECTOR_RAIL_POWERED_MASK;
+        test.check(
+                (poweredDetectorRail & 0x7) == detectorRailShape
+                        && (poweredDetectorRail
+                        & EasyPlaceExtraProtocol.DETECTOR_RAIL_POWERED_MASK) != 0,
+                "detector rail power must use a raw bit independent of shape"
+        );
         for(int raw = 0; raw < 0b1000_0000; raw++) {
             int extra = EasyPlaceExtraProtocol.toExtraValue(raw);
             test.check(EasyPlaceExtraProtocol.isExtra(extra), "every encoded value must carry the marker");

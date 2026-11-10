@@ -6,10 +6,12 @@
     "BaseRailBlockMixin",
     "FenceGateBlockMixin",
     "BlockItemMixin",
+    "DetectorRailBlockMixin",
     "ObserverBlockMixin",
     "RailStateMixin",
     "ServerGamePacketListenerImplMixin",
     "StandingAndWallBlockItemMixin",
+    "TntBlockMixin",
     "WallHangingSignBlockMixin",
     "WallBlockMixin"
   ],

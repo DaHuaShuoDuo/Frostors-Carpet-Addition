@@ -90,6 +90,19 @@ observer 的投影只恢复 `FACING`，`POWERED` 始终按未激活状态放置�
 的检测面轻松放置方块时，本次变化不会排程 observer 脉冲；其他方向的变化仍保持原版
 检测行为。该保护由 TriWasa 的 `easyPlaceObserverProtection` 子开关控制，默认开启；
 关闭后 observer 放置和检测面更新均回到原版语义。
+TNT 在轻松放置时不会因放置位置已有红石信号而点燃，已有 TNT 也不会因相邻轻松放置
+触发的邻居更新而点燃。保护覆盖 `onPlace` 与 `neighborChanged` 两条红石入口，由 TriWasa
+的 `easyPlaceTntProtection` 子开关控制；手动点火、投射物引燃和其他爆炸仍保持原版行为。
+该请求走所有 `BlockItem` 的公共放置路径，包括珊瑚扇等 `StandingAndWallBlockItem`
+变体。
+若本次放置的立即激活元件与 TNT 通过一个已充能红石导体（包括普通实体方块、音符盒等）
+相接，则 TNT 的第二跳邻居更新也会在本次放置期间被抑制。红石线、红石火把、探测铁轨
+等即时元件都使用同一导体判断；该保护只覆盖同步单级中继，不包含多级链或延迟 tick。
+投影中已激活的探测铁轨由 TriWasa 的 `easyPlaceDetectorRailProtection` 子开关单独
+保护，默认开启。客户端通过 raw 通道 bit4 标记 `POWERED=true`；FCA 恢复该状态，并在
+初次放置时取消探测铁轨自身的位置更新，使其不会立即按“无矿车”回退为未激活。该开关
+与 `easyPlaceRailBlockNoShapeUpdate` 独立：后者继续只控制轨道形状更新保护，关闭
+`easyPlaceDetectorRailProtection` 时不得发送 bit4，也不得按通用铁轨标志推断激活状态。
 
 服务端状态处理使用显式、初始化后冻结的行为族注册表。稳定的
 `EasyPlaceStateSync.apply(...)` 入口负责查找 owner；具体状态恢复位于
@@ -98,7 +111,7 @@ container、sign、redstone 和 special 等适配器，通用纯状态操作集�
 `EasyPlaceStateSupport`。旧的 `LegacyEasyPlaceStateSync` 单体映射和 fallback
 适配器已经移除。V2-Extra Payload 标记和协议版本仍为 1；辅助 Z 通道低 9 位继续用于
 crafter slot mask，bit9/bit10 分别表示 rail/wall 更新保护请求，bit11-16 标记匹配的
-相邻墙方向，bit17 表示 observer 保护请求。
+相邻墙方向，bit17 表示 observer 保护请求，bit18 表示 TNT 保护请求。
 多面方块的面索引顺序固定为 `DOWN, UP, NORTH, SOUTH, WEST, EAST`，藤蔓从同一顺序
 过滤 `DOWN` 得到 `UP, NORTH, SOUTH, WEST, EAST`。使用历史面顺序构建的客户端或
 服务端必须升级到匹配版本，混用版本时多面方块和藤蔓可能按错误方向解码。旧 `main`

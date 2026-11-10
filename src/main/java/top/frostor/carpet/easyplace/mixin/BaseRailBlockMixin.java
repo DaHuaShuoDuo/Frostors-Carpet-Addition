@@ -4,6 +4,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.BaseRailBlock;
 import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.DetectorRailBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.redstone.Orientation;
 import org.spongepowered.asm.mixin.Mixin;
@@ -25,10 +26,7 @@ public abstract class BaseRailBlockMixin {
             boolean movedByPiston,
             CallbackInfo ci
     ) {
-        if(EasyPlaceUpdateSuppressionGuard.shouldSuppress(
-                EasyPlaceUpdateSuppressionGuard.Family.RAIL,
-                pos
-        )) {
+        if(shouldSuppress(state, pos)) {
             top.frostor.carpet.FrostorsCarpetAddition.LOGGER.debug(
                     "[EasyPlace] Suppressed rail neighborChanged at {}",
                     pos
@@ -49,10 +47,7 @@ public abstract class BaseRailBlockMixin {
             boolean movedByPiston,
             CallbackInfoReturnable<BlockState> cir
     ) {
-        if(EasyPlaceUpdateSuppressionGuard.shouldSuppress(
-                EasyPlaceUpdateSuppressionGuard.Family.RAIL,
-                pos
-        )) {
+        if(shouldSuppress(state, pos)) {
             top.frostor.carpet.FrostorsCarpetAddition.LOGGER.debug(
                     "[EasyPlace] Suppressed rail updateState at {}",
                     pos
@@ -73,15 +68,23 @@ public abstract class BaseRailBlockMixin {
             boolean forceUpdate,
             CallbackInfoReturnable<BlockState> cir
     ) {
-        if(EasyPlaceUpdateSuppressionGuard.shouldSuppress(
-                EasyPlaceUpdateSuppressionGuard.Family.RAIL,
-                pos
-        )) {
+        if(shouldSuppress(state, pos)) {
             top.frostor.carpet.FrostorsCarpetAddition.LOGGER.debug(
                     "[EasyPlace] Suppressed rail updateDir at {}",
                     pos
             );
             cir.setReturnValue(state);
         }
+    }
+
+    private static boolean shouldSuppress(BlockState state, BlockPos pos) {
+        return EasyPlaceUpdateSuppressionGuard.shouldSuppress(
+                EasyPlaceUpdateSuppressionGuard.Family.RAIL,
+                pos
+        ) || (state.getBlock() instanceof DetectorRailBlock
+                && EasyPlaceUpdateSuppressionGuard.shouldSuppress(
+                EasyPlaceUpdateSuppressionGuard.Family.DETECTOR_RAIL,
+                pos
+        ));
     }
 }

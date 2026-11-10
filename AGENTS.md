@@ -217,6 +217,25 @@ Carpet 会把枚举候选显示为小写，并在解析输入时先转为大写�
 - 辅助 Z 通道 bit17 表示 TriWasa `easyPlaceObserverProtection` 请求 observer 保护。
   FCA 只能在 bit17 存在时 request `OBSERVER`；关闭开关时 TriWasa 不得发送 observer
   投影状态或该标志，必须回到原版 observer 放置与检测面更新语义。
+- 辅助 Z 通道 bit18 表示 TriWasa `easyPlaceTntProtection` 请求 TNT 保护。FCA 只能在
+  bit18 存在时 request `TNT`，并在 `TntBlock.onPlace` 与 `TntBlock.neighborChanged`
+  的 `HEAD` 取消红石点燃路径；不得拦截 `prime(...)` 本体的手动点火、投射物或爆炸引燃。
+- 探测铁轨 raw 通道 bit4 表示投影中的 `POWERED=true`，由 TriWasa
+  `easyPlaceDetectorRailProtection` 单独控制，默认开启且与
+  `easyPlaceRailBlockNoShapeUpdate` 独立。FCA 只能在 bit4 存在时 request
+  `DETECTOR_RAIL`；该 family 只保护本次实际放置位置，并在
+  `DetectorRailBlock.onPlace` 的 `HEAD` 取消探测铁轨初次位置更新，避免无矿车时
+  `checkPressed` 立即将激活状态清除。关闭开关时不得发送 bit4，也不得从通用 `RAIL`
+  标志推断探测铁轨的激活状态。
+- TNT 保护请求必须在 `BlockItem.place` 的公共路径中、`getPlacementState` 调用前完成，
+  不能依赖目标 state 或普通 `BlockItem` 专用 Mixin。`StandingAndWallBlockItem` 及其
+  珊瑚扇、墙挂/站立两用物品同样必须启用该次 TNT 邻域保护。
+- TNT 间接保护覆盖本次同步更新中的单级
+  `立即激活元件 origin -> 红石导体中继 -> TNT` 路径。中继必须使
+  `isRedstoneConductor(level, relayPos)` 为真，并且
+  `Level.getSignal(relayPos, directionFromTntToRelay) > 0`；不得白名单红石线或音符盒，
+  因为普通实体方块、红石火把、探测铁轨等也可能参与即时激活。该范围仍不包含多级中继
+  或 placement 返回后的计划 tick。
 - 命中位置中的 V2-Extra 编码会超出原版对方块中心的距离校验。仅对规则已开启且完成
   V2-Extra 握手的玩家放宽该校验，同时保留玩家触及范围和最终 `canPlace` 校验。该
   放宽必须独立生效，不能依赖 `antiCheatDisabled`。

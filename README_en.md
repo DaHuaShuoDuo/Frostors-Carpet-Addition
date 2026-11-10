@@ -112,6 +112,26 @@ its pulse tick, while changes on other faces retain vanilla observer behavior.
 TriWasa's `easyPlaceObserverProtection` child switch controls this behavior and
 defaults to enabled; disabling it restores vanilla observer placement and
 detection-face updates.
+TNT is not primed by an existing redstone signal when placed through easy place,
+and existing TNT is not primed by neighbor updates caused by an easy-place
+placement. The `easyPlaceTntProtection` switch covers both `onPlace` and
+`neighborChanged` redstone paths; manual ignition, projectiles, and explosions
+retain vanilla behavior.
+The request is emitted from the common `BlockItem` placement path, including
+`StandingAndWallBlockItem` variants such as coral fans.
+If an immediately active placed component shares a powered redstone conductor
+(including ordinary solid blocks and note blocks) with TNT, that second-hop TNT
+neighbor update is also suppressed during the current placement. Redstone wire,
+redstone torches, detector rails, and other immediate components use the same
+conductor test. This remains limited to a synchronous single relay.
+Powered detector rails in the projection use the separate
+`easyPlaceDetectorRailProtection` child switch, enabled by default. The client
+marks `POWERED=true` with raw bit 4; FCA restores that state and cancels the
+detector rail's own initial placement update so it is not immediately cleared
+when no minecart is present. This switch is independent of
+`easyPlaceRailBlockNoShapeUpdate`, which continues to control only rail shape
+protection. Disabling detector rail protection omits raw bit 4 and must not
+infer powered state from the generic rail flag.
 
 Server-side state handling uses explicit behavior-family registries that freeze
 after initialization. The stable `EasyPlaceStateSync.apply(...)` entry point
@@ -123,7 +143,8 @@ operations live in `EasyPlaceStateSupport`. The old monolithic
 V2-Extra payload marker and protocol version remain 1. In the auxiliary Z
 channel, the low nine bits remain the crafter slot mask; bits 9 and 10 request
 rail and wall update protection, and bits 11-16 mark matching wall neighbors.
-Bit 17 requests observer protection. Multiface wire indices use the fixed order
+Bit 17 requests observer protection, and bit 18 requests TNT protection.
+Multiface wire indices use the fixed order
 `DOWN, UP, NORTH, SOUTH, WEST, EAST`; vine derives `UP, NORTH, SOUTH, WEST,
 EAST` by filtering out `DOWN`. Clients or servers built with the historical
 face order must be upgraded to a matching release, because mixed versions can

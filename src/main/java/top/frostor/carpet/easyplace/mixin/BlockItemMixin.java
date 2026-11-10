@@ -12,6 +12,7 @@ import net.minecraft.world.level.LevelReader;
 import net.minecraft.world.level.block.BaseRailBlock;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.CandleBlock;
+import net.minecraft.world.level.block.DetectorRailBlock;
 import net.minecraft.world.level.block.WallBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import org.spongepowered.asm.mixin.Mixin;
@@ -188,24 +189,14 @@ public abstract class BlockItemMixin {
             return null;
         }
 
-        EasyPlaceUpdateSuppressionGuard.updatePlacementPosition(context.getClickedPos());
-        boolean preserveRail = EasyPlaceExtraProtocol.requestsRailUpdateSuppression(auxiliaryValue);
-        boolean preserveWall = EasyPlaceExtraProtocol.requestsWallUpdateSuppression(auxiliaryValue);
-        boolean preserveObserver = EasyPlaceExtraProtocol.requestsObserverUpdateSuppression(
-                auxiliaryValue
-        );
-        if(preserveRail) {
-            EasyPlaceUpdateSuppressionGuard.request(EasyPlaceUpdateSuppressionGuard.Family.RAIL);
-        }
-        if(preserveWall) {
-            EasyPlaceUpdateSuppressionGuard.request(EasyPlaceUpdateSuppressionGuard.Family.WALL);
-            EasyPlaceUpdateSuppressionGuard.requestWallNeighborMatches(
-                    EasyPlaceExtraProtocol.wallNeighborMatchMask(auxiliaryValue)
+        if(adjusted.getBlock() instanceof DetectorRailBlock
+                && (rawValue & EasyPlaceExtraProtocol.DETECTOR_RAIL_POWERED_MASK) != 0) {
+            EasyPlaceUpdateSuppressionGuard.request(
+                    EasyPlaceUpdateSuppressionGuard.Family.DETECTOR_RAIL
             );
         }
-        if(preserveObserver) {
-            EasyPlaceUpdateSuppressionGuard.request(EasyPlaceUpdateSuppressionGuard.Family.OBSERVER);
-        }
+        boolean preserveRail = EasyPlaceExtraProtocol.requestsRailUpdateSuppression(auxiliaryValue);
+        boolean preserveWall = EasyPlaceExtraProtocol.requestsWallUpdateSuppression(auxiliaryValue);
         if(rail && preserveRail) {
             top.frostor.carpet.FrostorsCarpetAddition.LOGGER.debug(
                     "[EasyPlace] Requested rail shape preservation at {} (raw=0x{})",
@@ -222,5 +213,53 @@ public abstract class BlockItemMixin {
             );
         }
         return adjusted;
+    }
+
+    @Inject(
+            method = "place",
+            at = @At(
+                    value = "INVOKE",
+                    target = "Lnet/minecraft/world/item/BlockItem;getPlacementState(Lnet/minecraft/world/item/context/BlockPlaceContext;)Lnet/minecraft/world/level/block/state/BlockState;",
+                    shift = At.Shift.BEFORE
+            )
+    )
+    private void easyPlace$requestUniversalPlacementProtections(
+            BlockPlaceContext context,
+            CallbackInfoReturnable<net.minecraft.world.InteractionResult> cir,
+            @Local(argsOnly = false, ordinal = 0) BlockPlaceContext placementContext
+    ) {
+        if(placementContext.getLevel().isClientSide()
+                || !(placementContext.getPlayer() instanceof ServerPlayer player)
+                || !EasyPlaceExtraServer.isSupported(player)) {
+            return;
+        }
+        int protocolValue = EasyPlaceExtraProtocol.decode(
+                placementContext.getClickLocation(),
+                placementContext.getClickedPos()
+        );
+        if(!EasyPlaceExtraProtocol.isExtra(protocolValue)) {
+            return;
+        }
+
+        int auxiliaryValue = EasyPlaceExtraProtocol.decodeZ(
+                placementContext.getClickLocation(),
+                placementContext.getClickedPos()
+        );
+        EasyPlaceUpdateSuppressionGuard.updatePlacementPosition(placementContext.getClickedPos());
+        if(EasyPlaceExtraProtocol.requestsRailUpdateSuppression(auxiliaryValue)) {
+            EasyPlaceUpdateSuppressionGuard.request(EasyPlaceUpdateSuppressionGuard.Family.RAIL);
+        }
+        if(EasyPlaceExtraProtocol.requestsWallUpdateSuppression(auxiliaryValue)) {
+            EasyPlaceUpdateSuppressionGuard.request(EasyPlaceUpdateSuppressionGuard.Family.WALL);
+            EasyPlaceUpdateSuppressionGuard.requestWallNeighborMatches(
+                    EasyPlaceExtraProtocol.wallNeighborMatchMask(auxiliaryValue)
+            );
+        }
+        if(EasyPlaceExtraProtocol.requestsObserverUpdateSuppression(auxiliaryValue)) {
+            EasyPlaceUpdateSuppressionGuard.request(EasyPlaceUpdateSuppressionGuard.Family.OBSERVER);
+        }
+        if(EasyPlaceExtraProtocol.requestsTntUpdateSuppression(auxiliaryValue)) {
+            EasyPlaceUpdateSuppressionGuard.request(EasyPlaceUpdateSuppressionGuard.Family.TNT);
+        }
     }
 }
