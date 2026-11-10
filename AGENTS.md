@@ -201,11 +201,22 @@ Carpet 会把枚举候选显示为小写，并在解析输入时先转为大写�
   保留水 tick 等原版副作用；不得在 `HEAD` 直接取消。
 - 放置期更新抑制 guard 按 `RAIL` 和 `WALL` family 分别记录并独立清理。嵌套放置和
   上一层结束后不得让一个方块族隐式压制另一个方块族。
-- 辅助 Z 通道的 bit9 和 bit10 分别表示本次放置请求 `RAIL`、`WALL` 邻域保护，低 9 位
-  继续留给 crafter slot mask。FCA 只能按客户端显式标志 request family；guard 的空间
+- 辅助 Z 通道的 bit9 和 bit10 分别表示本次放置请求 `RAIL`、`WALL` 邻域保护，bit11-16
+  表示六个方向中哪些相邻墙与投影预期一致；低 9 位继续留给 crafter slot mask。FCA
+  只能按客户端显式标志 request family；guard 的空间
   范围由 family 定义：`RAIL` 覆盖实际放置位置、四个水平邻居和上方邻居，不包括下方；
-  `WALL` 覆盖实际放置位置及六个面相邻位置。不得退化为整个 placement 调用内的全局
-  方块族抑制，也不得扩展到斜角或两格以外位置。
+  `WALL` 始终保护本次放置位置，邻居位置只在对应 match bit 存在时保护。不得退化为整个
+  placement 调用内的全局方块族抑制，也不得扩展到斜角或两格以外位置。
+- 相邻墙与投影预期的比较必须忽略 `WATERLOGGED`；其余方块种类、四侧 `WallSide` 和
+  `UP` 任一不符，都必须清除该方向的 wall neighbor match bit。竖向连续墙中的不符墙
+  因此不得因相邻的 Easy Place 墙而获得冻结保护。
+- Observer 只恢复稳定 `FACING`，必须忽略投影 `POWERED` 并强制新放置 observer 为
+  `POWERED=false`。已有 observer 的检测面被 Easy Place 时，仅在变化方向等于
+  `ObserverBlock.FACING` 且位置处于 `OBSERVER` 邻域内，于 `updateShape` 的 `HEAD`
+  返回原状态以阻止排程；不得全局禁用 observer 更新，也不能改用 `RETURN` 抑制。
+- 辅助 Z 通道 bit17 表示 TriWasa `easyPlaceObserverProtection` 请求 observer 保护。
+  FCA 只能在 bit17 存在时 request `OBSERVER`；关闭开关时 TriWasa 不得发送 observer
+  投影状态或该标志，必须回到原版 observer 放置与检测面更新语义。
 - 命中位置中的 V2-Extra 编码会超出原版对方块中心的距离校验。仅对规则已开启且完成
   V2-Extra 握手的玩家放宽该校验，同时保留玩家触及范围和最终 `canPlace` 校验。该
   放宽必须独立生效，不能依赖 `antiCheatDisabled`。

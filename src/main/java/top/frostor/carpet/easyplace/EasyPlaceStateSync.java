@@ -25,6 +25,7 @@ import top.frostor.carpet.easyplace.adapter.generic.GenericFallbackStateRestorer
 import top.frostor.carpet.easyplace.adapter.lantern.LanternStateRestorer;
 import top.frostor.carpet.easyplace.adapter.multiface.MultiFaceStateRestorer;
 import top.frostor.carpet.easyplace.adapter.mushroom.MushroomStateRestorer;
+import top.frostor.carpet.easyplace.adapter.observer.ObserverStateRestorer;
 import top.frostor.carpet.easyplace.adapter.quantity.QuantityStateRestorer;
 import top.frostor.carpet.easyplace.adapter.rail.DetectorRailStateRestorer;
 import top.frostor.carpet.easyplace.adapter.rail.RailStateRestorer;
@@ -130,6 +131,12 @@ public final class EasyPlaceStateSync {
         );
         registry.register("rail", 655, RailStateRestorer::matches, new RailStateRestorer());
         registry.register("wall", 652, WallStateRestorer::matches, new WallStateRestorer());
+        registry.register(
+                "observer",
+                651,
+                ObserverStateRestorer::matches,
+                new ObserverStateRestorer()
+        );
         registry.register(
                 "mushroom",
                 654,

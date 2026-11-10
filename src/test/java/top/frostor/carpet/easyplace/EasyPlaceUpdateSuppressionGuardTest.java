@@ -14,6 +14,7 @@ public final class EasyPlaceUpdateSuppressionGuardTest extends EasyPlaceTestSupp
         EasyPlaceUpdateSuppressionGuardTest test = new EasyPlaceUpdateSuppressionGuardTest();
         test.checkFamilyIsolation();
         test.checkSpatialScope();
+        test.checkWallNeighborMatchMask();
         test.checkPlacementPositionUpdate();
         test.checkNestingAndCleanup();
         return test.checks();
@@ -62,6 +63,8 @@ public final class EasyPlaceUpdateSuppressionGuardTest extends EasyPlaceTestSupp
         try {
             EasyPlaceUpdateSuppressionGuard.request(Family.RAIL);
             EasyPlaceUpdateSuppressionGuard.request(Family.WALL);
+            EasyPlaceUpdateSuppressionGuard.request(Family.OBSERVER);
+            EasyPlaceUpdateSuppressionGuard.requestWallNeighborMatches(0x3f);
             check(
                     EasyPlaceUpdateSuppressionGuard.shouldSuppress(Family.RAIL, ORIGIN)
                             && EasyPlaceUpdateSuppressionGuard.shouldSuppress(Family.WALL, ORIGIN),
@@ -78,6 +81,10 @@ public final class EasyPlaceUpdateSuppressionGuardTest extends EasyPlaceTestSupp
                 check(
                         EasyPlaceUpdateSuppressionGuard.shouldSuppress(Family.WALL, neighbor),
                         "wall scope must cover all six face neighbors"
+                );
+                check(
+                        EasyPlaceUpdateSuppressionGuard.shouldSuppress(Family.OBSERVER, neighbor),
+                        "observer scope must cover all six face neighbors"
                 );
             }
             check(
@@ -99,12 +106,46 @@ public final class EasyPlaceUpdateSuppressionGuardTest extends EasyPlaceTestSupp
         }
     }
 
+    private void checkWallNeighborMatchMask() {
+        int mask = (1 << Direction.NORTH.ordinal()) | (1 << Direction.UP.ordinal());
+        EasyPlaceUpdateSuppressionGuard.beginPlacement(ORIGIN);
+        try {
+            EasyPlaceUpdateSuppressionGuard.request(Family.WALL);
+            EasyPlaceUpdateSuppressionGuard.requestWallNeighborMatches(mask);
+            check(
+                    EasyPlaceUpdateSuppressionGuard.shouldSuppress(Family.WALL, ORIGIN),
+                    "the placed wall position must remain protected"
+            );
+            check(
+                    EasyPlaceUpdateSuppressionGuard.shouldSuppress(
+                            Family.WALL,
+                            ORIGIN.north()
+                    )
+                            && EasyPlaceUpdateSuppressionGuard.shouldSuppress(
+                            Family.WALL,
+                            ORIGIN.above()
+                    ),
+                    "matching wall neighbors must stay protected"
+            );
+            check(
+                    !EasyPlaceUpdateSuppressionGuard.shouldSuppress(
+                            Family.WALL,
+                            ORIGIN.east()
+                    ),
+                    "mismatched wall neighbors must not inherit neighbor protection"
+            );
+        } finally {
+            EasyPlaceUpdateSuppressionGuard.endPlacement();
+        }
+    }
+
     private void checkPlacementPositionUpdate() {
         BlockPos finalPosition = ORIGIN.offset(4, 0, 0);
         EasyPlaceUpdateSuppressionGuard.beginPlacement(ORIGIN);
         try {
             EasyPlaceUpdateSuppressionGuard.request(Family.RAIL);
             EasyPlaceUpdateSuppressionGuard.request(Family.WALL);
+            EasyPlaceUpdateSuppressionGuard.requestWallNeighborMatches(0x3f);
             EasyPlaceUpdateSuppressionGuard.updatePlacementPosition(finalPosition);
             check(
                     EasyPlaceUpdateSuppressionGuard.shouldSuppress(Family.RAIL, finalPosition)

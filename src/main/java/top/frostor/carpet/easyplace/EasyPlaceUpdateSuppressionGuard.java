@@ -20,7 +20,8 @@ public final class EasyPlaceUpdateSuppressionGuard {
                 Direction.EAST,
                 Direction.UP
         )),
-        WALL(EnumSet.allOf(Direction.class));
+        WALL(EnumSet.allOf(Direction.class)),
+        OBSERVER(EnumSet.allOf(Direction.class));
 
         private final Set<Direction> coveredDirections;
 
@@ -44,7 +45,7 @@ public final class EasyPlaceUpdateSuppressionGuard {
     private static final ThreadLocal<Integer> PLACE_DEPTH = ThreadLocal.withInitial(() -> 0);
     private static final ThreadLocal<EnumSet<Family>> SUPPRESSED_FAMILIES =
             ThreadLocal.withInitial(() -> EnumSet.noneOf(Family.class));
-    private static final ThreadLocal<Deque<BlockPos>> PLACEMENT_POSITIONS =
+    private static final ThreadLocal<Deque<PlacementScope>> PLACEMENT_SCOPES =
             ThreadLocal.withInitial(ArrayDeque::new);
 
     private EasyPlaceUpdateSuppressionGuard() {
@@ -54,9 +55,9 @@ public final class EasyPlaceUpdateSuppressionGuard {
         int depth = PLACE_DEPTH.get();
         if(depth == 0) {
             SUPPRESSED_FAMILIES.remove();
-            PLACEMENT_POSITIONS.remove();
+            PLACEMENT_SCOPES.remove();
         }
-        PLACEMENT_POSITIONS.get().push(placementPos);
+        PLACEMENT_SCOPES.get().push(new PlacementScope(placementPos, 0));
         PLACE_DEPTH.set(depth + 1);
     }
 
@@ -65,9 +66,9 @@ public final class EasyPlaceUpdateSuppressionGuard {
         if(depth <= 0) {
             PLACE_DEPTH.remove();
             SUPPRESSED_FAMILIES.remove();
-            PLACEMENT_POSITIONS.remove();
+            PLACEMENT_SCOPES.remove();
         } else {
-            PLACEMENT_POSITIONS.get().pop();
+            PLACEMENT_SCOPES.get().pop();
             PLACE_DEPTH.set(depth);
         }
     }
@@ -82,20 +83,49 @@ public final class EasyPlaceUpdateSuppressionGuard {
         if(PLACE_DEPTH.get() <= 0) {
             return;
         }
-        Deque<BlockPos> placementPositions = PLACEMENT_POSITIONS.get();
-        placementPositions.pop();
-        placementPositions.push(placementPos);
+        Deque<PlacementScope> placementScopes = PLACEMENT_SCOPES.get();
+        PlacementScope previous = placementScopes.pop();
+        placementScopes.push(new PlacementScope(placementPos, previous.wallNeighborMatchMask()));
+    }
+
+    public static void requestWallNeighborMatches(int wallNeighborMatchMask) {
+        if(PLACE_DEPTH.get() <= 0) {
+            return;
+        }
+        Deque<PlacementScope> placementScopes = PLACEMENT_SCOPES.get();
+        PlacementScope previous = placementScopes.pop();
+        placementScopes.push(new PlacementScope(
+                previous.placementPos(),
+                wallNeighborMatchMask & 0x3f
+        ));
     }
 
     public static boolean shouldSuppress(Family family, BlockPos pos) {
         if(PLACE_DEPTH.get() <= 0 || !SUPPRESSED_FAMILIES.get().contains(family)) {
             return false;
         }
-        for(BlockPos placementPos : PLACEMENT_POSITIONS.get()) {
-            if(family.covers(placementPos, pos)) {
+        for(PlacementScope scope : PLACEMENT_SCOPES.get()) {
+            if(family == Family.WALL
+                    ? coversWallNeighbors(scope, pos)
+                    : family.covers(scope.placementPos(), pos)) {
                 return true;
             }
         }
         return false;
+    }
+
+    private static boolean coversWallNeighbors(PlacementScope scope, BlockPos pos) {
+        if(pos.equals(scope.placementPos())) {
+            return true;
+        }
+        for(Direction direction : Direction.values()) {
+            if(pos.equals(scope.placementPos().relative(direction))) {
+                return (scope.wallNeighborMatchMask() & (1 << direction.ordinal())) != 0;
+            }
+        }
+        return false;
+    }
+
+    private record PlacementScope(BlockPos placementPos, int wallNeighborMatchMask) {
     }
 }

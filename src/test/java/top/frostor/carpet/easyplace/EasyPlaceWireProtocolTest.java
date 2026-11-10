@@ -1,5 +1,7 @@
 package top.frostor.carpet.easyplace;
 
+import net.minecraft.core.Direction;
+
 public final class EasyPlaceWireProtocolTest extends EasyPlaceTestSupport {
     private EasyPlaceWireProtocolTest() {
     }
@@ -34,6 +36,24 @@ public final class EasyPlaceWireProtocolTest extends EasyPlaceTestSupport {
                 !EasyPlaceExtraProtocol.requestsRailUpdateSuppression(-1)
                         && !EasyPlaceExtraProtocol.requestsWallUpdateSuppression(-1),
                 "an absent Z field must not enable either update suppression flag"
+        );
+        int wallMatchMask = (1 << Direction.NORTH.ordinal())
+                | (1 << Direction.UP.ordinal());
+        int wallAuxiliary = EasyPlaceExtraProtocol.WALL_UPDATE_SUPPRESSION
+                | (wallMatchMask << 11);
+        test.check(
+                EasyPlaceExtraProtocol.wallNeighborMatchMask(wallAuxiliary) == wallMatchMask,
+                "wall neighbor match bits must survive the auxiliary field"
+        );
+        test.check(
+                EasyPlaceExtraProtocol.wallNeighborMatchMask(-1) == 0,
+                "an absent Z field must not mark wall neighbors as matching"
+        );
+        int observerAuxiliary = EasyPlaceExtraProtocol.OBSERVER_UPDATE_SUPPRESSION;
+        test.check(
+                EasyPlaceExtraProtocol.requestsObserverUpdateSuppression(observerAuxiliary)
+                        && !EasyPlaceExtraProtocol.requestsObserverUpdateSuppression(-1),
+                "observer suppression must require an explicit positive auxiliary flag"
         );
         for(int raw = 0; raw < 0b1000_0000; raw++) {
             int extra = EasyPlaceExtraProtocol.toExtraValue(raw);

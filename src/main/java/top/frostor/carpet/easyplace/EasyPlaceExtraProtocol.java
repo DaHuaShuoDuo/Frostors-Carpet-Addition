@@ -11,6 +11,9 @@ public final class EasyPlaceExtraProtocol {
     public static final int CRAFTER_SLOT_MASK = 0x1ff;
     public static final int RAIL_UPDATE_SUPPRESSION = 1 << 9;
     public static final int WALL_UPDATE_SUPPRESSION = 1 << 10;
+    public static final int WALL_NEIGHBOR_MATCH_BASE = 1 << 11;
+    public static final int WALL_NEIGHBOR_MATCH_MASK = 0x3f << 11;
+    public static final int OBSERVER_UPDATE_SUPPRESSION = 1 << 17;
 
     private EasyPlaceExtraProtocol() {
     }
@@ -48,5 +51,14 @@ public final class EasyPlaceExtraProtocol {
 
     public static boolean requestsWallUpdateSuppression(int auxiliaryValue) {
         return auxiliaryValue >= 0 && (auxiliaryValue & WALL_UPDATE_SUPPRESSION) != 0;
+    }
+
+    public static int wallNeighborMatchMask(int auxiliaryValue) {
+        if(auxiliaryValue < 0) return 0;
+        return (auxiliaryValue & WALL_NEIGHBOR_MATCH_MASK) >>> 11;
+    }
+
+    public static boolean requestsObserverUpdateSuppression(int auxiliaryValue) {
+        return auxiliaryValue >= 0 && (auxiliaryValue & OBSERVER_UPDATE_SUPPRESSION) != 0;
     }
 }

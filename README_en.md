@@ -97,23 +97,33 @@ placement independently suppresses structural `updateShape` recalculation
 while preserving vanilla side effects such as water-tick scheduling.
 During any V2-Extra block placement, rail structural recalculation is suppressed
 at the actual placement position, its four horizontal neighbors, and the
-position above it, but not below it. Wall protection covers the placement
-position and all six face-adjacent positions. Diagonal positions, blocks two or
-more steps away, and ordinary non-Easy-Place placements remain unaffected.
+position above it, but not below it. Wall protection always covers the current
+placement position; adjacent walls are protected only when their actual state
+matches the projection. Comparison ignores `WATERLOGGED`, while block type, side
+connections, and `UP` mismatches exclude that neighbor. Diagonal positions,
+blocks two or more steps away, and ordinary non-Easy-Place placements remain
+unaffected.
 TriWasa controls these protections independently with the
 `easyPlaceRailBlockNoShapeUpdate` and `easyPlaceWallBlockNoShapeUpdate` child
 switches, both enabled by default.
+Observer projections restore only `FACING`; `POWERED` is always placed inactive.
+An easy-place change on an existing observer's detection face does not schedule
+its pulse tick, while changes on other faces retain vanilla observer behavior.
+TriWasa's `easyPlaceObserverProtection` child switch controls this behavior and
+defaults to enabled; disabling it restores vanilla observer placement and
+detection-face updates.
 
 Server-side state handling uses explicit behavior-family registries that freeze
 after initialization. The stable `EasyPlaceStateSync.apply(...)` entry point
 selects the owning adapter; concrete restoration lives under
-`easyplace/adapter` in directional, attachment, rail, wall, multiface, quantity,
+`easyplace/adapter` in directional, attachment, rail, wall, observer, multiface, quantity,
 container, sign, redstone, and special families, while shared pure state
 operations live in `EasyPlaceStateSupport`. The old monolithic
 `LegacyEasyPlaceStateSync` mapping and fallback adapter have been removed. The
 V2-Extra payload marker and protocol version remain 1. In the auxiliary Z
-channel, the low nine bits remain the crafter slot mask, while bits 9 and 10
-request rail and wall update protection respectively. Multiface wire indices use the fixed order
+channel, the low nine bits remain the crafter slot mask; bits 9 and 10 request
+rail and wall update protection, and bits 11-16 mark matching wall neighbors.
+Bit 17 requests observer protection. Multiface wire indices use the fixed order
 `DOWN, UP, NORTH, SOUTH, WEST, EAST`; vine derives `UP, NORTH, SOUTH, WEST,
 EAST` by filtering out `DOWN`. Clients or servers built with the historical
 face order must be upgraded to a matching release, because mixed versions can

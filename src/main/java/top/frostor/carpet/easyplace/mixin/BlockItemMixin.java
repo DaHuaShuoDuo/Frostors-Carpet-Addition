@@ -191,11 +191,20 @@ public abstract class BlockItemMixin {
         EasyPlaceUpdateSuppressionGuard.updatePlacementPosition(context.getClickedPos());
         boolean preserveRail = EasyPlaceExtraProtocol.requestsRailUpdateSuppression(auxiliaryValue);
         boolean preserveWall = EasyPlaceExtraProtocol.requestsWallUpdateSuppression(auxiliaryValue);
+        boolean preserveObserver = EasyPlaceExtraProtocol.requestsObserverUpdateSuppression(
+                auxiliaryValue
+        );
         if(preserveRail) {
             EasyPlaceUpdateSuppressionGuard.request(EasyPlaceUpdateSuppressionGuard.Family.RAIL);
         }
         if(preserveWall) {
             EasyPlaceUpdateSuppressionGuard.request(EasyPlaceUpdateSuppressionGuard.Family.WALL);
+            EasyPlaceUpdateSuppressionGuard.requestWallNeighborMatches(
+                    EasyPlaceExtraProtocol.wallNeighborMatchMask(auxiliaryValue)
+            );
+        }
+        if(preserveObserver) {
+            EasyPlaceUpdateSuppressionGuard.request(EasyPlaceUpdateSuppressionGuard.Family.OBSERVER);
         }
         if(rail && preserveRail) {
             top.frostor.carpet.FrostorsCarpetAddition.LOGGER.debug(
