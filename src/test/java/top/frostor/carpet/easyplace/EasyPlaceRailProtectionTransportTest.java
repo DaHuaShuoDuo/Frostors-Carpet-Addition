@@ -33,6 +33,7 @@ public final class EasyPlaceRailProtectionTransportTest extends EasyPlaceTestSup
     public static int run() {
         EasyPlaceRailProtectionTransportTest test =
                 new EasyPlaceRailProtectionTransportTest();
+        test.checkAllRawValuesRoundTrip();
         test.checkPacketSnapshotForEveryFace();
         test.checkAuxiliaryIsPositionIndependent();
         test.checkAuxiliarySchemaValidation();
@@ -42,6 +43,31 @@ public final class EasyPlaceRailProtectionTransportTest extends EasyPlaceTestSup
         test.checkRailDeferredWindow();
         test.checkYChannelCarriesNoRaw();
         return test.checks();
+    }
+
+    /**
+     * Exhaustive coverage of the seven-bit raw space on the contract anchor. A single sample
+     * (0x28) cannot detect EXTRA_MARKER collisions, because an anchor shifted one block west
+     * decodes to extraValue-1, which still carries the marker for 112 of the 128 raw values.
+     */
+    private void checkAllRawValuesRoundTrip() {
+        for(int raw = 0; raw <= 0x7f; raw++) {
+            int extraValue = EasyPlaceExtraProtocol.toExtraValue(raw);
+            Vec3 location = encode(BLOCK_POS, extraValue, ENCODED_AUXILIARY_VALUE);
+            check(
+                    EasyPlaceExtraProtocol.isExtra(extraValue),
+                    "every raw value must produce a marked extra value"
+            );
+            for(Direction face : Direction.values()) {
+                EasyPlacePacketRequest.Snapshot snapshot =
+                        EasyPlacePacketRequest.decode(location, BLOCK_POS, face);
+                check(
+                        snapshot != null && snapshot.resolvedRawValue() == raw,
+                        "raw " + raw + " must round trip on the packet blockPos anchor (face "
+                                + face + ")"
+                );
+            }
+        }
     }
 
     private void checkPacketSnapshotForEveryFace() {

@@ -127,31 +127,32 @@ If an immediately active placed component shares a powered redstone conductor
 neighbor update is also suppressed during the current placement. Redstone wire,
 redstone torches, detector rails, and other immediate components use the same
 conductor test. This remains limited to a synchronous single relay.
-Powered rails, activator rails, and detector rails use TriWasa's unified
-`easyPlaceRailProtection` child switch, enabled by default. The client stores
-their initial `POWERED` value in raw bit 4, requests rail shape protection with
-bit 9, and requests unified rail protection; neighbor matches use auxiliary bits 17-21 in
-`NORTH,SOUTH,WEST,EAST,UP` order. FCA handles shape/PP updates through
-`RAIL` and exact-position redstone state through `RAIL_STATE`. In 26.x, powered
-rails and activator rails are both instances of `PoweredRailBlock`, while
-detector rails use the separate `DetectorRailBlock` implementation. Neighbor
-rail matching never compares redstone state, and ordinary rails have no
-redstone state.
-
-The same handshake adds the `easy_place_y_precision` capability and
-`y_precision_bits=8`. A supporting client stores an eight-bit fixed-point hit
-height relative to the bottom of the target block in Y. The server decodes X
-raw against the packet's `BlockHitResult.blockPos`, matching the client
-encoding anchor. FCA snapshots raw and Y when `handleUseItemOn` receives the
-hit result, before reach validation and vanilla block interaction or placement
-run. Older clients that do not
-advertise the capability continue sending their original Y value, so mixed
-versions keep the previous path.
-
-The packet-level raw/Y snapshot is associated with the current
-`BlockItem.place` lifecycle. Wall-mounted placements and other target
-transforms use that snapshot instead of reinterpreting X raw against the
-transformed position.
+Regular and sticky pistons keep their existing facing restoration; the
+projected `EXTENDED` is neither encoded nor restored. When the placement target
+is an unextended piston in the projection, when one of the six face neighbors
+exactly matches the projection, or when a piston reachable as a second-hop QC
+target through a powered conductor directly above it matches the projection,
+FCA suppresses that piston's `setPlacedBy`, `onPlace`, and `neighborChanged`
+activation checks for the current `BlockItem.place` lifecycle. Mismatched
+pistons keep vanilla updates; ordinary updates after the placement, manual
+block events, and real piston movement are unaffected. TriWasa's
+`easyPlacePistonProtection` child switch controls this and defaults to
+enabled; the 12-bit mask travels in Y bits 8-19. The archived cross-packet
+context architecture is not restored and X/Z are untouched.
+Powered rails, activator rails, and detector rails are protected by TriWasa's
+unified `easyPlaceRailProtection` child switch, enabled by default. The client
+stores their initial `POWERED` in raw bit 4 and uses raw bit 3 (powered,
+activator, and detector rails) or bit 4 (ordinary rails) as a fallback flag;
+the unified protection request and the neighbor match mask travel in Z bit 9
+and bits 17-21, in the fixed `NORTH,SOUTH,WEST,EAST,UP` order. FCA has only
+the `RAIL` family, which covers shape, PP, neighbor matching, and the placed
+position's state; the `RAIL_STATE` family has been removed. In 26.x powered and
+activator rails are both `PoweredRailBlock` instances, while detector rails use
+the separate `DetectorRailBlock`. Neighbor matching compares only rail type and
+shape, never redstone state, and ordinary rails have no redstone state. The
+`checkPressed` tick scheduled after placing a detector rail is covered by a
+short suppression window at the placement position, itself constrained by the
+neighbor mask, so rails are never frozen indefinitely.
 
 Server-side state handling uses explicit behavior-family registries that freeze
 after initialization. The stable `EasyPlaceStateSync.apply(...)` entry point
@@ -161,9 +162,57 @@ container, sign, redstone, and special families, while shared pure state
 operations live in `EasyPlaceStateSupport`. The old monolithic
 `LegacyEasyPlaceStateSync` mapping and fallback adapter have been removed. The
 V2-Extra payload marker and protocol version remain 1. In the auxiliary Z
-channel, the low nine bits remain the crafter slot mask; bits 9 and 10 request
-rail and wall update protection, and bits 11-16 mark matching wall neighbors.
-Bit 17 requests observer protection, and bit 18 requests TNT protection.
+channel the low nine bits remain the crafter slot mask; bits 9 and 10 request
+rail and wall update protection, bits 11-16 mark matching wall neighbors,
+bits 17-21 mark matching rail neighbors in `NORTH,SOUTH,WEST,EAST,UP` order,
+bit 22 requests observer protection, bit 23 requests TNT protection, bit 24 is
+the `AUXILIARY_SCHEMA` marker, bit 25 is free, and bits 26-27 are the wall
+auxiliary schema and `UP`.
+
+The same handshake adds `easy_place_y_precision` with `y_precision_bits=8` and
+`easy_place_piston_protection` with `piston_protection_bits=12`. A supporting
+client writes the eight-bit fixed-point hit height relative to the bottom of
+the block into Y bits 0-7; Y bits 8-19 carry the 12-bit piston protection mask
+and bit 20 is the `Y_PISTON_SCHEMA` marker, set only when the mask is non-zero.
+Y never reuses raw, and a zero mask or missing capability keeps Y bit-identical
+to the plain precision encoding. X raw and Y precision are always encoded
+against the packet `BlockHitResult.blockPos`; Z auxiliary uses a **fixed
+origin** (world Z=0, `z = auxiliary * 2 + 2`) and is independent of the click
+position, hit face, and placement target, so the main Litematica path, legacy
+`WorldUtils`, and printer adapters no longer need to agree on one `BlockPos`.
+Bit 24 of Z is the `AUXILIARY_SCHEMA` marker: the server accepts only Z values
+carrying it, strips that bit after decoding, and treats an unencoded or
+unmarked Z as "no auxiliary".
+The hit location travels as a binary32 float offset relative to `blockPos`,
+whose exact-integer limit is 2^24; the largest Y payload is
+`2 + 2*(2^21-1) = 2^22`, leaving two bits of headroom, so neither 26.2 nor
+26.3 loses precision.
+
+FCA saves the complete packet-level snapshot when `handleUseItemOn` receives
+the unmodified hit result, then runs target transforms and placement, and
+associates the snapshot with the `BlockItem.place` lifecycle. Wall-mounted
+placements and other target transforms use that snapshot instead of
+reinterpreting X raw or Z auxiliary against the transformed position.
+`BlockPlaceContext.getClickedPos()` is one block away from the packet position
+along the hit face, and `at(...)` may rebuild the click location from the block
+centre, so decoding from the transformed context loses the marker, bit 9, or
+the neighbor mask depending on the face. The snapshot lives on the processing
+thread of a single packet inside a try/finally scope; no cross-packet context
+architecture is used. The Z contract requires FCA and TriWasa to be built from
+matching versions; mixing versions silently drops rail, wall, observer, and
+TNT protection bits.
+26.2 and 26.3 share one placement semantic: they depend on different
+Litematica versions (0.28.6 / 0.29.1), and 26.3 turns
+`ServerboundUseItemOnPacket` into a record whose `BlockHitResult.STREAM_CODEC`
+transmits the hit location as a **float offset from `blockPos`**. To hide those
+differences, the wire X/Y anchor is fixed to the packet `blockPos`; positions
+resolved by `BellRules.resolveProtocolTarget` (`protocolPos`) are used only to
+read the projection and current world state and must never be passed to
+`encodeX`/`encodeY`. The server uses Z's `AUXILIARY_SCHEMA` bit as the primary
+packet marker and falls back to the hit face and X-axis neighbors when the
+primary X anchor has no marker. Both versions therefore follow the same decode
+path, and side-mounted bells whose `facing` lies on the X axis no longer lose
+the V2-Extra marker to an anchor shift.
 Multiface wire indices use the fixed order
 `DOWN, UP, NORTH, SOUTH, WEST, EAST`; vine derives `UP, NORTH, SOUTH, WEST,
 EAST` by filtering out `DOWN`. Clients or servers built with the historical
