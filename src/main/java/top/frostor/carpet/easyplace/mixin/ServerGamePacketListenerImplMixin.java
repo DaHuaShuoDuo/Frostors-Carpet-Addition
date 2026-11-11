@@ -13,7 +13,6 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.ModifyVariable;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import top.frostor.carpet.FrostorSettings;
-import top.frostor.carpet.easyplace.EasyPlaceExtraProtocol;
 import top.frostor.carpet.easyplace.EasyPlaceExtraServer;
 import top.frostor.carpet.easyplace.EasyPlacePacketRequest;
 
@@ -29,33 +28,15 @@ public abstract class ServerGamePacketListenerImplMixin {
     )
     private BlockHitResult easyPlace$capturePacketRequest(BlockHitResult hitResult) {
         if(FrostorSettings.easyPlaceProtocolExtra && EasyPlaceExtraServer.isSupported(player)) {
-            int protocolValue = EasyPlaceExtraProtocol.decode(
+            EasyPlacePacketRequest.Snapshot snapshot = EasyPlacePacketRequest.decode(
                     hitResult.getLocation(),
-                    hitResult.getBlockPos()
+                    hitResult.getBlockPos(),
+                    hitResult.getDirection()
             );
-            net.minecraft.core.BlockPos alternatePos = hitResult.getBlockPos()
-                    .relative(hitResult.getDirection());
-            int alternateProtocolValue = EasyPlaceExtraProtocol.decode(
-                    hitResult.getLocation(),
-                    alternatePos
-            );
-            if(EasyPlaceExtraProtocol.isExtra(protocolValue)
-                    || EasyPlaceExtraProtocol.isExtra(alternateProtocolValue)) {
-                int packedY = EasyPlaceExtraProtocol.decodeY(
-                        hitResult.getLocation(),
-                        hitResult.getBlockPos()
-                );
-                EasyPlacePacketRequest.begin(new EasyPlacePacketRequest.Snapshot(
-                        EasyPlaceExtraProtocol.isExtra(protocolValue)
-                                ? EasyPlaceExtraProtocol.toRawValue(protocolValue)
-                                : -1,
-                        EasyPlaceExtraProtocol.isExtra(alternateProtocolValue)
-                                ? EasyPlaceExtraProtocol.toRawValue(alternateProtocolValue)
-                                : -1,
-                        packedY < 0
-                                ? -1
-                                : packedY & EasyPlaceExtraProtocol.Y_PRECISION_MASK
-                ));
+            if(snapshot != null) {
+                EasyPlacePacketRequest.begin(snapshot);
+            } else {
+                EasyPlacePacketRequest.end();
             }
         }
         return hitResult;

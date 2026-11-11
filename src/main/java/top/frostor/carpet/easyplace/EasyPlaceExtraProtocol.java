@@ -22,6 +22,12 @@ public final class EasyPlaceExtraProtocol {
     public static final int TNT_UPDATE_SUPPRESSION = 1 << 23;
     public static final int WALL_AUXILIARY_SCHEMA = 1 << 26;
     public static final int WALL_UP = 1 << 27;
+    /**
+     * Marks a deliberately encoded Z auxiliary field. Both client and server are released in
+     * lockstep, so this schema bit replaces the fragile "decoded value >= 0" test and lets the
+     * server pick the correct Z anchor without guessing from the X channel.
+     */
+    public static final int AUXILIARY_SCHEMA = 1 << 24;
     public static final int RAIL_POWERED_MASK = 1 << 4;
     public static final int RAIL_PROTECTION_FLAG_POWERED = 1 << 3;
     public static final int RAIL_PROTECTION_FLAG_REGULAR = 1 << 4;
@@ -38,6 +44,16 @@ public final class EasyPlaceExtraProtocol {
 
     public static int decodeZ(Vec3 hitPos, BlockPos clickedPos) {
         return decodeDimension(hitPos.z - clickedPos.getZ());
+    }
+
+    /**
+     * The Z auxiliary field is anchored at world Z = 0 rather than at the click position. Client
+     * encoding paths do not all agree on which block position the packet will carry (Litematica's
+     * main/legacy/printer paths pass different positions), so a relative anchor made the decoded
+     * auxiliary value shift by one bit depending on the hit face.
+     */
+    public static int decodeAuxiliary(Vec3 hitPos) {
+        return decodeDimension(hitPos.z);
     }
 
     public static int decodeY(Vec3 hitPos, BlockPos clickedPos) {
@@ -77,6 +93,17 @@ public final class EasyPlaceExtraProtocol {
 
     public static boolean isExtra(int protocolValue) {
         return protocolValue >= 0 && (protocolValue & EXTRA_MARKER) != 0;
+    }
+
+    public static boolean hasAuxiliarySchema(int auxiliaryValue) {
+        return auxiliaryValue >= 0 && (auxiliaryValue & AUXILIARY_SCHEMA) != 0;
+    }
+
+    public static int stripAuxiliarySchema(int auxiliaryValue) {
+        if(!hasAuxiliarySchema(auxiliaryValue)) {
+            return -1;
+        }
+        return auxiliaryValue & ~AUXILIARY_SCHEMA;
     }
 
     public static int toRawValue(int extraProtocolValue) {
@@ -119,6 +146,9 @@ public final class EasyPlaceExtraProtocol {
             net.minecraft.world.level.block.Block block,
             int rawValue
     ) {
+        if(rawValue < 0 || block == null) {
+            return false;
+        }
         if(block instanceof PoweredRailBlock || block instanceof DetectorRailBlock) {
             return (rawValue & RAIL_PROTECTION_FLAG_POWERED) != 0;
         }
@@ -126,6 +156,21 @@ public final class EasyPlaceExtraProtocol {
             return (rawValue & RAIL_PROTECTION_FLAG_REGULAR) != 0;
         }
         return false;
+    }
+
+    /**
+     * Single source of truth for the RAIL family request: the auxiliary Z field carries the
+     * explicit suppression flag and the neighbour match mask, while the raw X field carries a
+     * rail-only fallback for clients that cannot send the Z field.
+     */
+    public static boolean requestsRailProtection(
+            net.minecraft.world.level.block.Block block,
+            int rawValue,
+            int auxiliaryValue
+    ) {
+        return requestsRailUpdateSuppression(auxiliaryValue)
+                || railNeighborMatchMask(auxiliaryValue) != 0
+                || requestsRailUpdateSuppression(block, rawValue);
     }
 
     public static boolean wallUp(int auxiliaryValue) {

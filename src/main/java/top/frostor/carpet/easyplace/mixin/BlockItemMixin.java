@@ -183,31 +183,26 @@ public abstract class BlockItemMixin {
             return null;
         }
 
-        boolean preserveRail = EasyPlaceExtraProtocol.requestsRailUpdateSuppression(auxiliaryValue)
-                || (rail && EasyPlaceExtraProtocol.requestsRailUpdateSuppression(
+        boolean preserveRail = EasyPlaceExtraProtocol.requestsRailProtection(
                 adjusted.getBlock(),
-                rawValue
-        ));
+                rawValue,
+                auxiliaryValue
+        );
         boolean preserveWall = EasyPlaceExtraProtocol.requestsWallUpdateSuppression(auxiliaryValue);
         if(rail && preserveRail) {
+            int railNeighborMatchMask =
+                    EasyPlaceExtraProtocol.railNeighborMatchMask(auxiliaryValue);
             top.frostor.carpet.FrostorsCarpetAddition.LOGGER.info(
                     "[EasyPlace-Rail] request target={} raw=0x{} auxiliary=0x{} neighborMask=0x{}",
                     context.getClickedPos(),
                     Integer.toHexString(rawValue),
                     Integer.toHexString(auxiliaryValue),
-                    Integer.toHexString(
-                            EasyPlaceExtraProtocol.railNeighborMatchMask(auxiliaryValue)
-                    )
+                    Integer.toHexString(railNeighborMatchMask)
             );
-            EasyPlaceUpdateSuppressionGuard.request(EasyPlaceUpdateSuppressionGuard.Family.RAIL);
-            EasyPlaceUpdateSuppressionGuard.requestRailNeighborMatches(
-                    EasyPlaceExtraProtocol.railNeighborMatchMask(auxiliaryValue)
-            );
-            top.frostor.carpet.FrostorsCarpetAddition.LOGGER.debug(
-                    "[EasyPlace] Requested rail protection at {} (raw=0x{}, auxiliary=0x{})",
+            EasyPlaceUpdateSuppressionGuard.requestRailProtection(
+                    context.getLevel(),
                     context.getClickedPos(),
-                    Integer.toHexString(rawValue),
-                    Integer.toHexString(auxiliaryValue)
+                    railNeighborMatchMask
             );
         }
         if(adjusted.getBlock() instanceof WallBlock && preserveWall) {
@@ -247,10 +242,16 @@ public abstract class BlockItemMixin {
         int auxiliaryValue = request.auxiliaryValue();
         int railNeighborMatchMask =
                 EasyPlaceExtraProtocol.railNeighborMatchMask(auxiliaryValue);
-        boolean preserveRail =
-                EasyPlaceExtraProtocol.requestsRailUpdateSuppression(auxiliaryValue)
-                        || railNeighborMatchMask != 0;
-        top.frostor.carpet.FrostorsCarpetAddition.LOGGER.info(
+        net.minecraft.world.level.block.Block placedBlock =
+                placementContext.getItemInHand().getItem() instanceof BlockItem blockItem
+                        ? blockItem.getBlock()
+                        : null;
+        boolean preserveRail = EasyPlaceExtraProtocol.requestsRailProtection(
+                placedBlock,
+                request.rawValue(),
+                auxiliaryValue
+        );
+        top.frostor.carpet.FrostorsCarpetAddition.LOGGER.debug(
                 "[EasyPlace-Rail] universal target={} auxiliary=0x{} request={} mask=0x{}",
                 placementContext.getClickedPos(),
                 Integer.toHexString(auxiliaryValue),
@@ -259,8 +260,9 @@ public abstract class BlockItemMixin {
         );
         EasyPlaceUpdateSuppressionGuard.updatePlacementPosition(placementContext.getClickedPos());
         if(preserveRail) {
-            EasyPlaceUpdateSuppressionGuard.request(EasyPlaceUpdateSuppressionGuard.Family.RAIL);
-            EasyPlaceUpdateSuppressionGuard.requestRailNeighborMatches(
+            EasyPlaceUpdateSuppressionGuard.requestRailProtection(
+                    placementContext.getLevel(),
+                    placementContext.getClickedPos(),
                     railNeighborMatchMask
             );
         }
@@ -286,41 +288,37 @@ public abstract class BlockItemMixin {
                 || !EasyPlaceExtraServer.isSupported(player)) {
             return null;
         }
+
+        // The packet hit result is the only place where the raw X field still has its original
+        // anchor. BlockPlaceContext.getClickedPos() may be shifted by the hit face and
+        // BlockPlaceContext.at(...) may rebuild the click location entirely, so prefer the
+        // packet snapshot whenever one exists.
+        EasyPlacePacketRequest.Snapshot packetRequest = EasyPlacePacketRequest.current();
+        if(packetRequest != null) {
+            return packetRequest.toPlacementSnapshot();
+        }
+
+        // Fallback for paths that do not pass through handleUseItemOn.
         int protocolValue = EasyPlaceExtraProtocol.decode(
                 context.getClickLocation(),
                 context.getClickedPos()
         );
         if(!EasyPlaceExtraProtocol.isExtra(protocolValue)) return null;
-
-        EasyPlacePacketRequest.Snapshot packetRequest = EasyPlacePacketRequest.current();
-        int rawValue;
-        int alternateRawValue = -1;
-        if(packetRequest == null) {
-            rawValue = EasyPlaceExtraProtocol.toRawValue(protocolValue);
-        } else {
-            rawValue = packetRequest.rawValue();
-            alternateRawValue = packetRequest.alternateRawValue();
-        }
-        int yPrecision;
-        if(packetRequest != null) {
-            yPrecision = packetRequest.yPrecisionValue();
-        } else {
-            int packedY = EasyPlaceExtraProtocol.decodeY(
-                    context.getClickLocation(),
-                    context.getClickedPos()
-            );
-            yPrecision = packedY < 0
-                    ? -1
-                    : packedY & EasyPlaceExtraProtocol.Y_PRECISION_MASK;
-        }
+        int packedY = EasyPlaceExtraProtocol.decodeY(
+                context.getClickLocation(),
+                context.getClickedPos()
+        );
         return new EasyPlacePlacementRequest.Snapshot(
-                rawValue,
-                alternateRawValue,
-                EasyPlaceExtraProtocol.decodeZ(
-                        context.getClickLocation(),
-                        context.getClickedPos()
+                EasyPlaceExtraProtocol.toRawValue(protocolValue),
+                -1,
+                EasyPlaceExtraProtocol.stripAuxiliarySchema(
+                        EasyPlaceExtraProtocol.decodeAuxiliary(
+                                context.getClickLocation()
+                        )
                 ),
-                yPrecision
+                packedY < 0
+                        ? -1
+                        : packedY & EasyPlaceExtraProtocol.Y_PRECISION_MASK
         );
     }
 }

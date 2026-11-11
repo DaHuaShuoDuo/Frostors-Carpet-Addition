@@ -209,12 +209,27 @@ Carpet 会把枚举候选显示为小写，并在解析输入时先转为大写�
   `getPlacementState`、`canPlace`、`setBlock`、`onPlace` 或后续放置逻辑抛出时，
   guard scope 与 item-stack 临时组件仍必须成对清理。
 - 辅助 Z 通道的 bit9 和 bit10 分别表示本次放置请求 `RAIL`、`WALL` 邻域保护，bit11-16
-  表示六个方向中哪些相邻墙与投影预期一致，bit19-24 表示哪些相邻铁轨与投影预期一致，
-  bit25 表示目标铁轨红石状态保护请求；低 9 位继续留给 crafter slot mask。FCA
-  只能按客户端显式标志 request family；guard 的空间
-  范围由 family 定义：`RAIL` 覆盖实际放置位置、四个水平邻居和上方邻居，不包括下方；
-  `WALL` 和 `RAIL` 始终保护本次放置位置，邻居位置只在对应 match bit 存在时保护。
-  不得退化为整个 placement 调用内的全局方块族抑制，也不得扩展到斜角或两格以外位置。
+  表示六个方向中哪些相邻墙与投影预期一致，bit17-21 表示五个方向中哪些相邻铁轨与投影
+  预期一致，bit22 请求 observer 保护，bit23 请求 TNT 保护；低 9 位继续留给 crafter
+  slot mask，bit24 是 `AUXILIARY_SCHEMA` 标记，bit25 空闲，bit26-27 是墙的 auxiliary
+  schema / `UP`。FCA 只能按客户端显式标志 request family；guard 的空间范围由 family
+  定义：`RAIL` 覆盖实际放置位置、四个水平邻居和上方邻居，不包括下方；`WALL` 和 `RAIL`
+  始终保护本次放置位置，邻居位置只在对应 match bit 存在时保护。不得退化为整个 placement
+  调用内的全局方块族抑制，也不得扩展到斜角或两格以外位置。
+- X raw、Z auxiliary 和 Y 精度必须在 `handleUseItemOn` 拿到未修改的
+  `BlockHitResult` 时一次性解码并存入 packet 级快照，随后与 `BlockItem.place` 生命周期
+  关联。禁止从 `BlockPlaceContext.getClickLocation()` / `getClickedPos()` 重新解释：前者
+  可能被 `BlockPlaceContext.at(...)` 用方块中心重建，后者相对 packet `blockPos` 按命中面
+  偏移一格，按朝向不同会丢失 marker、bit9 或邻轨 mask。
+- Z auxiliary 使用**固定原点**（`z = auxiliary * 2 + 2`，与世界 Z=0 对齐），不得以任何
+  `BlockPos` 的 Z 分量作为编码/解码锚点；TriWasa 的主路径、legacy `WorldUtils` 路径与
+  printer 适配传入的 `BlockPos` 语义不同，相对锚点会让辅助字段随命中面错一位。
+  `AUXILIARY_SCHEMA`（bit24）是唯一合法的"Z 已编码"判据，服务端解出后必须剥离该位，
+  缺少该位一律视为无 auxiliary（-1），不得回退到 `decodeZ >= 0` 之类的猜测。
+  Y 只承载 8-bit 命中高度，不得把 raw 复用进 Y。packet 快照是单包单线程的局部变量，
+  不得改回跨包 context id、pending 队列或按目标位置关联的 ContextStore。
+  该 Z 通道契约要求 FCA 与 TriWasa 同版本号配套，混用版本时铁轨/墙/observer/TNT 保护
+  位都会被静默丢弃。
 - 相邻墙与投影预期的比较必须忽略 `WATERLOGGED`；其余方块种类、四侧 `WallSide` 和
   `UP` 任一不符，都必须清除该方向的 wall neighbor match bit。竖向连续墙中的不符墙
   因此不得因相邻的 Easy Place 墙而获得冻结保护。
@@ -222,20 +237,24 @@ Carpet 会把枚举候选显示为小写，并在解析输入时先转为大写�
   `POWERED=false`。已有 observer 的检测面被 Easy Place 时，仅在变化方向等于
   `ObserverBlock.FACING` 且位置处于 `OBSERVER` 邻域内，于 `updateShape` 的 `HEAD`
   返回原状态以阻止排程；不得全局禁用 observer 更新，也不能改用 `RETURN` 抑制。
-- 辅助 Z 通道 bit17 表示 TriWasa `easyPlaceObserverProtection` 请求 observer 保护。
-  FCA 只能在 bit17 存在时 request `OBSERVER`；关闭开关时 TriWasa 不得发送 observer
+- 辅助 Z 通道 bit22 表示 TriWasa `easyPlaceObserverProtection` 请求 observer 保护。
+  FCA 只能在 bit22 存在时 request `OBSERVER`；关闭开关时 TriWasa 不得发送 observer
   投影状态或该标志，必须回到原版 observer 放置与检测面更新语义。
-- 辅助 Z 通道 bit18 表示 TriWasa `easyPlaceTntProtection` 请求 TNT 保护。FCA 只能在
-  bit18 存在时 request `TNT`，并在 `TntBlock.onPlace` 与 `TntBlock.neighborChanged`
+- 辅助 Z 通道 bit23 表示 TriWasa `easyPlaceTntProtection` 请求 TNT 保护。FCA 只能在
+  bit23 存在时 request `TNT`，并在 `TntBlock.onPlace` 与 `TntBlock.neighborChanged`
   的 `HEAD` 取消红石点燃路径；不得拦截 `prime(...)` 本体的手动点火、投射物或爆炸引燃。
 - 铁轨 raw 通道 bit4 表示投影中的 `POWERED`，由 TriWasa 的统一
-  `easyPlaceRailProtection` 控制；Z 通道 bit25 请求目标位置状态保护。FCA 的 `RAIL`
-  family 负责形状/PP 更新和邻轨 match mask，`RAIL_STATE` family 只覆盖实际放置位置。
-  `PoweredRailBlock.updateState` 与 `DetectorRailBlock.checkPressed` 在 `RAIL_STATE`
-  覆盖时取消，分别保护 `PoweredRailBlock` 与探测铁轨的初始激活状态。26.x 中动力铁轨
-  和激活铁轨都是 `PoweredRailBlock` 的不同方块实例，因此同一 Mixin、`instanceof`
-  判断和 `POWERED` 编解码必须同时覆盖二者；没有独立 `ActivatorRailBlock`。普通铁轨
-  没有红石状态。关闭统一开关时不得发送 bit9、bit25、rail match mask 或 bit4。
+  `easyPlaceRailProtection` 控制；另外 raw bit3（动力/激活/探测铁轨）或 bit4（普通
+  铁轨）作为无法发送 Z 字段时的保护兜底标志。Z 通道 bit9 请求统一铁轨保护，bit17-21
+  是邻轨 match mask，顺序固定为 `NORTH,SOUTH,WEST,EAST,UP`。FCA 只有 `RAIL` family，
+  负责形状/PP 更新、邻轨 match mask 和放置位置状态；`RAIL_STATE` family 已移除。
+  `PoweredRailBlock.updateState`、`DetectorRailBlock.checkPressed` 与
+  `RailState.place` 都在 `RAIL` 覆盖时取消。探测铁轨放置后会排程 `checkPressed` tick，
+  该延迟更新由放置位置上短时效、按邻轨 mask 约束且线程安全的抑制窗口覆盖，不允许退化
+  为无限期或按玩家关联的 context 存储。26.x 中动力铁轨和激活铁轨都是
+  `PoweredRailBlock` 的不同方块实例，因此同一 Mixin、`instanceof` 判断和 `POWERED`
+  编解码必须同时覆盖二者；没有独立 `ActivatorRailBlock`。普通铁轨没有红石状态。
+  关闭统一开关时不得发送 bit9、邻轨 match mask、raw 兜底标志或 bit4。
 - TNT 保护请求必须在 `BlockItem.place` 的公共路径中、`getPlacementState` 调用前完成，
   不能依赖目标 state 或普通 `BlockItem` 专用 Mixin。`StandingAndWallBlockItem` 及其
   珊瑚扇、墙挂/站立两用物品同样必须启用该次 TNT 邻域保护。

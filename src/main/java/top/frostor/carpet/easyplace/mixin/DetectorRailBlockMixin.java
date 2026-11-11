@@ -24,7 +24,6 @@ public abstract class DetectorRailBlockMixin {
             CallbackInfo ci
     ) {
         if(EasyPlaceUpdateSuppressionGuard.shouldSuppressRail(level, pos)) {
-            EasyPlaceUpdateSuppressionGuard.retainRailProtection(level, pos);
             ci.cancel();
         }
     }

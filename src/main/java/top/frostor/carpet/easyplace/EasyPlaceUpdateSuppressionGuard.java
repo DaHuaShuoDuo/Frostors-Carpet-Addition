@@ -9,9 +9,9 @@ import net.minecraft.world.level.block.state.BlockState;
 import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.EnumSet;
-import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiPredicate;
 import java.util.function.Predicate;
 
@@ -50,6 +50,15 @@ public final class EasyPlaceUpdateSuppressionGuard {
         }
     }
 
+    /**
+     * Detector rails schedule a {@code checkPressed} tick after placement; that tick runs after
+     * the ThreadLocal placement scope has ended. A short position-scoped window covers it. This is
+     * a suppression window, not a placement context: no packet correlation, no context id and no
+     * per-player pending queue.
+     */
+    private static final long RAIL_DEFERRED_TICKS = 2L;
+    private static final Map<ResourceKey<Level>, Map<BlockPos, RailWindow>> RAIL_WINDOWS =
+            new ConcurrentHashMap<>();
     private static final ThreadLocal<Integer> PLACE_DEPTH = ThreadLocal.withInitial(() -> 0);
     private static final ThreadLocal<Deque<PlacementScope>> PLACEMENT_SCOPES =
             ThreadLocal.withInitial(ArrayDeque::new);
@@ -60,8 +69,6 @@ public final class EasyPlaceUpdateSuppressionGuard {
             Direction.EAST,
             Direction.UP
     };
-    private static final Map<ResourceKey<Level>, Map<BlockPos, Long>> RAIL_GRACE =
-            new HashMap<>();
 
     private EasyPlaceUpdateSuppressionGuard() {
     }
@@ -113,6 +120,41 @@ public final class EasyPlaceUpdateSuppressionGuard {
         PLACEMENT_SCOPES.get().peek().railNeighborMatchMask = railNeighborMatchMask & 0x1f;
     }
 
+    /**
+     * Arms the RAIL family for the current placement and registers a short deferred window at the
+     * placement position. Both the synchronous scope and the deferred window use the same
+     * neighbour match mask, so neighbours are never protected unconditionally.
+     */
+    public static void requestRailProtection(Level level, BlockPos placementPos, int mask) {
+        int neighbourMask = mask & 0x1f;
+        if(PLACE_DEPTH.get() > 0) {
+            PlacementScope scope = PLACEMENT_SCOPES.get().peek();
+            scope.suppressedFamilies.add(Family.RAIL);
+            scope.railNeighborMatchMask = neighbourMask;
+        }
+        if(level == null || level.isClientSide()) {
+            return;
+        }
+        armRailWindow(level.dimension(), level.getGameTime(), placementPos, neighbourMask);
+    }
+
+    static void armRailWindow(
+            ResourceKey<Level> dimension,
+            long gameTime,
+            BlockPos placementPos,
+            int mask
+    ) {
+        Map<BlockPos, RailWindow> windows = RAIL_WINDOWS.computeIfAbsent(
+                dimension,
+                ignored -> new ConcurrentHashMap<>()
+        );
+        windows.entrySet().removeIf(entry -> entry.getValue().expiresAt() < gameTime);
+        windows.put(
+                placementPos.immutable(),
+                new RailWindow(gameTime + RAIL_DEFERRED_TICKS, mask & 0x1f)
+        );
+    }
+
     public static boolean shouldSuppress(Family family, BlockPos pos) {
         if(PLACE_DEPTH.get() <= 0) {
             return false;
@@ -136,26 +178,34 @@ public final class EasyPlaceUpdateSuppressionGuard {
         if(shouldSuppress(Family.RAIL, pos)) {
             return true;
         }
-        Map<BlockPos, Long> positions = RAIL_GRACE.get(level.dimension());
-        Long expiresAt = positions == null ? null : positions.get(pos);
-        return expiresAt != null && level.getGameTime() <= expiresAt;
+        return level != null
+                && !level.isClientSide()
+                && hasRailWindow(level.dimension(), level.getGameTime(), pos);
     }
 
-    public static void retainRailProtection(Level level, BlockPos pos) {
-        if(level.isClientSide()) {
-            return;
+    static boolean hasRailWindow(ResourceKey<Level> dimension, long gameTime, BlockPos pos) {
+        Map<BlockPos, RailWindow> windows = RAIL_WINDOWS.get(dimension);
+        if(windows == null || windows.isEmpty()) {
+            return false;
         }
-        long gameTime = level.getGameTime();
-        Map<BlockPos, Long> positions = RAIL_GRACE.computeIfAbsent(
-                level.dimension(),
-                ignored -> new HashMap<>()
-        );
-        positions.entrySet().removeIf(entry -> entry.getValue() < gameTime);
-        positions.put(pos, gameTime);
+        for(Map.Entry<BlockPos, RailWindow> entry : windows.entrySet()) {
+            RailWindow window = entry.getValue();
+            if(window.expiresAt() < gameTime) {
+                continue;
+            }
+            if(coversRailNeighbors(entry.getKey(), window.neighborMask(), pos)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public static void clearRailProtection() {
-        RAIL_GRACE.clear();
+        RAIL_WINDOWS.clear();
+    }
+
+    static void clearRailProtection(ResourceKey<Level> dimension) {
+        RAIL_WINDOWS.remove(dimension);
     }
 
     public static String railDiagnostic(BlockPos pos) {
@@ -242,16 +292,23 @@ public final class EasyPlaceUpdateSuppressionGuard {
     }
 
     private static boolean coversRailNeighbors(PlacementScope scope, BlockPos pos) {
-        if(pos.equals(scope.placementPos)) {
+        return coversRailNeighbors(scope.placementPos, scope.railNeighborMatchMask, pos);
+    }
+
+    private static boolean coversRailNeighbors(BlockPos placementPos, int mask, BlockPos pos) {
+        if(pos.equals(placementPos)) {
             return true;
         }
         for(int index = 0; index < RAIL_DIRECTIONS.length; index++) {
             Direction direction = RAIL_DIRECTIONS[index];
-            if(pos.equals(scope.placementPos.relative(direction))) {
-                return (scope.railNeighborMatchMask & (1 << index)) != 0;
+            if(pos.equals(placementPos.relative(direction))) {
+                return (mask & (1 << index)) != 0;
             }
         }
         return false;
+    }
+
+    private record RailWindow(long expiresAt, int neighborMask) {
     }
 
     private static final class PlacementScope {

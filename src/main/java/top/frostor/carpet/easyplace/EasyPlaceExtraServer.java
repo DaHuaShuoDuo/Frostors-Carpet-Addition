@@ -76,7 +76,10 @@ public final class EasyPlaceExtraServer {
     public static void onRuleChanged(MinecraftServer server, boolean enabled) {
         if(server == null) return;
         broadcastCapability(server, enabled);
-        if(!enabled) SUPPORTED_PLAYERS.clear();
+        if(!enabled) {
+            SUPPORTED_PLAYERS.clear();
+            EasyPlaceUpdateSuppressionGuard.clearRailProtection();
+        }
     }
 
     public static boolean isSupported(ServerPlayer player) {

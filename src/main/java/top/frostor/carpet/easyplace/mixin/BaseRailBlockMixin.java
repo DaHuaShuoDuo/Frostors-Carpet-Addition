@@ -25,8 +25,8 @@ public abstract class BaseRailBlockMixin {
             boolean movedByPiston,
             CallbackInfo ci
     ) {
-        boolean suppress = shouldSuppress(level, pos);
-        top.frostor.carpet.FrostorsCarpetAddition.LOGGER.info(
+        boolean suppress = EasyPlaceUpdateSuppressionGuard.shouldSuppressRail(level, pos);
+        top.frostor.carpet.FrostorsCarpetAddition.LOGGER.debug(
                 "[EasyPlace-Rail] neighborChanged pos={} neighbor={} piston={} suppress={} guard={}",
                 pos,
                 neighborBlock,
@@ -82,10 +82,6 @@ public abstract class BaseRailBlockMixin {
     }
 
     private static boolean shouldSuppress(Level level, BlockPos pos) {
-        boolean suppress = EasyPlaceUpdateSuppressionGuard.shouldSuppressRail(level, pos);
-        if(suppress) {
-            EasyPlaceUpdateSuppressionGuard.retainRailProtection(level, pos);
-        }
-        return suppress;
+        return EasyPlaceUpdateSuppressionGuard.shouldSuppressRail(level, pos);
     }
 }
