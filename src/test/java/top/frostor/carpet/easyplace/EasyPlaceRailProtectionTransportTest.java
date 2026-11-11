@@ -37,6 +37,7 @@ public final class EasyPlaceRailProtectionTransportTest extends EasyPlaceTestSup
         test.checkAuxiliaryIsPositionIndependent();
         test.checkAuxiliarySchemaValidation();
         test.checkAlternateAnchorFallback();
+        test.checkVersionIndependentWireAnchors();
         test.checkRailProtectionDecision();
         test.checkRailDeferredWindow();
         test.checkYChannelCarriesNoRaw();
@@ -185,6 +186,49 @@ public final class EasyPlaceRailProtectionTransportTest extends EasyPlaceTestSup
                         && snapshot.auxiliaryValue() == AUXILIARY_VALUE,
                 "resolved values must follow the recognised anchor"
         );
+    }
+
+    /**
+     * Minecraft 26.2 uses Litematica 0.28.6 and a plain ServerboundUseItemOnPacket, while 26.3
+     * uses Litematica 0.29.1 and a record packet whose BlockHitResult codec stores the location
+     * as a float offset from blockPos. Both must decode identically; an offset X anchor (bell
+     * placement plans, printer adapters) may not change the decoded values.
+     */
+    private void checkVersionIndependentWireAnchors() {
+        int extraValue = EasyPlaceExtraProtocol.toExtraValue(RAW_VALUE);
+        BlockPos offsetAnchor = BLOCK_POS.relative(Direction.WEST);
+        Vec3 shifted = new Vec3(
+                offsetAnchor.getX() + (extraValue << 1) + 2.0,
+                BLOCK_POS.getY() + 2.0 + Y_PRECISION_VALUE * 2.0,
+                (ENCODED_AUXILIARY_VALUE << 1) + 2.0
+        );
+
+        for(Direction face : Direction.values()) {
+            EasyPlacePacketRequest.Snapshot snapshot =
+                    EasyPlacePacketRequest.decode(shifted, BLOCK_POS, face);
+            check(snapshot != null, "an offset X anchor must still be a V2-Extra packet (" + face + ")");
+            check(
+                    snapshot.auxiliaryValue() == AUXILIARY_VALUE,
+                    "Z auxiliary must not depend on the X anchor (" + face + ")"
+            );
+            EasyPlacePlacementRequest.Snapshot placement = snapshot.toPlacementSnapshot();
+            check(
+                    placement != null && placement.rawValue() == RAW_VALUE,
+                    "the X candidate search must recover the raw value (" + face + ")"
+            );
+        }
+
+        Vec3 plainClick = new Vec3(
+                BLOCK_POS.getX() + 0.5,
+                BLOCK_POS.getY() + 0.5,
+                BLOCK_POS.getZ() + 0.5
+        );
+        for(Direction face : Direction.values()) {
+            check(
+                    EasyPlacePacketRequest.decode(plainClick, BLOCK_POS, face) == null,
+                    "a plain click must not become a V2-Extra packet (" + face + ")"
+            );
+        }
     }
 
     private void checkRailProtectionDecision() {

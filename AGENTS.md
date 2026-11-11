@@ -230,6 +230,12 @@ Carpet 会把枚举候选显示为小写，并在解析输入时先转为大写�
   不得改回跨包 context id、pending 队列或按目标位置关联的 ContextStore。
   该 Z 通道契约要求 FCA 与 TriWasa 同版本号配套，混用版本时铁轨/墙/observer/TNT 保护
   位都会被静默丢弃。
+- 26.2/26.3 放置语义必须统一：两版分别依赖 Litematica 0.28.6 / 0.29.1，且 26.3 的
+  `ServerboundUseItemOnPacket` 是 record，命中位置以相对 `blockPos` 的 float 传输。wire 的
+  X/Y 编码锚点只能是 packet `BlockHitResult.blockPos`；`resolveProtocolTarget` 一类的
+  `protocolPos` 仅用于读投影/世界状态，禁止进入 `encodeX`/`encodeY`。服务端以 Z 的
+  `AUXILIARY_SCHEMA` 位识别 V2-Extra 包，并在 X 主锚点无 marker 时按命中面及 X 轴
+  相邻锚点兜底，不得按 Minecraft 版本分叉实现。
 - 相邻墙与投影预期的比较必须忽略 `WATERLOGGED`；其余方块种类、四侧 `WallSide` 和
   `UP` 任一不符，都必须清除该方向的 wall neighbor match bit。竖向连续墙中的不符墙
   因此不得因相邻的 Easy Place 墙而获得冻结保护。

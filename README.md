@@ -122,7 +122,7 @@ crafter slot mask，bit9/bit10 分别表示 rail/wall 更新保护请求，bit11
 表示 TNT 保护请求，bit24 是 `AUXILIARY_SCHEMA` 标记，bit25 空闲。
 同一握手新增 `easy_place_y_precision` capability 和 `y_precision_bits=8`。支持该
 能力的客户端把命中高度相对方块底部的 8-bit 定点值放入 Y；Y 通道只承载该精度值，
-不复用 raw。X raw 与 Y 精度按客户端的协议目标坐标编码；Z auxiliary 改为**固定原点**
+不复用 raw。X raw 与 Y 精度一律按 packet `BlockHitResult.blockPos` 编码；Z auxiliary 改为**固定原点**
 （世界 Z=0，`z = auxiliary * 2 + 2`），与点击位置、命中面和放置目标完全无关，客户端
 所有编码路径（Litematica 主路径、legacy `WorldUtils`、printer 适配）因此不再需要约定
 同一个 `BlockPos`。Z 的 bit24 是 `AUXILIARY_SCHEMA` 标记，服务端只接受带该标记的 Z 值，
@@ -134,6 +134,13 @@ FCA 在 `handleUseItemOn` 收到未修改的命中结果时保存整份 packet �
 位置，从转换后的上下文反解会随朝向丢失 marker、bit9 或邻轨 mask。该快照仅存在于单个
 数据包的处理线程内，不使用跨包 context 架构。Z 通道的这一变更要求 FCA 与 TriWasa
 同版本号配套使用。
+26.2/26.3 放置语义统一：两版依赖的 Litematica 不同（0.28.6 / 0.29.1），且 26.3 把
+`ServerboundUseItemOnPacket` 改为 record，命中位置经 `BlockHitResult.STREAM_CODEC` 以
+**相对 `blockPos` 的 float** 传输。为屏蔽这些差异，wire 的 X/Y 锚点固定为 packet
+`blockPos`；`BellRules.resolveProtocolTarget` 等解析出的 `protocolPos` 只用于读取投影与
+当前世界状态，不得传给 `encodeX`/`encodeY`。服务端以 Z 的 `AUXILIARY_SCHEMA` 位为主判据，
+X 主锚点失配时再按命中面及 X 轴相邻锚点兜底。两版因此走同一套解码路径，侧挂钟等
+`facing` 落在 X 轴的目标不会再因锚点偏移丢失 V2-Extra marker。
 多面方块的面索引顺序固定为 `DOWN, UP, NORTH, SOUTH, WEST, EAST`，藤蔓从同一顺序
 过滤 `DOWN` 得到 `UP, NORTH, SOUTH, WEST, EAST`。使用历史面顺序构建的客户端或
 服务端必须升级到匹配版本，混用版本时多面方块和藤蔓可能按错误方向解码。旧 `main`

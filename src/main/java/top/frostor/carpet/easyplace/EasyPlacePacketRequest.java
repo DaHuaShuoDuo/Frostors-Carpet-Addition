@@ -17,6 +17,7 @@ import org.jetbrains.annotations.Nullable;
  * pending queue.</p>
  */
 public final class EasyPlacePacketRequest {
+    private static final Direction[] X_ANCHOR_CANDIDATES = {Direction.EAST, Direction.WEST};
     private static final ThreadLocal<Snapshot> REQUEST = new ThreadLocal<>();
 
     private EasyPlacePacketRequest() {
@@ -39,27 +40,53 @@ public final class EasyPlacePacketRequest {
      *
      * @return {@code null} when the packet does not carry the V2-Extra marker
      */
+    /**
+     * Decodes all V2-Extra wire fields from the packet hit result.
+     *
+     * <p>The wire contract is anchored at {@code blockPos} on both sides, so this is identical
+     * for Minecraft 26.2 and 26.3 even though 26.3 turns {@code ServerboundUseItemOnPacket}
+     * into a record and uses the generic {@code BlockHitResult.STREAM_CODEC}. The Z schema bit
+     * is the authoritative "this is a V2-Extra packet" marker; X candidates are kept as a
+     * fallback for client paths (printer adapters, bell placement plans in some Litematica
+     * versions) that resolve the X anchor one block away from the packet position.</p>
+     *
+     * @return {@code null} when the packet carries neither the Z schema nor an X marker
+     */
     public static @Nullable Snapshot decode(Vec3 location, BlockPos blockPos, Direction face) {
-        int protocolValue = EasyPlaceExtraProtocol.decode(location, blockPos);
-        BlockPos alternatePos = blockPos.relative(face);
-        int alternateProtocolValue = EasyPlaceExtraProtocol.decode(location, alternatePos);
-
-        boolean primaryExtra = EasyPlaceExtraProtocol.isExtra(protocolValue);
-        boolean alternateExtra = EasyPlaceExtraProtocol.isExtra(alternateProtocolValue);
-        if(!primaryExtra && !alternateExtra) {
-            return null;
-        }
-
-        // Z uses a fixed origin on both sides, so the hit face and the placement target cannot
-        // shift its bit layout. The schema bit distinguishes a real auxiliary field from an
-        // unencoded click location.
         int auxiliaryValue = EasyPlaceExtraProtocol.stripAuxiliarySchema(
                 EasyPlaceExtraProtocol.decodeAuxiliary(location)
         );
+        boolean schemaPresent = auxiliaryValue >= 0;
+
+        int primaryValue = EasyPlaceExtraProtocol.decode(location, blockPos);
+        int primaryRaw = EasyPlaceExtraProtocol.isExtra(primaryValue)
+                ? EasyPlaceExtraProtocol.toRawValue(primaryValue)
+                : -1;
+
+        int faceValue = EasyPlaceExtraProtocol.decode(location, blockPos.relative(face));
+        int alternateRaw = EasyPlaceExtraProtocol.isExtra(faceValue)
+                ? EasyPlaceExtraProtocol.toRawValue(faceValue)
+                : -1;
+        if(alternateRaw < 0) {
+            for(Direction direction : X_ANCHOR_CANDIDATES) {
+                int candidate = EasyPlaceExtraProtocol.decode(
+                        location,
+                        blockPos.relative(direction)
+                );
+                if(EasyPlaceExtraProtocol.isExtra(candidate)) {
+                    alternateRaw = EasyPlaceExtraProtocol.toRawValue(candidate);
+                    break;
+                }
+            }
+        }
+        if(!schemaPresent && primaryRaw < 0 && alternateRaw < 0) {
+            return null;
+        }
+
         int packedY = EasyPlaceExtraProtocol.decodeY(location, blockPos);
         return new Snapshot(
-                primaryExtra ? EasyPlaceExtraProtocol.toRawValue(protocolValue) : -1,
-                alternateExtra ? EasyPlaceExtraProtocol.toRawValue(alternateProtocolValue) : -1,
+                primaryRaw,
+                alternateRaw,
                 auxiliaryValue,
                 packedY < 0 ? -1 : packedY & EasyPlaceExtraProtocol.Y_PRECISION_MASK
         );
