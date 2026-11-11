@@ -23,6 +23,10 @@ public final class EasyPlacePacketRequest {
         return REQUEST.get();
     }
 
-    public record Snapshot(int rawValue, int yPrecisionValue) {
+    public record Snapshot(
+            int rawValue,
+            int alternateRawValue,
+            int yPrecisionValue
+    ) {
     }
 }

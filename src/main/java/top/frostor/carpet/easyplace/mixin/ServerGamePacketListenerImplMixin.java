@@ -29,14 +29,32 @@ public abstract class ServerGamePacketListenerImplMixin {
     )
     private BlockHitResult easyPlace$capturePacketRequest(BlockHitResult hitResult) {
         if(FrostorSettings.easyPlaceProtocolExtra && EasyPlaceExtraServer.isSupported(player)) {
-            int payload = EasyPlaceExtraProtocol.decodeYPayload(
-                    hitResult.getLocation()
+            int protocolValue = EasyPlaceExtraProtocol.decode(
+                    hitResult.getLocation(),
+                    hitResult.getBlockPos()
             );
-            int rawValue = EasyPlaceExtraProtocol.rawValueFromYPayload(payload);
-            if(rawValue >= 0) {
+            net.minecraft.core.BlockPos alternatePos = hitResult.getBlockPos()
+                    .relative(hitResult.getDirection());
+            int alternateProtocolValue = EasyPlaceExtraProtocol.decode(
+                    hitResult.getLocation(),
+                    alternatePos
+            );
+            if(EasyPlaceExtraProtocol.isExtra(protocolValue)
+                    || EasyPlaceExtraProtocol.isExtra(alternateProtocolValue)) {
+                int packedY = EasyPlaceExtraProtocol.decodeY(
+                        hitResult.getLocation(),
+                        hitResult.getBlockPos()
+                );
                 EasyPlacePacketRequest.begin(new EasyPlacePacketRequest.Snapshot(
-                        rawValue,
-                        payload & EasyPlaceExtraProtocol.Y_PRECISION_MASK
+                        EasyPlaceExtraProtocol.isExtra(protocolValue)
+                                ? EasyPlaceExtraProtocol.toRawValue(protocolValue)
+                                : -1,
+                        EasyPlaceExtraProtocol.isExtra(alternateProtocolValue)
+                                ? EasyPlaceExtraProtocol.toRawValue(alternateProtocolValue)
+                                : -1,
+                        packedY < 0
+                                ? -1
+                                : packedY & EasyPlaceExtraProtocol.Y_PRECISION_MASK
                 ));
             }
         }

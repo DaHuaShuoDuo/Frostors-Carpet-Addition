@@ -16,11 +16,10 @@ public final class EasyPlaceExtraProtocol {
     public static final int WALL_UPDATE_SUPPRESSION = 1 << 10;
     public static final int WALL_NEIGHBOR_MATCH_BASE = 1 << 11;
     public static final int WALL_NEIGHBOR_MATCH_MASK = 0x3f << 11;
-    public static final int OBSERVER_UPDATE_SUPPRESSION = 1 << 17;
-    public static final int TNT_UPDATE_SUPPRESSION = 1 << 18;
-    public static final int RAIL_NEIGHBOR_MATCH_BASE = 1 << 19;
-    public static final int RAIL_NEIGHBOR_MATCH_MASK = 0x3f << 19;
-    public static final int RAIL_STATE_UPDATE_SUPPRESSION = 1 << 25;
+    public static final int RAIL_NEIGHBOR_MATCH_BASE = 1 << 17;
+    public static final int RAIL_NEIGHBOR_MATCH_MASK = 0x1f << 17;
+    public static final int OBSERVER_UPDATE_SUPPRESSION = 1 << 22;
+    public static final int TNT_UPDATE_SUPPRESSION = 1 << 23;
     public static final int WALL_AUXILIARY_SCHEMA = 1 << 26;
     public static final int WALL_UP = 1 << 27;
     public static final int RAIL_POWERED_MASK = 1 << 4;
@@ -29,9 +28,6 @@ public final class EasyPlaceExtraProtocol {
     public static final int Y_PRECISION_BITS = 8;
     public static final int Y_PRECISION_SCALE = 1 << Y_PRECISION_BITS;
     public static final int Y_PRECISION_MASK = Y_PRECISION_SCALE - 1;
-    public static final int Y_PAYLOAD_SCHEMA = 1 << 15;
-    public static final int Y_RAW_SHIFT = Y_PRECISION_BITS;
-    public static final int Y_RAW_MASK = 0x7f;
 
     private EasyPlaceExtraProtocol() {
     }
@@ -48,30 +44,13 @@ public final class EasyPlaceExtraProtocol {
         return decodeDimension(hitPos.y - clickedPos.getY());
     }
 
-    public static int decodeYPayload(Vec3 hitPos) {
-        if(hitPos.y < 2.0) return -1;
-        return ((int) hitPos.y - 2) >>> 1;
-    }
-
-    public static Vec3 encodeY(BlockPos pos, Vec3 hitVec, int rawValue) {
+    public static Vec3 encodeY(BlockPos pos, Vec3 hitVec) {
         int precisionValue = quantizeRelativeY(hitVec.y - pos.getY());
-        int payload = Y_PAYLOAD_SCHEMA
-                | ((rawValue & Y_RAW_MASK) << Y_RAW_SHIFT)
-                | precisionValue;
         return new Vec3(
                 hitVec.x,
-                2.0 + payload * 2.0,
+                pos.getY() + 2.0 + precisionValue * 2.0,
                 hitVec.z
         );
-    }
-
-    public static boolean isYPayload(int payload) {
-        return payload >= 0 && (payload & Y_PAYLOAD_SCHEMA) != 0;
-    }
-
-    public static int rawValueFromYPayload(int payload) {
-        if(!isYPayload(payload)) return -1;
-        return (payload >>> Y_RAW_SHIFT) & Y_RAW_MASK;
     }
 
     public static int quantizeRelativeY(double relativeHitY) {
@@ -133,11 +112,7 @@ public final class EasyPlaceExtraProtocol {
 
     public static int railNeighborMatchMask(int auxiliaryValue) {
         if(auxiliaryValue < 0) return 0;
-        return (auxiliaryValue & RAIL_NEIGHBOR_MATCH_MASK) >>> 19;
-    }
-
-    public static boolean requestsRailStateUpdateSuppression(int auxiliaryValue) {
-        return auxiliaryValue >= 0 && (auxiliaryValue & RAIL_STATE_UPDATE_SUPPRESSION) != 0;
+        return (auxiliaryValue & RAIL_NEIGHBOR_MATCH_MASK) >>> 17;
     }
 
     public static boolean requestsRailUpdateSuppression(

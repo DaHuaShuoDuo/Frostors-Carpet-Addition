@@ -102,8 +102,8 @@ TNT 在轻松放置时不会因放置位置已有红石信号而点燃，已有 
 等即时元件都使用同一导体判断；该保护只覆盖同步单级中继，不包含多级链或延迟 tick。
 投影中已激活的动力铁轨、激活铁轨和探测铁轨由 TriWasa 的统一
 `easyPlaceRailProtection` 子开关保护，默认开启。客户端通过 raw 通道 bit4 保存这三类
-铁轨的初始 `POWERED`，通过 bit9 请求铁轨形状保护，通过 bit25 请求目标位置的红石状态
-保护；邻轨匹配使用 Z 通道 bit19-24。FCA 的 `RAIL` family 负责形状/PP 更新，
+铁轨的初始 `POWERED`，通过 bit9 请求统一铁轨保护；邻轨匹配使用 Z 通道 bit17-21，
+顺序固定为 `NORTH,SOUTH,WEST,EAST,UP`。FCA 的 `RAIL` family 负责形状、PP 和
 `RAIL_STATE` family 只覆盖实际放置位置并保护带红石状态的铁轨。26.x 中动力铁轨和激活
 铁轨都是 `PoweredRailBlock` 的实例，探测铁轨使用独立的 `DetectorRailBlock`。邻轨
 match mask 只比较铁轨种类与形状，不比较红石状态；普通铁轨没有红石状态。
@@ -115,16 +115,15 @@ container、sign、redstone 和 special 等适配器，通用纯状态操作集�
 `EasyPlaceStateSupport`。旧的 `LegacyEasyPlaceStateSync` 单体映射和 fallback
 适配器已经移除。V2-Extra Payload 标记和协议版本仍为 1；辅助 Z 通道低 9 位继续用于
 crafter slot mask，bit9/bit10 分别表示 rail/wall 更新保护请求，bit11-16 标记匹配的
-相邻墙方向，bit17 表示 observer 保护请求，bit18 表示 TNT 保护请求，bit19-24 标记
-匹配的相邻铁轨方向，bit25 表示目标铁轨红石状态保护请求。
+相邻墙方向，bit17-21 标记匹配的相邻铁轨方向，bit22 表示 observer 保护请求，bit23
+表示 TNT 保护请求，bit24-25 空闲。
 同一握手新增 `easy_place_y_precision` capability 和 `y_precision_bits=8`。支持该
-能力的客户端在 Y 中使用 bit15 schema、bit8-14 raw、bit0-7 命中高度定点值；FCA 在
-服务端 `handleUseItemOn` 收到命中结果时先解出与目标位置无关的 raw 和近似命中高度，
-再执行触及校验、方块交互和放置。
+能力的客户端把命中高度相对方块底部的 8-bit 定点值放入 Y。X raw 的服务端解码锚点
+固定为 packet `BlockHitResult.blockPos`，与客户端编码目标一致；FCA 在
+`handleUseItemOn` 收到命中结果时保存 raw/Y 快照，再执行后续目标转换和放置。
 不支持该能力的旧客户端继续发送原始 Y，新旧组合保持原有路径。
 服务端把 packet 级 raw/Y 快照与 `BlockItem.place` 生命周期关联；挂墙方块等后续目标
-变换只使用该快照，不从改变后的目标坐标重新解释 X raw。X raw 继续作为不支持 Y payload
-的旧客户端回退。
+变换只使用该快照，不从改变后的目标坐标重新解释 X raw。
 多面方块的面索引顺序固定为 `DOWN, UP, NORTH, SOUTH, WEST, EAST`，藤蔓从同一顺序
 过滤 `DOWN` 得到 `UP, NORTH, SOUTH, WEST, EAST`。使用历史面顺序构建的客户端或
 服务端必须升级到匹配版本，混用版本时多面方块和藤蔓可能按错误方向解码。旧 `main`

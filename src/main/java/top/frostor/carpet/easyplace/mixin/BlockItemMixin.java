@@ -190,6 +190,15 @@ public abstract class BlockItemMixin {
         ));
         boolean preserveWall = EasyPlaceExtraProtocol.requestsWallUpdateSuppression(auxiliaryValue);
         if(rail && preserveRail) {
+            top.frostor.carpet.FrostorsCarpetAddition.LOGGER.info(
+                    "[EasyPlace-Rail] request target={} raw=0x{} auxiliary=0x{} neighborMask=0x{}",
+                    context.getClickedPos(),
+                    Integer.toHexString(rawValue),
+                    Integer.toHexString(auxiliaryValue),
+                    Integer.toHexString(
+                            EasyPlaceExtraProtocol.railNeighborMatchMask(auxiliaryValue)
+                    )
+            );
             EasyPlaceUpdateSuppressionGuard.request(EasyPlaceUpdateSuppressionGuard.Family.RAIL);
             EasyPlaceUpdateSuppressionGuard.requestRailNeighborMatches(
                     EasyPlaceExtraProtocol.railNeighborMatchMask(auxiliaryValue)
@@ -236,11 +245,23 @@ public abstract class BlockItemMixin {
         }
 
         int auxiliaryValue = request.auxiliaryValue();
+        int railNeighborMatchMask =
+                EasyPlaceExtraProtocol.railNeighborMatchMask(auxiliaryValue);
+        boolean preserveRail =
+                EasyPlaceExtraProtocol.requestsRailUpdateSuppression(auxiliaryValue)
+                        || railNeighborMatchMask != 0;
+        top.frostor.carpet.FrostorsCarpetAddition.LOGGER.info(
+                "[EasyPlace-Rail] universal target={} auxiliary=0x{} request={} mask=0x{}",
+                placementContext.getClickedPos(),
+                Integer.toHexString(auxiliaryValue),
+                preserveRail,
+                Integer.toHexString(railNeighborMatchMask)
+        );
         EasyPlaceUpdateSuppressionGuard.updatePlacementPosition(placementContext.getClickedPos());
-        if(EasyPlaceExtraProtocol.requestsRailUpdateSuppression(auxiliaryValue)) {
+        if(preserveRail) {
             EasyPlaceUpdateSuppressionGuard.request(EasyPlaceUpdateSuppressionGuard.Family.RAIL);
             EasyPlaceUpdateSuppressionGuard.requestRailNeighborMatches(
-                    EasyPlaceExtraProtocol.railNeighborMatchMask(auxiliaryValue)
+                    railNeighborMatchMask
             );
         }
         if(EasyPlaceExtraProtocol.requestsWallUpdateSuppression(auxiliaryValue)) {
@@ -254,11 +275,6 @@ public abstract class BlockItemMixin {
         }
         if(EasyPlaceExtraProtocol.requestsTntUpdateSuppression(auxiliaryValue)) {
             EasyPlaceUpdateSuppressionGuard.request(EasyPlaceUpdateSuppressionGuard.Family.TNT);
-        }
-        if(EasyPlaceExtraProtocol.requestsRailStateUpdateSuppression(auxiliaryValue)) {
-            EasyPlaceUpdateSuppressionGuard.request(
-                    EasyPlaceUpdateSuppressionGuard.Family.RAIL_STATE
-            );
         }
     }
 
@@ -277,9 +293,14 @@ public abstract class BlockItemMixin {
         if(!EasyPlaceExtraProtocol.isExtra(protocolValue)) return null;
 
         EasyPlacePacketRequest.Snapshot packetRequest = EasyPlacePacketRequest.current();
-        int rawValue = packetRequest == null
-                ? EasyPlaceExtraProtocol.toRawValue(protocolValue)
-                : packetRequest.rawValue();
+        int rawValue;
+        int alternateRawValue = -1;
+        if(packetRequest == null) {
+            rawValue = EasyPlaceExtraProtocol.toRawValue(protocolValue);
+        } else {
+            rawValue = packetRequest.rawValue();
+            alternateRawValue = packetRequest.alternateRawValue();
+        }
         int yPrecision;
         if(packetRequest != null) {
             yPrecision = packetRequest.yPrecisionValue();
@@ -294,6 +315,7 @@ public abstract class BlockItemMixin {
         }
         return new EasyPlacePlacementRequest.Snapshot(
                 rawValue,
+                alternateRawValue,
                 EasyPlaceExtraProtocol.decodeZ(
                         context.getClickLocation(),
                         context.getClickedPos()

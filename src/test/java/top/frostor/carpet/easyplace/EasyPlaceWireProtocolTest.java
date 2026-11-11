@@ -72,16 +72,16 @@ public final class EasyPlaceWireProtocolTest extends EasyPlaceTestSupport {
                         && !EasyPlaceExtraProtocol.requestsTntUpdateSuppression(-1),
                 "TNT suppression must require an explicit positive auxiliary flag"
         );
-        int railNeighborMask = (1 << Direction.UP.ordinal())
-                | (1 << Direction.NORTH.ordinal());
+        int railNeighborMask = 0b1_0001;
         int railAuxiliary = EasyPlaceExtraProtocol.RAIL_UPDATE_SUPPRESSION
-                | EasyPlaceExtraProtocol.RAIL_STATE_UPDATE_SUPPRESSION
-                | (railNeighborMask << 19);
+                | (railNeighborMask
+                << Integer.numberOfTrailingZeros(
+                EasyPlaceExtraProtocol.RAIL_NEIGHBOR_MATCH_BASE
+        ));
         test.check(
                 EasyPlaceExtraProtocol.railNeighborMatchMask(railAuxiliary) == railNeighborMask
-                        && EasyPlaceExtraProtocol.requestsRailStateUpdateSuppression(railAuxiliary)
                         && EasyPlaceExtraProtocol.railNeighborMatchMask(-1) == 0,
-                "rail neighbor and state protection bits must survive the auxiliary field"
+                "rail neighbor bits must survive the auxiliary field"
         );
         int detectorRailShape = 0x5;
         int poweredDetectorRail = detectorRailShape

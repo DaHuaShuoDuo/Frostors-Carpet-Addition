@@ -3,6 +3,7 @@ package top.frostor.carpet.easyplace;
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.fabricmc.loader.api.FabricLoader;
 import carpet.CarpetServer;
 import carpet.api.settings.SettingsManager;
@@ -52,6 +53,8 @@ public final class EasyPlaceExtraServer {
         );
         ServerPlayConnectionEvents.DISCONNECT.register((handler, server) ->
                 forget(handler.player));
+        ServerLifecycleEvents.SERVER_STOPPING.register(server ->
+                EasyPlaceUpdateSuppressionGuard.clearRailProtection());
     }
 
     public static void registerRuleObserver(SettingsManager settingsManager) {

@@ -71,7 +71,6 @@ public final class EasyPlacePlacementLifecycleTest extends EasyPlaceTestSupport 
     private static boolean cleanupCompleted() {
         return !EasyPlaceItemStackSync.isPlacementActive()
                 && !EasyPlaceUpdateSuppressionGuard.shouldSuppress(Family.RAIL, ORIGIN)
-                && !EasyPlaceUpdateSuppressionGuard.shouldSuppress(Family.WALL, ORIGIN)
-                && !EasyPlaceUpdateSuppressionGuard.shouldSuppress(Family.RAIL_STATE, ORIGIN);
+                && !EasyPlaceUpdateSuppressionGuard.shouldSuppress(Family.WALL, ORIGIN);
     }
 }

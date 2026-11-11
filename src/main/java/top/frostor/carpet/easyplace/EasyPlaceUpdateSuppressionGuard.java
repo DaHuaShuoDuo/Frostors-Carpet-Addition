@@ -2,12 +2,15 @@ package top.frostor.carpet.easyplace;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.resources.ResourceKey;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockState;
 
 import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.EnumSet;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Set;
 import java.util.function.BiPredicate;
 import java.util.function.Predicate;
@@ -26,8 +29,7 @@ public final class EasyPlaceUpdateSuppressionGuard {
         )),
         WALL(EnumSet.allOf(Direction.class)),
         OBSERVER(EnumSet.allOf(Direction.class)),
-        TNT(EnumSet.allOf(Direction.class)),
-        RAIL_STATE(EnumSet.noneOf(Direction.class));
+        TNT(EnumSet.allOf(Direction.class));
 
         private final Set<Direction> coveredDirections;
 
@@ -51,6 +53,15 @@ public final class EasyPlaceUpdateSuppressionGuard {
     private static final ThreadLocal<Integer> PLACE_DEPTH = ThreadLocal.withInitial(() -> 0);
     private static final ThreadLocal<Deque<PlacementScope>> PLACEMENT_SCOPES =
             ThreadLocal.withInitial(ArrayDeque::new);
+    private static final Direction[] RAIL_DIRECTIONS = {
+            Direction.NORTH,
+            Direction.SOUTH,
+            Direction.WEST,
+            Direction.EAST,
+            Direction.UP
+    };
+    private static final Map<ResourceKey<Level>, Map<BlockPos, Long>> RAIL_GRACE =
+            new HashMap<>();
 
     private EasyPlaceUpdateSuppressionGuard() {
     }
@@ -99,7 +110,7 @@ public final class EasyPlaceUpdateSuppressionGuard {
         if(PLACE_DEPTH.get() <= 0) {
             return;
         }
-        PLACEMENT_SCOPES.get().peek().railNeighborMatchMask = railNeighborMatchMask & 0x3f;
+        PLACEMENT_SCOPES.get().peek().railNeighborMatchMask = railNeighborMatchMask & 0x1f;
     }
 
     public static boolean shouldSuppress(Family family, BlockPos pos) {
@@ -119,6 +130,54 @@ public final class EasyPlaceUpdateSuppressionGuard {
             }
         }
         return false;
+    }
+
+    public static boolean shouldSuppressRail(Level level, BlockPos pos) {
+        if(shouldSuppress(Family.RAIL, pos)) {
+            return true;
+        }
+        Map<BlockPos, Long> positions = RAIL_GRACE.get(level.dimension());
+        Long expiresAt = positions == null ? null : positions.get(pos);
+        return expiresAt != null && level.getGameTime() <= expiresAt;
+    }
+
+    public static void retainRailProtection(Level level, BlockPos pos) {
+        if(level.isClientSide()) {
+            return;
+        }
+        long gameTime = level.getGameTime();
+        Map<BlockPos, Long> positions = RAIL_GRACE.computeIfAbsent(
+                level.dimension(),
+                ignored -> new HashMap<>()
+        );
+        positions.entrySet().removeIf(entry -> entry.getValue() < gameTime);
+        positions.put(pos, gameTime);
+    }
+
+    public static void clearRailProtection() {
+        RAIL_GRACE.clear();
+    }
+
+    public static String railDiagnostic(BlockPos pos) {
+        if(PLACE_DEPTH.get() <= 0) {
+            return "inactive";
+        }
+        StringBuilder result = new StringBuilder();
+        for(PlacementScope scope : PLACEMENT_SCOPES.get()) {
+            if(!scope.suppressedFamilies.contains(Family.RAIL)) {
+                continue;
+            }
+            if(result.length() > 0) {
+                result.append("; ");
+            }
+            result.append("placement=")
+                    .append(scope.placementPos)
+                    .append(", mask=0x")
+                    .append(Integer.toHexString(scope.railNeighborMatchMask))
+                    .append(", covers=")
+                    .append(coversRailNeighbors(scope, pos));
+        }
+        return result.length() == 0 ? "no-rail-request" : result.toString();
     }
 
     public static boolean shouldSuppressTnt(Level level, BlockPos pos) {
@@ -186,9 +245,10 @@ public final class EasyPlaceUpdateSuppressionGuard {
         if(pos.equals(scope.placementPos)) {
             return true;
         }
-        for(Direction direction : Family.RAIL.coveredDirections) {
+        for(int index = 0; index < RAIL_DIRECTIONS.length; index++) {
+            Direction direction = RAIL_DIRECTIONS[index];
             if(pos.equals(scope.placementPos.relative(direction))) {
-                return (scope.railNeighborMatchMask & (1 << direction.ordinal())) != 0;
+                return (scope.railNeighborMatchMask & (1 << index)) != 0;
             }
         }
         return false;

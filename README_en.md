@@ -130,8 +130,8 @@ conductor test. This remains limited to a synchronous single relay.
 Powered rails, activator rails, and detector rails use TriWasa's unified
 `easyPlaceRailProtection` child switch, enabled by default. The client stores
 their initial `POWERED` value in raw bit 4, requests rail shape protection with
-bit 9, and requests target-position redstone-state protection with bit 25;
-neighbor matches use auxiliary bits 19-24. FCA handles shape/PP updates through
+bit 9, and requests unified rail protection; neighbor matches use auxiliary bits 17-21 in
+`NORTH,SOUTH,WEST,EAST,UP` order. FCA handles shape/PP updates through
 `RAIL` and exact-position redstone state through `RAIL_STATE`. In 26.x, powered
 rails and activator rails are both instances of `PoweredRailBlock`, while
 detector rails use the separate `DetectorRailBlock` implementation. Neighbor
@@ -139,19 +139,19 @@ rail matching never compares redstone state, and ordinary rails have no
 redstone state.
 
 The same handshake adds the `easy_place_y_precision` capability and
-`y_precision_bits=8`. A supporting client uses bit 15 as a schema marker, bits
-8-14 for raw state, and bits 0-7 for the eight-bit fixed-point hit height in Y.
-FCA decodes target-independent raw and an approximate hit height when
-`handleUseItemOn` receives the hit result, before reach validation and vanilla
-block interaction or placement run. Older clients that do not
+`y_precision_bits=8`. A supporting client stores an eight-bit fixed-point hit
+height relative to the bottom of the target block in Y. The server decodes X
+raw against the packet's `BlockHitResult.blockPos`, matching the client
+encoding anchor. FCA snapshots raw and Y when `handleUseItemOn` receives the
+hit result, before reach validation and vanilla block interaction or placement
+run. Older clients that do not
 advertise the capability continue sending their original Y value, so mixed
 versions keep the previous path.
 
 The packet-level raw/Y snapshot is associated with the current
 `BlockItem.place` lifecycle. Wall-mounted placements and other target
 transforms use that snapshot instead of reinterpreting X raw against the
-transformed position. X raw remains the fallback for older clients without the
-Y payload.
+transformed position.
 
 Server-side state handling uses explicit behavior-family registries that freeze
 after initialization. The stable `EasyPlaceStateSync.apply(...)` entry point

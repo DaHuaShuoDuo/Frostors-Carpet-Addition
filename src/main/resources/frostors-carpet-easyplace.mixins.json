@@ -8,7 +8,6 @@
     "BlockItemMixin",
     "DetectorRailBlockMixin",
     "ObserverBlockMixin",
-    "PoweredRailBlockMixin",
     "RailStateMixin",
     "ServerGamePacketListenerImplMixin",
     "StandingAndWallBlockItemMixin",

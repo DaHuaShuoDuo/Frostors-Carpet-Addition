@@ -14,42 +14,12 @@ public final class EasyPlaceUpdateSuppressionGuardTest extends EasyPlaceTestSupp
         EasyPlaceUpdateSuppressionGuardTest test = new EasyPlaceUpdateSuppressionGuardTest();
         test.checkFamilyIsolation();
         test.checkSpatialScope();
-        test.checkRailStateScope();
         test.checkRailNeighborMatchMask();
         test.checkWallNeighborMatchMask();
         test.checkPoweredConductorRelay();
         test.checkPlacementPositionUpdate();
         test.checkNestingAndCleanup();
         return test.checks();
-    }
-
-    private void checkRailStateScope() {
-        EasyPlaceUpdateSuppressionGuard.beginPlacement(ORIGIN);
-        try {
-            EasyPlaceUpdateSuppressionGuard.request(Family.RAIL_STATE);
-            check(
-                    EasyPlaceUpdateSuppressionGuard.shouldSuppress(Family.RAIL_STATE, ORIGIN),
-                    "rail redstone-state protection must cover the placed position"
-            );
-            for(Direction direction : Direction.values()) {
-                check(
-                        !EasyPlaceUpdateSuppressionGuard.shouldSuppress(
-                                Family.RAIL_STATE,
-                                ORIGIN.relative(direction)
-                        ),
-                        "rail redstone-state protection must not cover face neighbors"
-                );
-            }
-            check(
-                    !EasyPlaceUpdateSuppressionGuard.shouldSuppress(
-                            Family.RAIL,
-                            ORIGIN
-                    ),
-                    "rail redstone-state protection must not enable rail shape suppression"
-            );
-        } finally {
-            EasyPlaceUpdateSuppressionGuard.endPlacement();
-        }
     }
 
     private void checkFamilyIsolation() {
@@ -146,7 +116,7 @@ public final class EasyPlaceUpdateSuppressionGuardTest extends EasyPlaceTestSupp
     }
 
     private void checkRailNeighborMatchMask() {
-        int mask = (1 << Direction.NORTH.ordinal()) | (1 << Direction.UP.ordinal());
+        int mask = 0b1_0001;
         EasyPlaceUpdateSuppressionGuard.beginPlacement(ORIGIN);
         try {
             EasyPlaceUpdateSuppressionGuard.request(Family.RAIL);
@@ -280,8 +250,8 @@ public final class EasyPlaceUpdateSuppressionGuardTest extends EasyPlaceTestSupp
 
     private void checkNestingAndCleanup() {
         BlockPos nestedOrigin = ORIGIN.above();
-        int outerRailMask = 1 << Direction.NORTH.ordinal();
-        int innerRailMask = 1 << Direction.UP.ordinal();
+        int outerRailMask = 0b0_0001;
+        int innerRailMask = 0b1_0000;
         int outerWallMask = 1 << Direction.NORTH.ordinal();
         int innerWallMask = 1 << Direction.UP.ordinal();
         EasyPlaceUpdateSuppressionGuard.beginPlacement(ORIGIN);
@@ -299,7 +269,6 @@ public final class EasyPlaceUpdateSuppressionGuardTest extends EasyPlaceTestSupp
                 EasyPlaceUpdateSuppressionGuard.request(Family.WALL);
                 EasyPlaceUpdateSuppressionGuard.request(Family.OBSERVER);
                 EasyPlaceUpdateSuppressionGuard.request(Family.TNT);
-                EasyPlaceUpdateSuppressionGuard.request(Family.RAIL_STATE);
                 EasyPlaceUpdateSuppressionGuard.requestRailNeighborMatches(innerRailMask);
                 EasyPlaceUpdateSuppressionGuard.requestWallNeighborMatches(innerWallMask);
                 check(
@@ -336,11 +305,7 @@ public final class EasyPlaceUpdateSuppressionGuardTest extends EasyPlaceTestSupp
             );
             check(
                     !EasyPlaceUpdateSuppressionGuard.shouldSuppress(Family.OBSERVER, ORIGIN)
-                            && !EasyPlaceUpdateSuppressionGuard.shouldSuppress(Family.TNT, ORIGIN)
-                            && !EasyPlaceUpdateSuppressionGuard.shouldSuppress(
-                                    Family.RAIL_STATE,
-                                    ORIGIN
-                            ),
+                            && !EasyPlaceUpdateSuppressionGuard.shouldSuppress(Family.TNT, ORIGIN),
                     "inner-only family requests must not leak into the outer placement"
             );
             check(

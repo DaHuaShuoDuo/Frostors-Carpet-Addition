@@ -23,10 +23,8 @@ public abstract class DetectorRailBlockMixin {
             BlockState state,
             CallbackInfo ci
     ) {
-        if(EasyPlaceUpdateSuppressionGuard.shouldSuppress(
-                EasyPlaceUpdateSuppressionGuard.Family.RAIL,
-                pos
-        )) {
+        if(EasyPlaceUpdateSuppressionGuard.shouldSuppressRail(level, pos)) {
+            EasyPlaceUpdateSuppressionGuard.retainRailProtection(level, pos);
             ci.cancel();
         }
     }

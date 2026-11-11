@@ -40,6 +40,7 @@ public final class EasyPlacePlacementRequest {
 
     public record Snapshot(
             int rawValue,
+            int alternateRawValue,
             int auxiliaryValue,
             int yPrecisionValue
     ) {

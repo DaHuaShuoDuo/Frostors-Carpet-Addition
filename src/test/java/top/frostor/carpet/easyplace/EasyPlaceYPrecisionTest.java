@@ -62,15 +62,11 @@ public final class EasyPlaceYPrecisionTest extends EasyPlaceTestSupport {
     private void checkWireRoundTrip() {
         BlockPos pos = new BlockPos(-17, 70, 31);
         Vec3 original = new Vec3(2.5, 70.73, 6.5);
-        Vec3 encoded = EasyPlaceExtraProtocol.encodeY(pos, original, 0x5a);
-        int payload = EasyPlaceExtraProtocol.decodeYPayload(encoded);
-        int precisionValue = payload & EasyPlaceExtraProtocol.Y_PRECISION_MASK;
+        Vec3 encoded = EasyPlaceExtraProtocol.encodeY(pos, original);
+        int precisionValue = EasyPlaceExtraProtocol.decodeY(encoded, pos)
+                & EasyPlaceExtraProtocol.Y_PRECISION_MASK;
 
         check(encoded.x == original.x && encoded.z == original.z, "Y encoding must preserve X and Z");
-        check(
-                EasyPlaceExtraProtocol.rawValueFromYPayload(payload) == 0x5a,
-                "raw must travel independently of the placement target"
-        );
         check(
                 precisionValue == EasyPlaceExtraProtocol.quantizeRelativeY(0.73),
                 "Y precision value must round trip through the wire encoding"
@@ -137,22 +133,12 @@ public final class EasyPlaceYPrecisionTest extends EasyPlaceTestSupport {
                 EasyPlaceExtraProtocol.toRawValue(transformedProtocol) == 0x0E,
                 "the transformed target must demonstrate the legacy X ambiguity"
         );
-        Vec3 encodedY = EasyPlaceExtraProtocol.encodeY(
-                encodedTarget,
-                new Vec3(10.5, 70.5, 10.5),
-                wallTorchEastLit
-        );
-        int payload = EasyPlaceExtraProtocol.decodeYPayload(encodedY);
-        check(
-                EasyPlaceExtraProtocol.rawValueFromYPayload(payload) == wallTorchEastLit,
-                "the Y payload must preserve wall torch raw across target transforms"
-        );
-
         EasyPlacePlacementRequest.Snapshot snapshot =
                 new EasyPlacePlacementRequest.Snapshot(
                         EasyPlaceExtraProtocol.toRawValue(
                                 EasyPlaceExtraProtocol.decode(encodedHit, encodedTarget)
                         ),
+                        -1,
                         0,
                         0
                 );

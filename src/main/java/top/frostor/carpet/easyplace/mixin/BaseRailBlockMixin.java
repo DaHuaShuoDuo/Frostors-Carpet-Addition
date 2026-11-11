@@ -25,11 +25,16 @@ public abstract class BaseRailBlockMixin {
             boolean movedByPiston,
             CallbackInfo ci
     ) {
-        if(shouldSuppress(pos)) {
-            top.frostor.carpet.FrostorsCarpetAddition.LOGGER.debug(
-                    "[EasyPlace] Suppressed rail neighborChanged at {}",
-                    pos
-            );
+        boolean suppress = shouldSuppress(level, pos);
+        top.frostor.carpet.FrostorsCarpetAddition.LOGGER.info(
+                "[EasyPlace-Rail] neighborChanged pos={} neighbor={} piston={} suppress={} guard={}",
+                pos,
+                neighborBlock,
+                movedByPiston,
+                suppress,
+                EasyPlaceUpdateSuppressionGuard.railDiagnostic(pos)
+        );
+        if(suppress) {
             ci.cancel();
         }
     }
@@ -46,7 +51,7 @@ public abstract class BaseRailBlockMixin {
             boolean movedByPiston,
             CallbackInfoReturnable<BlockState> cir
     ) {
-        if(shouldSuppress(pos)) {
+        if(shouldSuppress(level, pos)) {
             top.frostor.carpet.FrostorsCarpetAddition.LOGGER.debug(
                     "[EasyPlace] Suppressed rail updateState at {}",
                     pos
@@ -67,7 +72,7 @@ public abstract class BaseRailBlockMixin {
             boolean forceUpdate,
             CallbackInfoReturnable<BlockState> cir
     ) {
-        if(shouldSuppress(pos)) {
+        if(shouldSuppress(level, pos)) {
             top.frostor.carpet.FrostorsCarpetAddition.LOGGER.debug(
                     "[EasyPlace] Suppressed rail updateDir at {}",
                     pos
@@ -76,10 +81,11 @@ public abstract class BaseRailBlockMixin {
         }
     }
 
-    private static boolean shouldSuppress(BlockPos pos) {
-        return EasyPlaceUpdateSuppressionGuard.shouldSuppress(
-                EasyPlaceUpdateSuppressionGuard.Family.RAIL,
-                pos
-        );
+    private static boolean shouldSuppress(Level level, BlockPos pos) {
+        boolean suppress = EasyPlaceUpdateSuppressionGuard.shouldSuppressRail(level, pos);
+        if(suppress) {
+            EasyPlaceUpdateSuppressionGuard.retainRailProtection(level, pos);
+        }
+        return suppress;
     }
 }
