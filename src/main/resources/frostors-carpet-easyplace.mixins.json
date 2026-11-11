@@ -13,6 +13,7 @@
     "ServerGamePacketListenerImplMixin",
     "StandingAndWallBlockItemMixin",
     "TntBlockMixin",
+    "UseOnContextMixin",
     "WallHangingSignBlockMixin",
     "WallBlockMixin"
   ],

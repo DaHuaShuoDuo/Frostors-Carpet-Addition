@@ -78,7 +78,8 @@ FCA 的规则由 Carpet 管理，并随世界配置保存：
 `attached`，但仍校验目标可替换、碰撞和通用放置约束。蜡烛同样只在放置阶段要求
 下方支撑，V2-Extra 允许无支撑放置且不改变放置后的 `updateShape` 行为。数量类方块按原版每次增加一级并将投影数量作为上限，每次交互只消耗一个对应物品。
 所有原版 `WallBlock` 变体恢复投影中的四侧 `NONE/LOW/TALL` 连接和 `UP` 柱子状态；
-`WATERLOGGED` 不进入协议状态，仍以服务端当前放置状态为准。墙方块放置期间会独立抑制
+墙体 `UP` 使用 auxiliary bit26 的 schema 和 bit27 的状态位，服务端继续接受旧 bit0
+布局。`WATERLOGGED` 不进入协议状态，仍以服务端当前放置状态为准。墙方块放置期间会独立抑制
 结构性 `updateShape` 重算，同时保留水方块 tick 等原版副作用。
 任意 V2-Extra 方块放置期间，实际放置位置内的铁轨结构重算会被抑制；四个水平邻居和
 上方邻居中的铁轨只有实际状态与投影预期一致时才保护。墙体始终保护本次放置位置，
@@ -116,6 +117,14 @@ container、sign、redstone 和 special 等适配器，通用纯状态操作集�
 crafter slot mask，bit9/bit10 分别表示 rail/wall 更新保护请求，bit11-16 标记匹配的
 相邻墙方向，bit17 表示 observer 保护请求，bit18 表示 TNT 保护请求，bit19-24 标记
 匹配的相邻铁轨方向，bit25 表示目标铁轨红石状态保护请求。
+同一握手新增 `easy_place_y_precision` capability 和 `y_precision_bits=8`。支持该
+能力的客户端在 Y 中使用 bit15 schema、bit8-14 raw、bit0-7 命中高度定点值；FCA 在
+服务端 `handleUseItemOn` 收到命中结果时先解出与目标位置无关的 raw 和近似命中高度，
+再执行触及校验、方块交互和放置。
+不支持该能力的旧客户端继续发送原始 Y，新旧组合保持原有路径。
+服务端把 packet 级 raw/Y 快照与 `BlockItem.place` 生命周期关联；挂墙方块等后续目标
+变换只使用该快照，不从改变后的目标坐标重新解释 X raw。X raw 继续作为不支持 Y payload
+的旧客户端回退。
 多面方块的面索引顺序固定为 `DOWN, UP, NORTH, SOUTH, WEST, EAST`，藤蔓从同一顺序
 过滤 `DOWN` 得到 `UP, NORTH, SOUTH, WEST, EAST`。使用历史面顺序构建的客户端或
 服务端必须升级到匹配版本，混用版本时多面方块和藤蔓可能按错误方向解码。旧 `main`

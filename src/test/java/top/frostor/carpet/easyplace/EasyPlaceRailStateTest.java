@@ -12,9 +12,38 @@ public final class EasyPlaceRailStateTest extends EasyPlaceTestSupport {
 
     public static int run() {
         EasyPlaceRailStateTest test = new EasyPlaceRailStateTest();
+        test.checkProtectionFlags();
         test.checkRailStateRestoration();
         test.checkActivatorRailStateRestoration();
         return test.checks();
+    }
+
+    private void checkProtectionFlags() {
+        check(
+                EasyPlaceExtraProtocol.requestsRailUpdateSuppression(
+                        Blocks.RAIL,
+                        EasyPlaceExtraProtocol.RAIL_PROTECTION_FLAG_REGULAR
+                ),
+                "regular rail protection must be recoverable from raw"
+        );
+        check(
+                EasyPlaceExtraProtocol.requestsRailUpdateSuppression(
+                        Blocks.POWERED_RAIL,
+                        EasyPlaceExtraProtocol.RAIL_PROTECTION_FLAG_POWERED
+                ),
+                "powered rail protection must be recoverable from raw"
+        );
+        check(
+                EasyPlaceExtraProtocol.requestsRailUpdateSuppression(
+                        Blocks.DETECTOR_RAIL,
+                        EasyPlaceExtraProtocol.RAIL_PROTECTION_FLAG_POWERED
+                ),
+                "detector rail protection must be recoverable from raw"
+        );
+        check(
+                !EasyPlaceExtraProtocol.requestsRailUpdateSuppression(Blocks.RAIL, 0),
+                "rail protection must not be inferred without a raw request flag"
+        );
     }
 
     private void checkRailStateRestoration() {

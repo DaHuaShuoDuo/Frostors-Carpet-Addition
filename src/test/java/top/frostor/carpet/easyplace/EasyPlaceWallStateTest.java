@@ -71,9 +71,22 @@ public final class EasyPlaceWallStateTest extends EasyPlaceTestSupport {
                 Blocks.STONE_BRICK_WALL.defaultBlockState(),
                 null,
                 0,
-                1
+                EasyPlaceExtraProtocol.WALL_AUXILIARY_SCHEMA
+                        | EasyPlaceExtraProtocol.WALL_UP
         );
         check(withPost != null && withPost.getValue(WallBlock.UP), "auxiliary bit zero must set UP");
+
+        BlockState schemaWithoutPost = EasyPlaceStateSync.apply(
+                Blocks.STONE_BRICK_WALL,
+                Blocks.STONE_BRICK_WALL.defaultBlockState().setValue(WallBlock.UP, true),
+                null,
+                0,
+                EasyPlaceExtraProtocol.WALL_AUXILIARY_SCHEMA
+        );
+        check(
+                schemaWithoutPost != null && !schemaWithoutPost.getValue(WallBlock.UP),
+                "wall schema without the UP bit must clear UP"
+        );
 
         BlockState absentAuxiliary = EasyPlaceStateSync.apply(
                 Blocks.STONE_BRICK_WALL,

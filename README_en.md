@@ -93,6 +93,8 @@ unsupported placement without changing later `updateShape` behavior. Quantity-st
 All vanilla `WallBlock` variants restore the projected `NONE/LOW/TALL`
 connections on all four sides and the `UP` post state. `WATERLOGGED` is not
 encoded and remains authoritative from the server's placement state. Wall
+`UP` uses auxiliary bit 26 as a schema marker and bit 27 as its value; the
+server still accepts the legacy bit-zero layout. Wall
 placement independently suppresses structural `updateShape` recalculation
 while preserving vanilla side effects such as water-tick scheduling.
 During any V2-Extra block placement, rail structural recalculation is suppressed
@@ -135,6 +137,21 @@ rails and activator rails are both instances of `PoweredRailBlock`, while
 detector rails use the separate `DetectorRailBlock` implementation. Neighbor
 rail matching never compares redstone state, and ordinary rails have no
 redstone state.
+
+The same handshake adds the `easy_place_y_precision` capability and
+`y_precision_bits=8`. A supporting client uses bit 15 as a schema marker, bits
+8-14 for raw state, and bits 0-7 for the eight-bit fixed-point hit height in Y.
+FCA decodes target-independent raw and an approximate hit height when
+`handleUseItemOn` receives the hit result, before reach validation and vanilla
+block interaction or placement run. Older clients that do not
+advertise the capability continue sending their original Y value, so mixed
+versions keep the previous path.
+
+The packet-level raw/Y snapshot is associated with the current
+`BlockItem.place` lifecycle. Wall-mounted placements and other target
+transforms use that snapshot instead of reinterpreting X raw against the
+transformed position. X raw remains the fallback for older clients without the
+Y payload.
 
 Server-side state handling uses explicit behavior-family registries that freeze
 after initialization. The stable `EasyPlaceStateSync.apply(...)` entry point

@@ -25,7 +25,8 @@ public final class EasyPlaceExtraProtocolTest {
                 + EasyPlaceObserverStateTest.run()
                 + EasyPlaceSpecialStateTest.run()
                 + EasyPlaceDirectionalStateTest.run()
-                + EasyPlaceAttachmentStateTest.run();
+                + EasyPlaceAttachmentStateTest.run()
+                + EasyPlaceYPrecisionTest.run();
 
         System.out.println("EasyPlaceExtraProtocolTest passed " + checks + " checks");
     }

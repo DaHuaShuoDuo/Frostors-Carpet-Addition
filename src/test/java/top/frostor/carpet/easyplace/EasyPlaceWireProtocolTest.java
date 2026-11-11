@@ -1,6 +1,7 @@
 package top.frostor.carpet.easyplace;
 
 import net.minecraft.core.Direction;
+import net.minecraft.nbt.CompoundTag;
 
 public final class EasyPlaceWireProtocolTest extends EasyPlaceTestSupport {
     private EasyPlaceWireProtocolTest() {
@@ -16,6 +17,16 @@ public final class EasyPlaceWireProtocolTest extends EasyPlaceTestSupport {
         test.check(
                 EasyPlaceExtraPayload.PROTOCOL_VERSION == 1,
                 "public payload API must preserve protocol version 1"
+        );
+        CompoundTag yCapability = EasyPlaceExtraServer.capabilityData(true, "test");
+        test.check(
+                EasyPlaceExtraServer.supportsYPrecision(yCapability),
+                "server capability data must advertise eight-bit Y precision"
+        );
+        CompoundTag disabledYCapability = EasyPlaceExtraServer.capabilityData(false, "test");
+        test.check(
+                !EasyPlaceExtraServer.supportsYPrecision(disabledYCapability),
+                "disabled server capabilities must not advertise eight-bit Y precision"
         );
         test.check(
                 (EasyPlaceExtraProtocol.RAIL_UPDATE_SUPPRESSION

@@ -24,4 +24,17 @@ public final class EasyPlacePlacementLifecycle {
             }
         }
     }
+
+    public static <T> T run(
+            BlockPos placementPos,
+            EasyPlacePlacementRequest.Snapshot request,
+            Supplier<T> action
+    ) {
+        EasyPlacePlacementRequest.begin(request);
+        try {
+            return run(placementPos, action);
+        } finally {
+            EasyPlacePlacementRequest.end();
+        }
+    }
 }

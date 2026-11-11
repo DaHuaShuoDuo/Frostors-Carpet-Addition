@@ -5,6 +5,7 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.WallSide;
 import org.jetbrains.annotations.Nullable;
 import top.frostor.carpet.easyplace.EasyPlaceStateSupport;
+import top.frostor.carpet.easyplace.EasyPlaceExtraProtocol;
 import top.frostor.carpet.easyplace.registry.EasyPlaceRestoreContext;
 import top.frostor.carpet.easyplace.registry.EasyPlaceStateRestorer;
 
@@ -48,7 +49,7 @@ public final class WallStateRestorer implements EasyPlaceStateRestorer {
         return EasyPlaceStateSupport.replaceSlot(
                 state,
                 WallBlock.UP,
-                context.auxiliaryValue() >= 0 && (context.auxiliaryValue() & 0x1) != 0
+                EasyPlaceExtraProtocol.wallUp(context.auxiliaryValue())
         );
     }
 }
