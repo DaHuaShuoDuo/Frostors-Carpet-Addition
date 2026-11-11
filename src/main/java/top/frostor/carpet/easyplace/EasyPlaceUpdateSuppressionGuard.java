@@ -29,7 +29,8 @@ public final class EasyPlaceUpdateSuppressionGuard {
         )),
         WALL(EnumSet.allOf(Direction.class)),
         OBSERVER(EnumSet.allOf(Direction.class)),
-        TNT(EnumSet.allOf(Direction.class));
+        TNT(EnumSet.allOf(Direction.class)),
+        PISTON(EnumSet.allOf(Direction.class));
 
         private final Set<Direction> coveredDirections;
 
@@ -121,6 +122,21 @@ public final class EasyPlaceUpdateSuppressionGuard {
     }
 
     /**
+     * Arms the PISTON family for the current placement and stores the client-provided mask.
+     * Only the placement position, matching face neighbours and matching QC second-hop targets
+     * are protected; a zero mask never arms the family.
+     */
+    public static void requestPistonProtection(int pistonProtectionMask) {
+        int mask = pistonProtectionMask & EasyPlaceExtraProtocol.PISTON_PROTECTION_MASK;
+        if(PLACE_DEPTH.get() <= 0 || mask == 0) {
+            return;
+        }
+        PlacementScope scope = PLACEMENT_SCOPES.get().peek();
+        scope.suppressedFamilies.add(Family.PISTON);
+        scope.pistonProtectionMask = mask;
+    }
+
+    /**
      * Arms the RAIL family for the current placement and registers a short deferred window at the
      * placement position. Both the synchronous scope and the deferred window use the same
      * neighbour match mask, so neighbours are never protected unconditionally.
@@ -167,7 +183,9 @@ public final class EasyPlaceUpdateSuppressionGuard {
                     ? coversWallNeighbors(scope, pos)
                     : family == Family.RAIL
                             ? coversRailNeighbors(scope, pos)
-                            : family.covers(scope.placementPos, pos)) {
+                            : family == Family.PISTON
+                                    ? coversPistonPositions(scope, pos)
+                                    : family.covers(scope.placementPos, pos)) {
                 return true;
             }
         }
@@ -256,6 +274,66 @@ public final class EasyPlaceUpdateSuppressionGuard {
         return false;
     }
 
+    /**
+     * Piston activation checks run in setPlacedBy / onPlace / neighborChanged. Direct positions
+     * are gated by the client mask; QC second-hop positions are additionally gated by a powered,
+     * face-adjacent conductor directly above the piston.
+     */
+    public static boolean shouldSuppressPiston(Level level, BlockPos pos) {
+        if(PLACE_DEPTH.get() <= 0) {
+            return false;
+        }
+        for(PlacementScope scope : PLACEMENT_SCOPES.get()) {
+            if(!scope.suppressedFamilies.contains(Family.PISTON)) {
+                continue;
+            }
+            if(coversPistonDirectPositions(scope, pos)) {
+                return true;
+            }
+            int qcTargetMatchBit = EasyPlaceExtraProtocol.pistonQcTargetMatchBit(
+                    scope.placementPos,
+                    pos
+            );
+            if(qcTargetMatchBit != 0
+                    && (scope.pistonProtectionMask & qcTargetMatchBit) != 0
+                    && hasPoweredQcRelay(
+                            scope.placementPos,
+                            pos,
+                            relayPos -> {
+                                BlockState relayState = level.getBlockState(relayPos);
+                                return relayState.isRedstoneConductor(level, relayPos);
+                            },
+                            relayPos -> level.getSignal(relayPos, Direction.UP) > 0
+                    )) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    static boolean hasPoweredQcRelay(
+            BlockPos placementPos,
+            BlockPos pistonPos,
+            Predicate<BlockPos> isRedstoneConductor,
+            Predicate<BlockPos> hasSignalTowardPiston
+    ) {
+        BlockPos relayPos = pistonPos.above();
+        if(placementPos.equals(relayPos) || !isFaceAdjacent(placementPos, relayPos)) {
+            return false;
+        }
+        return isRedstoneConductor.test(relayPos)
+                && hasSignalTowardPiston.test(relayPos);
+    }
+
+    private static boolean isFaceAdjacent(BlockPos first, BlockPos second) {
+        for(Direction direction : Direction.values()) {
+            if(second.equals(first.relative(direction))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     static boolean hasPoweredConductorRelay(
             BlockPos placementPos,
             BlockPos tntPos,
@@ -308,6 +386,23 @@ public final class EasyPlaceUpdateSuppressionGuard {
         return false;
     }
 
+    private static boolean coversPistonPositions(PlacementScope scope, BlockPos pos) {
+        return coversPistonDirectPositions(scope, pos);
+    }
+
+    private static boolean coversPistonDirectPositions(PlacementScope scope, BlockPos pos) {
+        int mask = scope.pistonProtectionMask;
+        if(pos.equals(scope.placementPos)) {
+            return (mask & EasyPlaceExtraProtocol.PISTON_TARGET_MATCH) != 0;
+        }
+        for(Direction direction : Direction.values()) {
+            if(pos.equals(scope.placementPos.relative(direction))) {
+                return (mask & (1 << (direction.ordinal() + 1))) != 0;
+            }
+        }
+        return false;
+    }
+
     private record RailWindow(long expiresAt, int neighborMask) {
     }
 
@@ -316,6 +411,7 @@ public final class EasyPlaceUpdateSuppressionGuard {
         private BlockPos placementPos;
         private int wallNeighborMatchMask;
         private int railNeighborMatchMask;
+        private int pistonProtectionMask;
 
         private PlacementScope(BlockPos placementPos) {
             this.placementPos = placementPos;

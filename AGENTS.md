@@ -226,8 +226,10 @@ Carpet 会把枚举候选显示为小写，并在解析输入时先转为大写�
   printer 适配传入的 `BlockPos` 语义不同，相对锚点会让辅助字段随命中面错一位。
   `AUXILIARY_SCHEMA`（bit24）是唯一合法的"Z 已编码"判据，服务端解出后必须剥离该位，
   缺少该位一律视为无 auxiliary（-1），不得回退到 `decodeZ >= 0` 之类的猜测。
-  Y 只承载 8-bit 命中高度，不得把 raw 复用进 Y。packet 快照是单包单线程的局部变量，
-  不得改回跨包 context id、pending 队列或按目标位置关联的 ContextStore。
+  Y 的 bit0-7 只承载 8-bit 命中高度，bit8-19 承载 12 位 `PISTON_PROTECTION_MASK`，
+  bit20 是 `Y_PISTON_SCHEMA`；Y 不得复用 raw，也不得把活塞掩码放进 X/Z。packet 快照
+  是单包单线程的局部变量，不得改回跨包 context id、pending 队列或按目标位置关联的
+  ContextStore。
   该 Z 通道契约要求 FCA 与 TriWasa 同版本号配套，混用版本时铁轨/墙/observer/TNT 保护
   位都会被静默丢弃。
 - 26.2/26.3 放置语义必须统一：两版分别依赖 Litematica 0.28.6 / 0.29.1，且 26.3 的
@@ -236,6 +238,12 @@ Carpet 会把枚举候选显示为小写，并在解析输入时先转为大写�
   `protocolPos` 仅用于读投影/世界状态，禁止进入 `encodeX`/`encodeY`。服务端以 Z 的
   `AUXILIARY_SCHEMA` 位识别 V2-Extra 包，并在 X 主锚点无 marker 时按命中面及 X 轴
   相邻锚点兜底，不得按 Minecraft 版本分叉实现。
+- 活塞保护以 Y 的 `Y_PISTON_SCHEMA`（bit20）为唯一判据，服务端解出后剥离，缺标记按
+  空掩码处理。掩码 bit0 是放置目标，bit1-6 按 `Direction.ordinal()` 标记匹配的面邻居，
+  bit7-11 标记五个 QC 二跳目标。`PISTON` family 只覆盖掩码命中的直接位置；QC 位置还
+  必须满足其上方一格为红石导体、与放置点面相邻且朝活塞输出信号，不得全局抑制活塞
+  更新。客户端仅在 `easyPlacePistonProtection` 开启、且服务端同时声明
+  `easy_place_piston_protection` 与 `easy_place_y_precision` 时编码掩码。
 - 相邻墙与投影预期的比较必须忽略 `WATERLOGGED`；其余方块种类、四侧 `WallSide` 和
   `UP` 任一不符，都必须清除该方向的 wall neighbor match bit。竖向连续墙中的不符墙
   因此不得因相邻的 Easy Place 墙而获得冻结保护。

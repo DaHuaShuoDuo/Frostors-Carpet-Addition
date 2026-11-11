@@ -31,6 +31,10 @@ public final class EasyPlaceExtraServer {
             EasyPlaceExtraPayload.CAPABILITY_HIT_POSITION_RELAXATION;
     public static final String CAPABILITY_Y_PRECISION =
             EasyPlaceExtraPayload.CAPABILITY_Y_PRECISION;
+    public static final String CAPABILITY_PISTON_PROTECTION =
+            EasyPlaceExtraPayload.CAPABILITY_PISTON_PROTECTION;
+    public static final String NBT_PISTON_PROTECTION_BITS =
+            EasyPlaceExtraPayload.NBT_PISTON_PROTECTION_BITS;
     private static final Set<UUID> SUPPORTED_PLAYERS = ConcurrentHashMap.newKeySet();
     private static final Set<UUID> Y_PRECISION_PLAYERS = ConcurrentHashMap.newKeySet();
     private static SettingsManager observedManager;
@@ -157,12 +161,18 @@ public final class EasyPlaceExtraServer {
         data.putInt(NBT_PROTOCOL_VERSION, PROTOCOL_VERSION);
         data.putBoolean(CAPABILITY_EASY_PLACE_V2_EXTRA, enabled);
         data.putBoolean(CAPABILITY_Y_PRECISION, enabled);
+        data.putBoolean(CAPABILITY_PISTON_PROTECTION, enabled);
         data.putInt(NBT_Y_PRECISION_BITS, EasyPlaceExtraProtocol.Y_PRECISION_BITS);
+        data.putInt(
+                NBT_PISTON_PROTECTION_BITS,
+                EasyPlaceExtraProtocol.PISTON_PROTECTION_BITS
+        );
         ListTag capabilities = new ListTag();
         capabilities.add(StringTag.valueOf(CAPABILITY_EASY_PLACE_V2_EXTRA));
         capabilities.add(StringTag.valueOf(CAPABILITY_HIT_POSITION_RELAXATION));
         if(enabled) {
             capabilities.add(StringTag.valueOf(CAPABILITY_Y_PRECISION));
+            capabilities.add(StringTag.valueOf(CAPABILITY_PISTON_PROTECTION));
         }
         data.put(NBT_CAPABILITIES, capabilities);
         return data;

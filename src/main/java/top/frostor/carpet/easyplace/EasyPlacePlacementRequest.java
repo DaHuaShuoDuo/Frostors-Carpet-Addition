@@ -42,7 +42,8 @@ public final class EasyPlacePlacementRequest {
             int rawValue,
             int alternateRawValue,
             int auxiliaryValue,
-            int yPrecisionValue
+            int yPrecisionValue,
+            int pistonProtectionMask
     ) {
     }
 }

@@ -278,6 +278,15 @@ public abstract class BlockItemMixin {
         if(EasyPlaceExtraProtocol.requestsTntUpdateSuppression(auxiliaryValue)) {
             EasyPlaceUpdateSuppressionGuard.request(EasyPlaceUpdateSuppressionGuard.Family.TNT);
         }
+        int pistonProtectionMask = request.pistonProtectionMask();
+        if(pistonProtectionMask != 0) {
+            top.frostor.carpet.FrostorsCarpetAddition.LOGGER.debug(
+                    "[EasyPlace-Piston] request target={} mask=0x{}",
+                    placementContext.getClickedPos(),
+                    Integer.toHexString(pistonProtectionMask)
+            );
+            EasyPlaceUpdateSuppressionGuard.requestPistonProtection(pistonProtectionMask);
+        }
     }
 
     private static EasyPlacePlacementRequest.Snapshot easyPlace$snapshot(
@@ -318,7 +327,10 @@ public abstract class BlockItemMixin {
                 ),
                 packedY < 0
                         ? -1
-                        : packedY & EasyPlaceExtraProtocol.Y_PRECISION_MASK
+                        : packedY & EasyPlaceExtraProtocol.Y_PRECISION_MASK,
+                packedY < 0
+                        ? 0
+                        : EasyPlaceExtraProtocol.decodeYPiston(packedY)
         );
     }
 }

@@ -88,7 +88,8 @@ public final class EasyPlacePacketRequest {
                 primaryRaw,
                 alternateRaw,
                 auxiliaryValue,
-                packedY < 0 ? -1 : packedY & EasyPlaceExtraProtocol.Y_PRECISION_MASK
+                packedY < 0 ? -1 : packedY & EasyPlaceExtraProtocol.Y_PRECISION_MASK,
+                packedY < 0 ? 0 : EasyPlaceExtraProtocol.decodeYPiston(packedY)
         );
     }
 
@@ -96,7 +97,8 @@ public final class EasyPlacePacketRequest {
             int rawValue,
             int alternateRawValue,
             int auxiliaryValue,
-            int yPrecisionValue
+            int yPrecisionValue,
+            int pistonProtectionMask
     ) {
         /** The raw value decoded against the client's actual X encoding anchor. */
         public int resolvedRawValue() {
@@ -112,7 +114,8 @@ public final class EasyPlacePacketRequest {
                     raw,
                     alternateRawValue,
                     auxiliaryValue,
-                    yPrecisionValue
+                    yPrecisionValue,
+                    pistonProtectionMask
             );
         }
     }

@@ -140,6 +140,7 @@ public final class EasyPlaceYPrecisionTest extends EasyPlaceTestSupport {
                         ),
                         -1,
                         0,
+                        0,
                         0
                 );
         EasyPlacePlacementRequest.begin(snapshot);

@@ -100,6 +100,13 @@ TNT 在轻松放置时不会因放置位置已有红石信号而点燃，已有 
 若本次放置的立即激活元件与 TNT 通过一个已充能红石导体（包括普通实体方块、音符盒等）
 相接，则 TNT 的第二跳邻居更新也会在本次放置期间被抑制。红石线、红石火把、探测铁轨
 等即时元件都使用同一导体判断；该保护只覆盖同步单级中继，不包含多级链或延迟 tick。
+普通活塞与粘性活塞保留现有朝向恢复，不编码或恢复投影中的 `EXTENDED`。当放置目标
+为投影中未伸出的活塞、六面邻居与投影完全一致，或某个经其上方一格已充能导体中继
+形成第二跳 QC 的活塞与投影完全一致时，FCA 在本次 `BlockItem.place` 生命周期内
+抑制对应活塞的 `setPlacedBy`、`onPlace` 与 `neighborChanged` 激活检查。不匹配的
+活塞仍执行原版更新，放置结束后的普通更新、手动方块事件与真实活塞运动不受影响。
+该保护由 TriWasa 的 `easyPlacePistonProtection` 子开关控制，默认开启；12 位掩码走
+Y 的 bit8-19，不恢复归档分支的跨包 context 架构，也不占用 X/Z 通道。
 投影中已激活的动力铁轨、激活铁轨和探测铁轨由 TriWasa 的统一
 `easyPlaceRailProtection` 子开关保护，默认开启。客户端通过 raw 通道 bit4 保存这三类
 铁轨的初始 `POWERED`，另用 raw bit3（动力/激活/探测铁轨）或 bit4（普通铁轨）作为
@@ -120,13 +127,18 @@ container、sign、redstone 和 special 等适配器，通用纯状态操作集�
 crafter slot mask，bit9/bit10 分别表示 rail/wall 更新保护请求，bit11-16 标记匹配的
 相邻墙方向，bit17-21 标记匹配的相邻铁轨方向，bit22 表示 observer 保护请求，bit23
 表示 TNT 保护请求，bit24 是 `AUXILIARY_SCHEMA` 标记，bit25 空闲。
-同一握手新增 `easy_place_y_precision` capability 和 `y_precision_bits=8`。支持该
-能力的客户端把命中高度相对方块底部的 8-bit 定点值放入 Y；Y 通道只承载该精度值，
-不复用 raw。X raw 与 Y 精度一律按 packet `BlockHitResult.blockPos` 编码；Z auxiliary 改为**固定原点**
+同一握手新增 `easy_place_y_precision` capability 和 `y_precision_bits=8`，以及
+`easy_place_piston_protection` capability 和 `piston_protection_bits=12`。支持前者的
+客户端把命中高度相对方块底部的 8-bit 定点值放入 Y 的 bit0-7；Y 的 bit8-19 承载
+12 位活塞保护掩码，bit20 是 `Y_PISTON_SCHEMA` 标记，只有掩码非零时才置位。Y 不复用
+raw；掩码为零或能力缺失时 Y 编码与纯精度版本逐位一致。X raw 与 Y 精度一律按 packet
+`BlockHitResult.blockPos` 编码；Z auxiliary 改为**固定原点**
 （世界 Z=0，`z = auxiliary * 2 + 2`），与点击位置、命中面和放置目标完全无关，客户端
 所有编码路径（Litematica 主路径、legacy `WorldUtils`、printer 适配）因此不再需要约定
 同一个 `BlockPos`。Z 的 bit24 是 `AUXILIARY_SCHEMA` 标记，服务端只接受带该标记的 Z 值，
 解出后剥离该位；未编码或缺少标记的 Z 一律按"无 auxiliary"处理。
+命中位置按相对 `blockPos` 的 binary32 float 传输，精确整数上限 2^24；Y payload 最大
+`2 + 2*(2^21-1) = 2^22`，留两位余量，26.2/26.3 均无精度损失。
 FCA 在 `handleUseItemOn` 收到未修改的命中结果时保存整份 packet 级快照，再执行后续目标
 转换和放置，并把该快照与 `BlockItem.place` 生命周期关联；挂墙方块等后续目标变换只使用
 该快照，不从改变后的目标坐标重新解释 X raw 或 Z auxiliary。`BlockPlaceContext` 的
