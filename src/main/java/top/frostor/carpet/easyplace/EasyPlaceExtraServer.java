@@ -155,6 +155,7 @@ public final class EasyPlaceExtraServer {
         return data.getIntOr(NBT_PROTOCOL_VERSION, -1) == PROTOCOL_VERSION
                 && data.getBooleanOr(CAPABILITY_EASY_PLACE_V2_EXTRA, false)
                 && advertisesCapability(data, CAPABILITY_EASY_PLACE_V2_EXTRA)
+                && data.getBooleanOr(CAPABILITY_PACKET_ANCHOR, false)
                 && advertisesCapability(data, CAPABILITY_PACKET_ANCHOR);
     }
 
@@ -188,6 +189,7 @@ public final class EasyPlaceExtraServer {
         data.putString("mod_version", version);
         data.putInt(NBT_PROTOCOL_VERSION, PROTOCOL_VERSION);
         data.putBoolean(CAPABILITY_EASY_PLACE_V2_EXTRA, enabled);
+        data.putBoolean(CAPABILITY_PACKET_ANCHOR, enabled);
         data.putBoolean(CAPABILITY_Y_PRECISION, enabled);
         data.putBoolean(CAPABILITY_PISTON_PROTECTION, enabled);
         data.putInt(NBT_Y_PRECISION_BITS, EasyPlaceExtraProtocol.Y_PRECISION_BITS);
@@ -235,14 +237,20 @@ public final class EasyPlaceExtraServer {
             boolean enabled
     ) {
         int count = 0;
+        int grantedCount = 0;
         for(ServerPlayer player : server.getPlayerList().getPlayers()) {
             if(!ServerPlayNetworking.canSend(player, EasyPlaceExtraPayload.TYPE)) continue;
-            sendAck(player, enabled);
+            // The rule toggle must not grant support to a client whose HELLO was rejected: the
+            // server would keep ignoring its payload while the client starts encoding.
+            boolean granted = enabled && VALID_HELLO_PLAYERS.contains(player.getUUID());
+            sendAck(player, granted);
+            if(granted) grantedCount++;
             count++;
         }
         FrostorsCarpetAddition.LOGGER.info(
-                "[EasyPlace] Broadcast V2-Extra capability={} to {} online client(s)",
+                "[EasyPlace] Broadcast V2-Extra capability={} (granted {}) to {} online client(s)",
                 enabled,
+                grantedCount,
                 count
         );
     }

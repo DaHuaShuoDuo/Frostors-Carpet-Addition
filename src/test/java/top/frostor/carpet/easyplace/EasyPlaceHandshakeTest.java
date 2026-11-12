@@ -41,6 +41,14 @@ public final class EasyPlaceHandshakeTest extends EasyPlaceTestSupport {
                 ack.getBooleanOr(EasyPlaceExtraServer.CAPABILITY_PISTON_PROTECTION, false),
                 "the ACK must advertise piston protection"
         );
+        check(
+                ack.getBooleanOr(EasyPlaceExtraServer.CAPABILITY_PACKET_ANCHOR, false)
+                        && ack.getBooleanOr(
+                        EasyPlaceExtraServer.CAPABILITY_EASY_PLACE_V2_EXTRA,
+                        false
+                ),
+                "the ACK must advertise the packet anchor explicitly"
+        );
     }
 
     private void checkHelloValidation() {
@@ -92,6 +100,24 @@ public final class EasyPlaceHandshakeTest extends EasyPlaceTestSupport {
         check(
                 !EasyPlaceExtraServer.acceptsHello(legacyAnchor),
                 "a client that does not declare the packet anchor contract must be rejected"
+        );
+
+        CompoundTag anchorListOnly = hello();
+        anchorListOnly.remove(EasyPlaceExtraServer.CAPABILITY_PACKET_ANCHOR);
+        check(
+                !EasyPlaceExtraServer.acceptsHello(anchorListOnly),
+                "the packet anchor must also appear as an explicit boolean"
+        );
+
+        CompoundTag anchorBooleanOnly = hello();
+        anchorBooleanOnly.put(
+                EasyPlaceExtraServer.NBT_CAPABILITIES,
+                listOf(EasyPlaceExtraServer.CAPABILITY_EASY_PLACE_V2_EXTRA)
+        );
+        anchorBooleanOnly.putBoolean(EasyPlaceExtraServer.CAPABILITY_PACKET_ANCHOR, true);
+        check(
+                !EasyPlaceExtraServer.acceptsHello(anchorBooleanOnly),
+                "the packet anchor must also appear in the capabilities list"
         );
 
         check(
@@ -153,6 +179,7 @@ public final class EasyPlaceHandshakeTest extends EasyPlaceTestSupport {
                 EasyPlaceExtraServer.PROTOCOL_VERSION
         );
         data.putBoolean(EasyPlaceExtraServer.CAPABILITY_EASY_PLACE_V2_EXTRA, true);
+        data.putBoolean(EasyPlaceExtraServer.CAPABILITY_PACKET_ANCHOR, true);
         data.put(
                 EasyPlaceExtraServer.NBT_CAPABILITIES,
                 listOf(
