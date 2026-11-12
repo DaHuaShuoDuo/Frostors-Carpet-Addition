@@ -29,6 +29,8 @@ public final class EasyPlaceExtraServer {
             EasyPlaceExtraPayload.CAPABILITY_EASY_PLACE_V2_EXTRA;
     public static final String CAPABILITY_HIT_POSITION_RELAXATION =
             EasyPlaceExtraPayload.CAPABILITY_HIT_POSITION_RELAXATION;
+    public static final String CAPABILITY_PACKET_ANCHOR =
+            EasyPlaceExtraPayload.CAPABILITY_PACKET_ANCHOR;
     public static final String CAPABILITY_Y_PRECISION =
             EasyPlaceExtraPayload.CAPABILITY_Y_PRECISION;
     public static final String CAPABILITY_PISTON_PROTECTION =
@@ -146,9 +148,14 @@ public final class EasyPlaceExtraServer {
 
     /** Validates an inbound client HELLO. Never used to validate our own ACK payloads. */
     static boolean acceptsHello(CompoundTag data) {
+        // The packet-anchor contract is mandatory: a client that still anchors its payload at a
+        // support block while sending a different blockPos would decode one raw value off, so it
+        // must not be granted V2-Extra at all. Rejecting it falls back to unmodified easy place
+        // instead of silently misplacing blocks.
         return data.getIntOr(NBT_PROTOCOL_VERSION, -1) == PROTOCOL_VERSION
                 && data.getBooleanOr(CAPABILITY_EASY_PLACE_V2_EXTRA, false)
-                && advertisesCapability(data, CAPABILITY_EASY_PLACE_V2_EXTRA);
+                && advertisesCapability(data, CAPABILITY_EASY_PLACE_V2_EXTRA)
+                && advertisesCapability(data, CAPABILITY_PACKET_ANCHOR);
     }
 
     static void acceptHello(ServerPlayer player) {
@@ -191,6 +198,7 @@ public final class EasyPlaceExtraServer {
         ListTag capabilities = new ListTag();
         capabilities.add(StringTag.valueOf(CAPABILITY_EASY_PLACE_V2_EXTRA));
         capabilities.add(StringTag.valueOf(CAPABILITY_HIT_POSITION_RELAXATION));
+        capabilities.add(StringTag.valueOf(CAPABILITY_PACKET_ANCHOR));
         if(enabled) {
             capabilities.add(StringTag.valueOf(CAPABILITY_Y_PRECISION));
             capabilities.add(StringTag.valueOf(CAPABILITY_PISTON_PROTECTION));

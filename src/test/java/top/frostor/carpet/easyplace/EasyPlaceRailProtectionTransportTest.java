@@ -7,12 +7,13 @@ import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.phys.Vec3;
 
 /**
- * Headless checks for the V2-Extra rail protection transport.
+ * Headless checks for the V2-Extra wire transport.
  *
- * <p>The client encodes X/Z/Y against the {@code BlockHitResult.blockPos} that goes on the wire.
- * The server's {@code BlockPlaceContext} shifts that position by the hit face, which used to
- * corrupt the auxiliary Z field (bit9 + rail neighbour mask) in a direction-dependent way. These
- * checks mirror the client encoder arithmetically without booting a client or a world.</p>
+ * <p>The packet codecs store the hit location as a binary32 float offset from
+ * {@code BlockHitResult.blockPos}, so that position is the only anchor the server can
+ * reproduce. Every field is decoded against it: the server never falls back to the hit face or
+ * to a horizontal neighbour. Clients that click a support block re-anchor the payload before
+ * queueing the click, which these checks mirror arithmetically without booting a world.</p>
  */
 public final class EasyPlaceRailProtectionTransportTest extends EasyPlaceTestSupport {
     private static final BlockPos BLOCK_POS = new BlockPos(-17, 70, 31);
@@ -37,8 +38,8 @@ public final class EasyPlaceRailProtectionTransportTest extends EasyPlaceTestSup
         test.checkPacketSnapshotForEveryFace();
         test.checkAuxiliaryIsPositionIndependent();
         test.checkAuxiliarySchemaValidation();
-        test.checkAlternateAnchorFallback();
-        test.checkVersionIndependentWireAnchors();
+        test.checkStrictPacketAnchor();
+        test.checkSupportBlockReanchoring();
         test.checkRailProtectionDecision();
         test.checkRailDeferredWindow();
         test.checkYChannelCarriesNoRaw();
@@ -60,9 +61,9 @@ public final class EasyPlaceRailProtectionTransportTest extends EasyPlaceTestSup
             );
             for(Direction face : Direction.values()) {
                 EasyPlacePacketRequest.Snapshot snapshot =
-                        EasyPlacePacketRequest.decode(location, BLOCK_POS, face);
+                        EasyPlacePacketRequest.decode(location, BLOCK_POS);
                 check(
-                        snapshot != null && snapshot.resolvedRawValue() == raw,
+                        snapshot != null && snapshot.rawValue() == raw,
                         "raw " + raw + " must round trip on the packet blockPos anchor (face "
                                 + face + ")"
                 );
@@ -76,10 +77,10 @@ public final class EasyPlaceRailProtectionTransportTest extends EasyPlaceTestSup
 
         for(Direction face : Direction.values()) {
             EasyPlacePacketRequest.Snapshot snapshot =
-                    EasyPlacePacketRequest.decode(location, BLOCK_POS, face);
+                    EasyPlacePacketRequest.decode(location, BLOCK_POS);
             check(snapshot != null, "packet snapshot must exist for face " + face);
             check(
-                    snapshot.resolvedRawValue() == RAW_VALUE,
+                    snapshot.rawValue() == RAW_VALUE,
                     "packet X raw must round trip for face " + face
             );
             check(
@@ -116,8 +117,7 @@ public final class EasyPlaceRailProtectionTransportTest extends EasyPlaceTestSup
         check(
                 EasyPlacePacketRequest.decode(
                         new Vec3(BLOCK_POS.getX() + 0.5, 70.5, BLOCK_POS.getZ() + 0.5),
-                        BLOCK_POS,
-                        Direction.UP
+                        BLOCK_POS
                 ) == null,
                 "plain right clicks must not create an Easy Place packet snapshot"
         );
@@ -143,7 +143,7 @@ public final class EasyPlaceRailProtectionTransportTest extends EasyPlaceTestSup
                             + face + ")"
             );
             EasyPlacePacketRequest.Snapshot snapshot =
-                    EasyPlacePacketRequest.decode(location, BLOCK_POS, face);
+                    EasyPlacePacketRequest.decode(location, BLOCK_POS);
             check(
                     snapshot != null && snapshot.auxiliaryValue() == AUXILIARY_VALUE,
                     "the auxiliary field must survive every hit face (" + face + ")"
@@ -158,7 +158,7 @@ public final class EasyPlaceRailProtectionTransportTest extends EasyPlaceTestSup
                 "the transformed target still loses the V2-Extra marker on an east-facing click"
         );
         check(
-                EasyPlacePacketRequest.decode(location, BLOCK_POS, Direction.EAST) != null,
+                EasyPlacePacketRequest.decode(location, BLOCK_POS) != null,
                 "packet-level decoding must not gate on the transformed target"
         );
     }
@@ -172,7 +172,7 @@ public final class EasyPlaceRailProtectionTransportTest extends EasyPlaceTestSup
                 0.5
         );
         EasyPlacePacketRequest.Snapshot plain =
-                EasyPlacePacketRequest.decode(unencoded, BLOCK_POS, Direction.UP);
+                EasyPlacePacketRequest.decode(unencoded, BLOCK_POS);
         check(
                 plain != null && plain.auxiliaryValue() == -1,
                 "a plain click location must not be interpreted as an auxiliary field"
@@ -180,7 +180,7 @@ public final class EasyPlaceRailProtectionTransportTest extends EasyPlaceTestSup
 
         Vec3 noSchema = encode(BLOCK_POS, extraValue, AUXILIARY_VALUE);
         EasyPlacePacketRequest.Snapshot unsigned =
-                EasyPlacePacketRequest.decode(noSchema, BLOCK_POS, Direction.UP);
+                EasyPlacePacketRequest.decode(noSchema, BLOCK_POS);
         check(
                 unsigned != null && unsigned.auxiliaryValue() == -1,
                 "an auxiliary field without the schema bit must be rejected"
@@ -195,66 +195,134 @@ public final class EasyPlaceRailProtectionTransportTest extends EasyPlaceTestSup
         );
     }
 
-    private void checkAlternateAnchorFallback() {
-        BlockPos westPos = BLOCK_POS.relative(Direction.WEST);
-        int extraValue = EasyPlaceExtraProtocol.toExtraValue(RAW_VALUE);
-        Vec3 location = encode(westPos, extraValue, ENCODED_AUXILIARY_VALUE);
+    /**
+     * The server must not repair a foreign anchor by scanning the hit face or the horizontal
+     * neighbours. Such a payload now decodes as absent or one raw value off, never as the value
+     * it was not anchored at.
+     */
+    private void checkStrictPacketAnchor() {
+        BlockPos foreignAnchor = BLOCK_POS.relative(Direction.WEST);
+        Vec3 location = encode(
+                foreignAnchor,
+                EasyPlaceExtraProtocol.toExtraValue(RAW_VALUE),
+                ENCODED_AUXILIARY_VALUE
+        );
 
         EasyPlacePacketRequest.Snapshot snapshot =
-                EasyPlacePacketRequest.decode(location, BLOCK_POS, Direction.WEST);
-        check(snapshot != null, "an alternate X anchor must still be recognised");
+                EasyPlacePacketRequest.decode(location, BLOCK_POS);
         check(
-                snapshot.rawValue() < 0 && snapshot.alternateRawValue() == RAW_VALUE,
-                "only the alternate X anchor may carry the marker for a wall-attached target"
-        );
-        check(
-                snapshot.resolvedRawValue() == RAW_VALUE
-                        && snapshot.auxiliaryValue() == AUXILIARY_VALUE,
-                "resolved values must follow the recognised anchor"
-        );
-    }
-
-    /**
-     * Minecraft 26.2 uses Litematica 0.28.6 and a plain ServerboundUseItemOnPacket, while 26.3
-     * uses Litematica 0.29.1 and a record packet whose BlockHitResult codec stores the location
-     * as a float offset from blockPos. Both must decode identically; an offset X anchor (bell
-     * placement plans, printer adapters) may not change the decoded values.
-     */
-    private void checkVersionIndependentWireAnchors() {
-        int extraValue = EasyPlaceExtraProtocol.toExtraValue(RAW_VALUE);
-        BlockPos offsetAnchor = BLOCK_POS.relative(Direction.WEST);
-        Vec3 shifted = new Vec3(
-                offsetAnchor.getX() + (extraValue << 1) + 2.0,
-                BLOCK_POS.getY() + 2.0 + Y_PRECISION_VALUE * 2.0,
-                (ENCODED_AUXILIARY_VALUE << 1) + 2.0
+                snapshot == null || snapshot.rawValue() != RAW_VALUE,
+                "a payload anchored one block away must not be repaired by another anchor"
         );
 
-        for(Direction face : Direction.values()) {
-            EasyPlacePacketRequest.Snapshot snapshot =
-                    EasyPlacePacketRequest.decode(shifted, BLOCK_POS, face);
-            check(snapshot != null, "an offset X anchor must still be a V2-Extra packet (" + face + ")");
-            check(
-                    snapshot.auxiliaryValue() == AUXILIARY_VALUE,
-                    "Z auxiliary must not depend on the X anchor (" + face + ")"
-            );
-            EasyPlacePlacementRequest.Snapshot placement = snapshot.toPlacementSnapshot();
-            check(
-                    placement != null && placement.rawValue() == RAW_VALUE,
-                    "the X candidate search must recover the raw value (" + face + ")"
-            );
-        }
+        Vec3 zeroRaw = encode(
+                foreignAnchor,
+                EasyPlaceExtraProtocol.toExtraValue(0),
+                ENCODED_AUXILIARY_VALUE
+        );
+        EasyPlacePacketRequest.Snapshot zero = EasyPlacePacketRequest.decode(zeroRaw, BLOCK_POS);
+        check(
+                zero == null || zero.rawValue() != 0,
+                "raw 0 must not be recovered from a foreign anchor either"
+        );
+        check(
+                EasyPlaceExtraProtocol.decode(
+                        new Vec3(Double.NaN, BLOCK_POS.getY(), BLOCK_POS.getZ()),
+                        BLOCK_POS
+                ) < 0,
+                "a malformed hit offset must decode as absent instead of an unsigned shift"
+        );
 
         Vec3 plainClick = new Vec3(
                 BLOCK_POS.getX() + 0.5,
                 BLOCK_POS.getY() + 0.5,
                 BLOCK_POS.getZ() + 0.5
         );
-        for(Direction face : Direction.values()) {
-            check(
-                    EasyPlacePacketRequest.decode(plainClick, BLOCK_POS, face) == null,
-                    "a plain click must not become a V2-Extra packet (" + face + ")"
-            );
+        check(
+                EasyPlacePacketRequest.decode(plainClick, BLOCK_POS) == null,
+                "a plain click must not become a V2-Extra packet"
+        );
+    }
+
+    /**
+     * Models the printer support path: the schematic target is encoded first, then the click is
+     * queued against the support block. The client re-anchors the payload to that packet position
+     * before sending, which keeps the wire contract single-anchored for every side.
+     *
+     * <p>Without the re-anchor a horizontal side decodes {@code raw - 1}, because the encoder
+     * writes {@code 2 + 2 * extra} and the receiver subtracts {@code 2} before the shift.</p>
+     */
+    private void checkSupportBlockReanchoring() {
+        for(int raw = 0; raw <= 0x7f; raw++) {
+            int extraValue = EasyPlaceExtraProtocol.toExtraValue(raw);
+            for(Direction side : Direction.values()) {
+                BlockPos support = BLOCK_POS.relative(side);
+                Vec3 encodedAtTarget = encode(
+                        BLOCK_POS,
+                        extraValue,
+                        ENCODED_AUXILIARY_VALUE
+                );
+                Vec3 reanchored = shiftAnchor(encodedAtTarget, side);
+                Vec3 received = wire(support, reanchored);
+                EasyPlacePacketRequest.Snapshot snapshot =
+                        EasyPlacePacketRequest.decode(received, support);
+                check(
+                        snapshot != null && snapshot.rawValue() == raw,
+                        "raw " + raw + " must survive the support-block anchor on side " + side
+                );
+                check(
+                        snapshot.yPrecisionValue() == Y_PRECISION_VALUE,
+                        "the Y precision must survive the support-block anchor on side " + side
+                );
+                check(
+                        snapshot.auxiliaryValue() != -1,
+                        "the fixed-origin Z auxiliary must be recognised on " + side
+                );
+                // The auxiliary field lives near 2^25, where binary32 steps by four, so the
+                // low bit of the decoded value is lossy by design; only the raw channel is
+                // asserted exactly here.
+
+                Vec3 notReanchored = wire(support, encodedAtTarget);
+                EasyPlacePacketRequest.Snapshot legacy =
+                        EasyPlacePacketRequest.decode(notReanchored, support);
+                // The "+2" payload offset absorbs a one-block shift towards the negative axis, so
+                // only east support clicks lost the raw value and only up support clicks lost the
+                // Y precision before the re-anchor.
+                if(side.getStepX() > 0) {
+                    check(
+                            legacy == null || legacy.rawValue() != raw,
+                            "an un-reanchored east support click must not decode as if it were correct"
+                    );
+                } else if(side.getStepY() > 0) {
+                    check(
+                            legacy == null
+                                    || legacy.yPrecisionValue() != Y_PRECISION_VALUE,
+                            "an un-reanchored up support click must not keep the Y precision"
+                    );
+                }
+            }
         }
+    }
+
+    /** Mirrors the binary32 float offset that both packet codecs write for the hit location. */
+    private static Vec3 wire(BlockPos packetPos, Vec3 absoluteLocation) {
+        return new Vec3(
+                packetPos.getX() + (float) (absoluteLocation.x - packetPos.getX()),
+                packetPos.getY() + (float) (absoluteLocation.y - packetPos.getY()),
+                packetPos.getZ() + (float) (absoluteLocation.z - packetPos.getZ())
+        );
+    }
+
+    /**
+     * The client only translates the X and Y channels. Z carries the fixed-origin auxiliary
+     * payload, so translating it would corrupt the flags.
+     */
+    private static Vec3 shiftAnchor(Vec3 encoded, Direction side) {
+        return new Vec3(
+                encoded.x + side.getStepX(),
+                encoded.y + side.getStepY(),
+                encoded.z
+        );
     }
 
     private void checkRailProtectionDecision() {

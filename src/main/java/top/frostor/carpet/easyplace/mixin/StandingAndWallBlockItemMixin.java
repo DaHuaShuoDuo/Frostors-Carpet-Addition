@@ -43,13 +43,6 @@ public abstract class StandingAndWallBlockItemMixin extends BlockItem {
         if(request == null) return;
 
         int rawValue = request.rawValue();
-        boolean wallPlacement = context.getClickedFace().getAxis().isHorizontal();
-        int alternateRawValue = request.alternateRawValue();
-        if(alternateRawValue >= 0
-                && ((rawValue & 1) != 0) != wallPlacement
-                && ((alternateRawValue & 1) != 0) == wallPlacement) {
-            rawValue = alternateRawValue;
-        }
         BlockState state = cir.getReturnValue();
         if(state == null) {
             boolean wall = (rawValue & 1) != 0;

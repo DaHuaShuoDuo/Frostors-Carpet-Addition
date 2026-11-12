@@ -138,7 +138,6 @@ public final class EasyPlaceYPrecisionTest extends EasyPlaceTestSupport {
                         EasyPlaceExtraProtocol.toRawValue(
                                 EasyPlaceExtraProtocol.decode(encodedHit, encodedTarget)
                         ),
-                        -1,
                         0,
                         0,
                         0

@@ -148,11 +148,13 @@ FCA 在 `handleUseItemOn` 收到未修改的命中结果时保存整份 packet �
 同版本号配套使用。
 26.2/26.3 放置语义统一：两版依赖的 Litematica 不同（0.28.6 / 0.29.1），且 26.3 把
 `ServerboundUseItemOnPacket` 改为 record，命中位置经 `BlockHitResult.STREAM_CODEC` 以
-**相对 `blockPos` 的 float** 传输。为屏蔽这些差异，wire 的 X/Y 锚点固定为 packet
-`blockPos`；`BellRules.resolveProtocolTarget` 等解析出的 `protocolPos` 只用于读取投影与
-当前世界状态，不得传给 `encodeX`/`encodeY`。服务端以 Z 的 `AUXILIARY_SCHEMA` 位为主判据，
-X 主锚点失配时再按命中面及 X 轴相邻锚点兜底。两版因此走同一套解码路径，侧挂钟等
-`facing` 落在 X 轴的目标不会再因锚点偏移丢失 V2-Extra marker。
+**相对 `blockPos` 的 float** 传输。wire 的 X/Y/Z 三个通道因此只承认 packet `blockPos`
+这一个锚点：客户端要点击支撑方块时，必须在入队时把 X/Y 平移同一差值，使载荷与 packet
+位置自洽；`BellRules.resolveProtocolTarget` 等解析出的 `protocolPos` 只用于读取投影与
+当前世界状态，不得传给 `encodeX`/`encodeY`。服务端不再按命中面或 X 轴相邻锚点兜底，
+X 在主锚点没有 marker 时一律视为无 raw，避免把错位的包解成一个"看起来合法"的其它
+raw 值。该契约以 HELLO 能力位 `easy_place_packet_anchor` 声明，未声明该能力的客户端
+不会获得 V2-Extra，而是回落到原版 easy place，不会静默放错方块状态。
 多面方块的面索引顺序固定为 `DOWN, UP, NORTH, SOUTH, WEST, EAST`，藤蔓从同一顺序
 过滤 `DOWN` 得到 `UP, NORTH, SOUTH, WEST, EAST`。使用历史面顺序构建的客户端或
 服务端必须升级到匹配版本，混用版本时多面方块和藤蔓可能按错误方向解码。旧 `main`

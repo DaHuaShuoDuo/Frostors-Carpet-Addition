@@ -204,15 +204,19 @@ TNT protection bits.
 26.2 and 26.3 share one placement semantic: they depend on different
 Litematica versions (0.28.6 / 0.29.1), and 26.3 turns
 `ServerboundUseItemOnPacket` into a record whose `BlockHitResult.STREAM_CODEC`
-transmits the hit location as a **float offset from `blockPos`**. To hide those
-differences, the wire X/Y anchor is fixed to the packet `blockPos`; positions
-resolved by `BellRules.resolveProtocolTarget` (`protocolPos`) are used only to
-read the projection and current world state and must never be passed to
-`encodeX`/`encodeY`. The server uses Z's `AUXILIARY_SCHEMA` bit as the primary
-packet marker and falls back to the hit face and X-axis neighbors when the
-primary X anchor has no marker. Both versions therefore follow the same decode
-path, and side-mounted bells whose `facing` lies on the X axis no longer lose
-the V2-Extra marker to an anchor shift.
+transmits the hit location as a **float offset from `blockPos`**. All three
+wire channels therefore accept exactly one anchor, the packet `blockPos`: a
+client that clicks a support block must translate its X/Y payload by the same
+difference when the click is queued, so the payload stays consistent with the
+packet position. Positions resolved by `BellRules.resolveProtocolTarget`
+(`protocolPos`) are used only to read the projection and current world state
+and must never be passed to `encodeX`/`encodeY`. The server no longer retries
+the hit face or the X-axis neighbors; a packet without an X marker on the
+contract anchor is treated as carrying no raw value instead of being decoded
+into a plausible but different state. Clients declare the contract through the
+`easy_place_packet_anchor` HELLO capability; a client that does not declare it
+gets no V2-Extra at all and falls back to unmodified easy place rather than
+misplacing blocks silently.
 Multiface wire indices use the fixed order
 `DOWN, UP, NORTH, SOUTH, WEST, EAST`; vine derives `UP, NORTH, SOUTH, WEST,
 EAST` by filtering out `DOWN`. Clients or servers built with the historical

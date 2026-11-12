@@ -298,10 +298,10 @@ public abstract class BlockItemMixin {
             return null;
         }
 
-        // The packet hit result is the only place where the raw X field still has its original
-        // anchor. BlockPlaceContext.getClickedPos() may be shifted by the hit face and
-        // BlockPlaceContext.at(...) may rebuild the click location entirely, so prefer the
-        // packet snapshot whenever one exists.
+        // The packet hit result is the only place where the V2-Extra payload is still anchored at
+        // its wire position. BlockPlaceContext.getClickedPos() may be shifted by the hit face and
+        // BlockPlaceContext.at(...) may rebuild the click location entirely, so decode the packet
+        // snapshot while the original hit result is still available.
         EasyPlacePacketRequest.Snapshot packetRequest = EasyPlacePacketRequest.current();
         if(packetRequest != null) {
             return packetRequest.toPlacementSnapshot();
@@ -319,7 +319,6 @@ public abstract class BlockItemMixin {
         );
         return new EasyPlacePlacementRequest.Snapshot(
                 EasyPlaceExtraProtocol.toRawValue(protocolValue),
-                -1,
                 EasyPlaceExtraProtocol.stripAuxiliarySchema(
                         EasyPlaceExtraProtocol.decodeAuxiliary(
                                 context.getClickLocation()

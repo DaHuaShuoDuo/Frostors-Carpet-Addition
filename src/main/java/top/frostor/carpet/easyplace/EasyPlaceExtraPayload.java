@@ -24,6 +24,7 @@ public record EasyPlaceExtraPayload(int packetId, CompoundTag data) implements C
     public static final String NBT_PISTON_PROTECTION_BITS = "piston_protection_bits";
     public static final String CAPABILITY_EASY_PLACE_V2_EXTRA = "easy_place_v2_extra";
     public static final String CAPABILITY_HIT_POSITION_RELAXATION = "hit_position_relaxation";
+    public static final String CAPABILITY_PACKET_ANCHOR = "easy_place_packet_anchor";
     public static final String CAPABILITY_Y_PRECISION = "easy_place_y_precision";
     public static final String CAPABILITY_PISTON_PROTECTION = "easy_place_piston_protection";
     public static final Type<EasyPlaceExtraPayload> TYPE = new Type<>(CHANNEL);

@@ -66,6 +66,11 @@ public final class EasyPlaceExtraProtocol {
     private EasyPlaceExtraProtocol() {
     }
 
+    /**
+     * X raw value relative to the packet's {@code BlockHitResult.blockPos}. Compiled clients
+     * re-anchor their payload to that position before queueing the click, so this is the only
+     * anchor the server has to support; no alternative anchor is attempted.
+     */
     public static int decode(Vec3 hitPos, BlockPos clickedPos) {
         return decodeDimension(hitPos.x - clickedPos.getX());
     }
@@ -168,7 +173,10 @@ public final class EasyPlaceExtraProtocol {
 
     private static int decodeDimension(double relativeHit) {
         if(relativeHit < 2.0) return -1;
-        return ((int) relativeHit - 2) >>> 1;
+        int payload = (int) relativeHit - 2;
+        // A payload shifted by one block yields a negative value; the old unconditional
+        // ">>> 1" turned that into 0x7fffffff and silently produced a bogus raw value.
+        return payload < 0 ? -1 : payload >>> 1;
     }
 
     public static boolean isExtra(int protocolValue) {

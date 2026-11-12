@@ -84,6 +84,16 @@ public final class EasyPlaceHandshakeTest extends EasyPlaceTestSupport {
                 "the base capability must also appear in the capabilities list"
         );
 
+        CompoundTag legacyAnchor = hello();
+        legacyAnchor.put(
+                EasyPlaceExtraServer.NBT_CAPABILITIES,
+                listOf(EasyPlaceExtraServer.CAPABILITY_EASY_PLACE_V2_EXTRA)
+        );
+        check(
+                !EasyPlaceExtraServer.acceptsHello(legacyAnchor),
+                "a client that does not declare the packet anchor contract must be rejected"
+        );
+
         check(
                 !EasyPlaceExtraServer.acceptsHello(new CompoundTag()),
                 "an empty hand-built HELLO must be rejected"
@@ -116,6 +126,9 @@ public final class EasyPlaceHandshakeTest extends EasyPlaceTestSupport {
                 StringTag.valueOf(EasyPlaceExtraServer.CAPABILITY_EASY_PLACE_V2_EXTRA)
         );
         completeCapabilities.add(
+                StringTag.valueOf(EasyPlaceExtraServer.CAPABILITY_PACKET_ANCHOR)
+        );
+        completeCapabilities.add(
                 StringTag.valueOf(EasyPlaceExtraServer.CAPABILITY_Y_PRECISION)
         );
         complete.put(EasyPlaceExtraServer.NBT_CAPABILITIES, completeCapabilities);
@@ -125,6 +138,14 @@ public final class EasyPlaceHandshakeTest extends EasyPlaceTestSupport {
         );
     }
 
+    private static ListTag listOf(String... capabilities) {
+        ListTag list = new ListTag();
+        for(String capability : capabilities) {
+            list.add(StringTag.valueOf(capability));
+        }
+        return list;
+    }
+
     private static CompoundTag hello() {
         CompoundTag data = new CompoundTag();
         data.putInt(
@@ -132,11 +153,13 @@ public final class EasyPlaceHandshakeTest extends EasyPlaceTestSupport {
                 EasyPlaceExtraServer.PROTOCOL_VERSION
         );
         data.putBoolean(EasyPlaceExtraServer.CAPABILITY_EASY_PLACE_V2_EXTRA, true);
-        ListTag capabilities = new ListTag();
-        capabilities.add(
-                StringTag.valueOf(EasyPlaceExtraServer.CAPABILITY_EASY_PLACE_V2_EXTRA)
+        data.put(
+                EasyPlaceExtraServer.NBT_CAPABILITIES,
+                listOf(
+                        EasyPlaceExtraServer.CAPABILITY_EASY_PLACE_V2_EXTRA,
+                        EasyPlaceExtraServer.CAPABILITY_PACKET_ANCHOR
+                )
         );
-        data.put(EasyPlaceExtraServer.NBT_CAPABILITIES, capabilities);
         return data;
     }
 }

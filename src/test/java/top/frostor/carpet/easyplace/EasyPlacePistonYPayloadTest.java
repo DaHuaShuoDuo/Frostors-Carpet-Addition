@@ -139,7 +139,7 @@ public final class EasyPlacePistonYPayloadTest extends EasyPlaceTestSupport {
         );
 
         EasyPlacePacketRequest.Snapshot snapshot =
-                EasyPlacePacketRequest.decode(location, BLOCK_POS, Direction.UP);
+                EasyPlacePacketRequest.decode(location, BLOCK_POS);
         check(snapshot != null, "the packet-level decoder must accept a piston-carrying packet");
         check(
                 snapshot.rawValue() == rawValue,

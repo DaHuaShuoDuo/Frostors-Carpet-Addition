@@ -234,10 +234,13 @@ Carpet 会把枚举候选显示为小写，并在解析输入时先转为大写�
   位都会被静默丢弃。
 - 26.2/26.3 放置语义必须统一：两版分别依赖 Litematica 0.28.6 / 0.29.1，且 26.3 的
   `ServerboundUseItemOnPacket` 是 record，命中位置以相对 `blockPos` 的 float 传输。wire 的
-  X/Y 编码锚点只能是 packet `BlockHitResult.blockPos`；`resolveProtocolTarget` 一类的
-  `protocolPos` 仅用于读投影/世界状态，禁止进入 `encodeX`/`encodeY`。服务端以 Z 的
-  `AUXILIARY_SCHEMA` 位识别 V2-Extra 包，并在 X 主锚点无 marker 时按命中面及 X 轴
-  相邻锚点兜底，不得按 Minecraft 版本分叉实现。
+  X/Y/Z 三个通道只承认 packet `BlockHitResult.blockPos` 这一个锚点；`resolveProtocolTarget`
+  一类的 `protocolPos` 仅用于读投影/世界状态，禁止进入 `encodeX`/`encodeY`。客户端点击
+  支撑方块时，必须在入队前把 X/Y 平移 `packetTarget - encodeAnchor`（Z 是固定原点
+  auxiliary，不得平移），服务端只按 `blockPos` 解一次，不得再按命中面、X 轴相邻锚点或
+  奇偶位兜底；`alternateRawValue` 一类候选字段不得回归。该契约由 HELLO 能力位
+  `easy_place_packet_anchor` 声明，未声明的客户端一律不授予 V2-Extra——宁可回落到原版
+  easy place，也不能静默解出错误 raw 后放错方块状态。
 - 活塞保护以 Y 的 `Y_PISTON_SCHEMA`（bit20）为唯一判据，服务端解出后剥离，缺标记按
   空掩码处理。掩码 bit0 是放置目标，bit1-6 按 `Direction.ordinal()` 标记匹配的面邻居，
   bit7-11 标记五个 QC 二跳目标。`PISTON` family 只覆盖掩码命中的直接位置；QC 位置还
