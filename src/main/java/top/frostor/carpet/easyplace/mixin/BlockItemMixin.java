@@ -307,7 +307,10 @@ public abstract class BlockItemMixin {
             return packetRequest.toPlacementSnapshot();
         }
 
-        // Fallback for paths that do not pass through handleUseItemOn.
+        // Fallback for paths that do not pass through handleUseItemOn. There is no packet hit
+        // result here, and getClickedPos()/getClickLocation() may already be shifted by the hit
+        // face or rebuilt by BlockPlaceContext.at(...), so neither can serve as the wire anchor.
+        // Auxiliary is therefore dropped instead of decoded against a guessed position.
         int protocolValue = EasyPlaceExtraProtocol.decode(
                 context.getClickLocation(),
                 context.getClickedPos()
@@ -319,11 +322,7 @@ public abstract class BlockItemMixin {
         );
         return new EasyPlacePlacementRequest.Snapshot(
                 EasyPlaceExtraProtocol.toRawValue(protocolValue),
-                EasyPlaceExtraProtocol.stripAuxiliarySchema(
-                        EasyPlaceExtraProtocol.decodeAuxiliary(
-                                context.getClickLocation()
-                        )
-                ),
+                -1,
                 packedY < 0
                         ? -1
                         : packedY & EasyPlaceExtraProtocol.Y_PRECISION_MASK,

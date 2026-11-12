@@ -44,17 +44,47 @@ public final class EasyPlacePacketRequest {
      * @return {@code null} when the packet carries neither the Z schema nor an X marker
      */
     public static @Nullable Snapshot decode(Vec3 location, BlockPos blockPos) {
-        int auxiliaryValue = EasyPlaceExtraProtocol.stripAuxiliarySchema(
-                EasyPlaceExtraProtocol.decodeAuxiliary(location)
-        );
-        boolean schemaPresent = auxiliaryValue >= 0;
+        return decode(location, blockPos, false);
+    }
 
+    /**
+     * Decodes a packet that may use the split, blockPos-relative auxiliary layout.
+     *
+     * <p>In relative-aux mode only the low 24 bits travel in Z; the schema, wall-schema and
+     * wall-up bits ride in the X payload, so X is the sole marker carrier and the auxiliary
+     * presence test moves there as well. Clients that did not negotiate the capability keep the
+     * legacy fixed-origin field.</p>
+     */
+    public static @Nullable Snapshot decode(
+            Vec3 location,
+            BlockPos blockPos,
+            boolean relativeAux
+    ) {
         int primaryValue = EasyPlaceExtraProtocol.decode(location, blockPos);
         int rawValue = EasyPlaceExtraProtocol.isExtra(primaryValue)
                 ? EasyPlaceExtraProtocol.toRawValue(primaryValue)
                 : -1;
-        if(!schemaPresent && rawValue < 0) {
-            return null;
+
+        int auxiliaryValue;
+        if(relativeAux) {
+            if(rawValue < 0) {
+                return null;
+            }
+            int relativePayload = EasyPlaceExtraProtocol.decodeRelativeAuxiliary(
+                    location,
+                    blockPos
+            );
+            auxiliaryValue = (primaryValue & EasyPlaceExtraProtocol.X_AUX_SCHEMA_BIT) == 0
+                    || relativePayload < 0
+                    ? -1
+                    : EasyPlaceExtraProtocol.joinAuxiliary(primaryValue, relativePayload);
+        } else {
+            auxiliaryValue = EasyPlaceExtraProtocol.stripAuxiliarySchema(
+                    EasyPlaceExtraProtocol.decodeAuxiliary(location)
+            );
+            if(auxiliaryValue < 0 && rawValue < 0) {
+                return null;
+            }
         }
 
         int packedY = EasyPlaceExtraProtocol.decodeY(location, blockPos);

@@ -30,7 +30,8 @@ public abstract class ServerGamePacketListenerImplMixin {
         if(FrostorSettings.easyPlaceProtocolExtra && EasyPlaceExtraServer.isSupported(player)) {
             EasyPlacePacketRequest.Snapshot snapshot = EasyPlacePacketRequest.decode(
                     hitResult.getLocation(),
-                    hitResult.getBlockPos()
+                    hitResult.getBlockPos(),
+                    EasyPlaceExtraServer.supportsRelativeAux(player)
             );
             if(snapshot != null) {
                 EasyPlacePacketRequest.begin(snapshot);

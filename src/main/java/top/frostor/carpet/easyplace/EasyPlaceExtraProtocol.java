@@ -28,6 +28,19 @@ public final class EasyPlaceExtraProtocol {
      * server pick the correct Z anchor without guessing from the X channel.
      */
     public static final int AUXILIARY_SCHEMA = 1 << 24;
+    /**
+     * Relative-aux mode keeps only the low 24 bits of the auxiliary value in Z and moves the
+     * three high bits into the X payload. A 24-bit payload keeps the binary32 wire offset at or
+     * below 2^25, and every even integer up to 2^25 is exact; a 25-bit payload already loses its
+     * lowest bit. The in-memory auxiliary layout stays unchanged, so every guard and state
+     * adapter keeps reading bits 24/26/27.
+     */
+    public static final int AUX_LOW_MASK = 0x00ff_ffff;
+    public static final int X_AUX_SCHEMA_BIT = 1 << 8;
+    public static final int X_WALL_SCHEMA_BIT = 1 << 9;
+    public static final int X_WALL_UP_BIT = 1 << 10;
+    public static final int X_AUX_HIGH_MASK =
+            X_AUX_SCHEMA_BIT | X_WALL_SCHEMA_BIT | X_WALL_UP_BIT;
     public static final int RAIL_POWERED_MASK = 1 << 4;
     public static final int RAIL_PROTECTION_FLAG_POWERED = 1 << 3;
     public static final int RAIL_PROTECTION_FLAG_REGULAR = 1 << 4;
@@ -87,6 +100,45 @@ public final class EasyPlaceExtraProtocol {
      */
     public static int decodeAuxiliary(Vec3 hitPos) {
         return decodeDimension(hitPos.z);
+    }
+
+    /**
+     * Low 24 bits of the auxiliary field, anchored at the packet {@code blockPos}.
+     *
+     * <p>Whether an auxiliary field is present at all is signalled by
+     * {@link #X_AUX_SCHEMA_BIT} in the X payload, not by this value.</p>
+     *
+     * @return the clamped 24-bit payload, or {@code -1} when the offset holds no payload
+     */
+    public static int decodeRelativeAuxiliary(Vec3 hitPos, BlockPos clickedPos) {
+        int value = decodeDimension(hitPos.z - clickedPos.getZ());
+        return value < 0 ? -1 : value & AUX_LOW_MASK;
+    }
+
+    /**
+     * Reassembles the in-memory auxiliary value from the split wire fields.
+     *
+     * <p>The three high bits travel in the X payload, so the value every consumer sees is
+     * identical to the legacy layout.</p>
+     */
+    public static int joinAuxiliary(int xPayload, int zPayload) {
+        if(zPayload < 0) {
+            return -1;
+        }
+        int auxiliaryValue = zPayload & AUX_LOW_MASK;
+        if((xPayload & X_AUX_SCHEMA_BIT) != 0) auxiliaryValue |= AUXILIARY_SCHEMA;
+        if((xPayload & X_WALL_SCHEMA_BIT) != 0) auxiliaryValue |= WALL_AUXILIARY_SCHEMA;
+        if((xPayload & X_WALL_UP_BIT) != 0) auxiliaryValue |= WALL_UP;
+        return auxiliaryValue;
+    }
+
+    /** Extracts the three auxiliary bits that travel in the X payload. */
+    public static int splitAuxiliaryHigh(int auxiliaryValue) {
+        int high = 0;
+        if((auxiliaryValue & AUXILIARY_SCHEMA) != 0) high |= X_AUX_SCHEMA_BIT;
+        if((auxiliaryValue & WALL_AUXILIARY_SCHEMA) != 0) high |= X_WALL_SCHEMA_BIT;
+        if((auxiliaryValue & WALL_UP) != 0) high |= X_WALL_UP_BIT;
+        return high;
     }
 
     public static int decodeY(Vec3 hitPos, BlockPos clickedPos) {

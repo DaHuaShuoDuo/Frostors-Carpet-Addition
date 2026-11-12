@@ -30,6 +30,7 @@ public final class EasyPlaceExtraProtocolTest {
                 + EasyPlaceRailProtectionTransportTest.run()
                 + EasyPlacePistonStateTest.run()
                 + EasyPlacePistonYPayloadTest.run()
+                + EasyPlaceAuxSplitTest.run()
                 + EasyPlaceHandshakeTest.run();
 
         System.out.println("EasyPlaceExtraProtocolTest passed " + checks + " checks");

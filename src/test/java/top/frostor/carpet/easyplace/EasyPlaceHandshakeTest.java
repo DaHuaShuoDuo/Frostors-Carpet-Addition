@@ -13,6 +13,7 @@ public final class EasyPlaceHandshakeTest extends EasyPlaceTestSupport {
         test.checkAckPayloadShape();
         test.checkHelloValidation();
         test.checkYPrecisionRequiresValidHello();
+        test.checkRelativeAuxCapability();
         return test.checks();
     }
 
@@ -164,6 +165,54 @@ public final class EasyPlaceHandshakeTest extends EasyPlaceTestSupport {
         );
     }
 
+    /**
+     * The relative-aux layout is optional: a client that does not declare it keeps the legacy
+     * fixed-origin field, and a half-declared capability must not be honoured either.
+     */
+    private void checkRelativeAuxCapability() {
+        check(
+                EasyPlaceExtraServer.supportsRelativeAux(hello(true)),
+                "a HELLO that declares the capability in both places must enable it"
+        );
+        check(
+                !EasyPlaceExtraServer.supportsRelativeAux(hello(false)),
+                "a HELLO without the capability must stay on the legacy layout"
+        );
+
+        CompoundTag booleanOnly = hello(true);
+        booleanOnly.put(
+                EasyPlaceExtraServer.NBT_CAPABILITIES,
+                listOf(
+                        EasyPlaceExtraServer.CAPABILITY_EASY_PLACE_V2_EXTRA,
+                        EasyPlaceExtraServer.CAPABILITY_PACKET_ANCHOR
+                )
+        );
+        check(
+                !EasyPlaceExtraServer.supportsRelativeAux(booleanOnly),
+                "the capability must also appear in the capabilities list"
+        );
+
+        CompoundTag listOnly = hello(false);
+        listOnly.put(
+                EasyPlaceExtraServer.NBT_CAPABILITIES,
+                listOf(
+                        EasyPlaceExtraServer.CAPABILITY_EASY_PLACE_V2_EXTRA,
+                        EasyPlaceExtraServer.CAPABILITY_PACKET_ANCHOR,
+                        EasyPlaceExtraServer.CAPABILITY_RELATIVE_AUX
+                )
+        );
+        check(
+                !EasyPlaceExtraServer.supportsRelativeAux(listOnly),
+                "a list entry without the explicit boolean must not enable the layout"
+        );
+
+        CompoundTag ack = EasyPlaceExtraServer.capabilityData(true, "test");
+        check(
+                ack.getBooleanOr(EasyPlaceExtraServer.CAPABILITY_RELATIVE_AUX, false),
+                "the enabled ACK must advertise the relative auxiliary layout"
+        );
+    }
+
     private static ListTag listOf(String... capabilities) {
         ListTag list = new ListTag();
         for(String capability : capabilities) {
@@ -173,6 +222,10 @@ public final class EasyPlaceHandshakeTest extends EasyPlaceTestSupport {
     }
 
     private static CompoundTag hello() {
+        return hello(false);
+    }
+
+    private static CompoundTag hello(boolean relativeAux) {
         CompoundTag data = new CompoundTag();
         data.putInt(
                 EasyPlaceExtraServer.NBT_PROTOCOL_VERSION,
@@ -180,13 +233,17 @@ public final class EasyPlaceHandshakeTest extends EasyPlaceTestSupport {
         );
         data.putBoolean(EasyPlaceExtraServer.CAPABILITY_EASY_PLACE_V2_EXTRA, true);
         data.putBoolean(EasyPlaceExtraServer.CAPABILITY_PACKET_ANCHOR, true);
-        data.put(
-                EasyPlaceExtraServer.NBT_CAPABILITIES,
-                listOf(
-                        EasyPlaceExtraServer.CAPABILITY_EASY_PLACE_V2_EXTRA,
-                        EasyPlaceExtraServer.CAPABILITY_PACKET_ANCHOR
-                )
+        ListTag capabilities = listOf(
+                EasyPlaceExtraServer.CAPABILITY_EASY_PLACE_V2_EXTRA,
+                EasyPlaceExtraServer.CAPABILITY_PACKET_ANCHOR
         );
+        if(relativeAux) {
+            data.putBoolean(EasyPlaceExtraServer.CAPABILITY_RELATIVE_AUX, true);
+            capabilities.add(
+                    StringTag.valueOf(EasyPlaceExtraServer.CAPABILITY_RELATIVE_AUX)
+            );
+        }
+        data.put(EasyPlaceExtraServer.NBT_CAPABILITIES, capabilities);
         return data;
     }
 }

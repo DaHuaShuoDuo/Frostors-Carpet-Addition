@@ -217,6 +217,16 @@ into a plausible but different state. Clients declare the contract through the
 `easy_place_packet_anchor` HELLO capability; a client that does not declare it
 gets no V2-Extra at all and falls back to unmodified easy place rather than
 misplacing blocks silently.
+
+The auxiliary channel has an optional **relative layout** as well, negotiated
+through the `easy_place_relative_aux` HELLO capability: the low 24 bits travel
+anchored at the packet `blockPos`, while `AUXILIARY_SCHEMA`,
+`WALL_AUXILIARY_SCHEMA` and `WALL_UP` ride in X payload bits 8-10. Twenty-four
+bits is the exact bound - the offset `2 + 2*payload` stays at or below 2^25 and
+is always even, where binary32 steps by two and every such value is exact. That
+is what the legacy fixed-origin layout loses on high masks such as crafter lock
+slots. Clients that do not declare the capability keep the legacy layout, and
+the two layouts are never mixed.
 Multiface wire indices use the fixed order
 `DOWN, UP, NORTH, SOUTH, WEST, EAST`; vine derives `UP, NORTH, SOUTH, WEST,
 EAST` by filtering out `DOWN`. Clients or servers built with the historical

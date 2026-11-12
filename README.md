@@ -155,6 +155,13 @@ FCA 在 `handleUseItemOn` 收到未修改的命中结果时保存整份 packet �
 X 在主锚点没有 marker 时一律视为无 raw，避免把错位的包解成一个"看起来合法"的其它
 raw 值。该契约以 HELLO 能力位 `easy_place_packet_anchor` 声明，未声明该能力的客户端
 不会获得 V2-Extra，而是回落到原版 easy place，不会静默放错方块状态。
+
+Z auxiliary 另外提供可选的 **relative 布局**（HELLO 能力位 `easy_place_relative_aux`）：
+低 24 位以 packet `blockPos` 为锚点传输，`AUXILIARY_SCHEMA`、`WALL_AUXILIARY_SCHEMA`、
+`WALL_UP` 三位搬到 X payload 的 bit8-10。24 位是精确上限——偏移 `2 + 2*payload ≤ 2^25`
+且恒为偶数，binary32 在该区间 ULP 为 2，可逐位还原；这正是 legacy 固定原点布局在
+crafter 锁槽等高位掩码上掉低位的根因。未声明该能力的客户端继续使用 legacy 布局，
+两种布局不会混解。
 多面方块的面索引顺序固定为 `DOWN, UP, NORTH, SOUTH, WEST, EAST`，藤蔓从同一顺序
 过滤 `DOWN` 得到 `UP, NORTH, SOUTH, WEST, EAST`。使用历史面顺序构建的客户端或
 服务端必须升级到匹配版本，混用版本时多面方块和藤蔓可能按错误方向解码。旧 `main`

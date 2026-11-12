@@ -31,6 +31,8 @@ public final class EasyPlaceExtraServer {
             EasyPlaceExtraPayload.CAPABILITY_HIT_POSITION_RELAXATION;
     public static final String CAPABILITY_PACKET_ANCHOR =
             EasyPlaceExtraPayload.CAPABILITY_PACKET_ANCHOR;
+    public static final String CAPABILITY_RELATIVE_AUX =
+            EasyPlaceExtraPayload.CAPABILITY_RELATIVE_AUX;
     public static final String CAPABILITY_Y_PRECISION =
             EasyPlaceExtraPayload.CAPABILITY_Y_PRECISION;
     public static final String CAPABILITY_PISTON_PROTECTION =
@@ -43,6 +45,7 @@ public final class EasyPlaceExtraServer {
      */
     private static final Set<UUID> VALID_HELLO_PLAYERS = ConcurrentHashMap.newKeySet();
     private static final Set<UUID> Y_PRECISION_PLAYERS = ConcurrentHashMap.newKeySet();
+    private static final Set<UUID> RELATIVE_AUX_PLAYERS = ConcurrentHashMap.newKeySet();
     private static SettingsManager observedManager;
 
     private EasyPlaceExtraServer() {
@@ -140,6 +143,11 @@ public final class EasyPlaceExtraServer {
         } else {
             Y_PRECISION_PLAYERS.remove(player.getUUID());
         }
+        if(supportsRelativeAux(data)) {
+            RELATIVE_AUX_PLAYERS.add(player.getUUID());
+        } else {
+            RELATIVE_AUX_PLAYERS.remove(player.getUUID());
+        }
         if(!FrostorSettings.easyPlaceProtocolExtra) return;
 
         FrostorsCarpetAddition.LOGGER.info("[EasyPlace] Received V2-Extra hello from {}", player.getScoreboardName());
@@ -190,6 +198,7 @@ public final class EasyPlaceExtraServer {
         data.putInt(NBT_PROTOCOL_VERSION, PROTOCOL_VERSION);
         data.putBoolean(CAPABILITY_EASY_PLACE_V2_EXTRA, enabled);
         data.putBoolean(CAPABILITY_PACKET_ANCHOR, enabled);
+        data.putBoolean(CAPABILITY_RELATIVE_AUX, enabled);
         data.putBoolean(CAPABILITY_Y_PRECISION, enabled);
         data.putBoolean(CAPABILITY_PISTON_PROTECTION, enabled);
         data.putInt(NBT_Y_PRECISION_BITS, EasyPlaceExtraProtocol.Y_PRECISION_BITS);
@@ -204,6 +213,7 @@ public final class EasyPlaceExtraServer {
         if(enabled) {
             capabilities.add(StringTag.valueOf(CAPABILITY_Y_PRECISION));
             capabilities.add(StringTag.valueOf(CAPABILITY_PISTON_PROTECTION));
+            capabilities.add(StringTag.valueOf(CAPABILITY_RELATIVE_AUX));
         }
         data.put(NBT_CAPABILITIES, capabilities);
         return data;
@@ -212,6 +222,22 @@ public final class EasyPlaceExtraServer {
     static void forget(ServerPlayer player) {
         VALID_HELLO_PLAYERS.remove(player.getUUID());
         Y_PRECISION_PLAYERS.remove(player.getUUID());
+        RELATIVE_AUX_PLAYERS.remove(player.getUUID());
+    }
+
+    /**
+     * Whether the client splits the auxiliary value into a 24-bit relative Z payload plus three
+     * bits in X. This is an optional capability: clients that do not declare it keep the legacy
+     * fixed-origin field, so the flag is never required by {@link #acceptsHello(CompoundTag)}.
+     */
+    public static boolean supportsRelativeAux(ServerPlayer player) {
+        return isSupported(player) && RELATIVE_AUX_PLAYERS.contains(player.getUUID());
+    }
+
+    static boolean supportsRelativeAux(CompoundTag data) {
+        return acceptsHello(data)
+                && data.getBooleanOr(CAPABILITY_RELATIVE_AUX, false)
+                && advertisesCapability(data, CAPABILITY_RELATIVE_AUX);
     }
 
     static boolean supportsYPrecision(CompoundTag data) {

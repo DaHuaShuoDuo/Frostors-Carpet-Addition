@@ -220,12 +220,20 @@ Carpet 会把枚举候选显示为小写，并在解析输入时先转为大写�
   `BlockHitResult` 时一次性解码并存入 packet 级快照，随后与 `BlockItem.place` 生命周期
   关联。禁止从 `BlockPlaceContext.getClickLocation()` / `getClickedPos()` 重新解释：前者
   可能被 `BlockPlaceContext.at(...)` 用方块中心重建，后者相对 packet `blockPos` 按命中面
-  偏移一格，按朝向不同会丢失 marker、bit9 或邻轨 mask。
-- Z auxiliary 使用**固定原点**（`z = auxiliary * 2 + 2`，与世界 Z=0 对齐），不得以任何
-  `BlockPos` 的 Z 分量作为编码/解码锚点；TriWasa 的主路径、legacy `WorldUtils` 路径与
-  printer 适配传入的 `BlockPos` 语义不同，相对锚点会让辅助字段随命中面错一位。
-  `AUXILIARY_SCHEMA`（bit24）是唯一合法的"Z 已编码"判据，服务端解出后必须剥离该位，
-  缺少该位一律视为无 auxiliary（-1），不得回退到 `decodeZ >= 0` 之类的猜测。
+  偏移一格，按朝向不同会丢失 marker、bit9 或邻轨 mask。没有 packet 快照的 fallback
+  路径必须直接丢弃 auxiliary（`-1`），只保留 X/Y，不得用 `getClickLocation()` 反解 Z。
+- Z auxiliary 有**两种布局**，由 HELLO 能力位 `easy_place_relative_aux` 逐玩家选择：
+  - legacy（未声明该能力）：固定原点 `z = aux * 2 + 2`，绝对锚定世界 Z=0；
+  - relative：`z = blockPos.z + 2 + 2*(aux & 0xFFFFFF)`，并把 `AUXILIARY_SCHEMA`(24)、
+    `WALL_AUXILIARY_SCHEMA`(26)、`WALL_UP`(27) 三位搬进 X payload 的 bit8-10。
+  24 位是精确上限：偏移 `2 + 2*payload ≤ 2^25` 且恒为偶数，binary32 在 `[2^24, 2^25]`
+  ULP=2，偶数可精确表示；25 位起开始丢低位，28 位（legacy）会丢低 5 位。
+  服务端按 `supportsRelativeAux(player)` 二选一，禁止同包混解；`joinAuxiliary` /
+  `splitAuxiliaryHigh` 只在编解码边界重排，内存中的 aux 位定义（含 24/26/27）保持不变，
+  guard 与状态适配器不得感知布局差异。
+  presence 判据随布局走：legacy 看 Z 的 `AUXILIARY_SCHEMA`，relative 看 X 的
+  `X_AUX_SCHEMA_BIT`；两种模式都必须剥离 schema 后再交给下游，不得回退到
+  `decodeZ >= 0` 之类的猜测。
   Y 的 bit0-7 只承载 8-bit 命中高度，bit8-19 承载 12 位 `PISTON_PROTECTION_MASK`，
   bit20 是 `Y_PISTON_SCHEMA`；Y 不得复用 raw，也不得把活塞掩码放进 X/Z。packet 快照
   是单包单线程的局部变量，不得改回跨包 context id、pending 队列或按目标位置关联的
@@ -236,11 +244,11 @@ Carpet 会把枚举候选显示为小写，并在解析输入时先转为大写�
   `ServerboundUseItemOnPacket` 是 record，命中位置以相对 `blockPos` 的 float 传输。wire 的
   X/Y/Z 三个通道只承认 packet `BlockHitResult.blockPos` 这一个锚点；`resolveProtocolTarget`
   一类的 `protocolPos` 仅用于读投影/世界状态，禁止进入 `encodeX`/`encodeY`。客户端点击
-  支撑方块时，必须在入队前把 X/Y 平移 `packetTarget - encodeAnchor`（Z 是固定原点
-  auxiliary，不得平移），服务端只按 `blockPos` 解一次，不得再按命中面、X 轴相邻锚点或
-  奇偶位兜底；`alternateRawValue` 一类候选字段不得回归。该契约由 HELLO 能力位
-  `easy_place_packet_anchor` 声明，未声明的客户端一律不授予 V2-Extra——宁可回落到原版
-  easy place，也不能静默解出错误 raw 后放错方块状态。
+  支撑方块时，必须在入队前把 X/Y 平移 `packetTarget - encodeAnchor`；Z 仅在 relative
+  布局下平移，legacy 的固定原点 auxiliary 不得移动。服务端只按 `blockPos` 解一次，不得再
+  按命中面、X 轴相邻锚点或奇偶位兜底；`alternateRawValue` 一类候选字段不得回归。该契约
+  由 HELLO 能力位 `easy_place_packet_anchor` 声明，未声明的客户端一律不授予 V2-Extra——
+  宁可回落到原版 easy place，也不能静默解出错误 raw 后放错方块状态。
 - 活塞保护以 Y 的 `Y_PISTON_SCHEMA`（bit20）为唯一判据，服务端解出后剥离，缺标记按
   空掩码处理。掩码 bit0 是放置目标，bit1-6 按 `Direction.ordinal()` 标记匹配的面邻居，
   bit7-11 标记五个 QC 二跳目标。`PISTON` family 只覆盖掩码命中的直接位置；QC 位置还
