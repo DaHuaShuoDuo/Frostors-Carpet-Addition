@@ -16,8 +16,8 @@ import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
-import top.frostor.carpet.easyplace.EasyPlaceExtraProtocol;
 import top.frostor.carpet.easyplace.EasyPlaceExtraServer;
+import top.frostor.carpet.easyplace.EasyPlacePlacementRequest;
 import top.frostor.carpet.easyplace.EasyPlaceStateSync;
 
 @Mixin(StandingAndWallBlockItem.class)
@@ -39,10 +39,10 @@ public abstract class StandingAndWallBlockItemMixin extends BlockItem {
                 || !(context.getPlayer() instanceof ServerPlayer player)
                 || !EasyPlaceExtraServer.isSupported(player)) return;
 
-        int protocolValue = EasyPlaceExtraProtocol.decode(context.getClickLocation(), context.getClickedPos());
-        if(!EasyPlaceExtraProtocol.isExtra(protocolValue)) return;
+        EasyPlacePlacementRequest.Snapshot request = EasyPlacePlacementRequest.current();
+        if(request == null) return;
 
-        int rawValue = EasyPlaceExtraProtocol.toRawValue(protocolValue);
+        int rawValue = request.rawValue();
         BlockState state = cir.getReturnValue();
         if(state == null) {
             boolean wall = (rawValue & 1) != 0;

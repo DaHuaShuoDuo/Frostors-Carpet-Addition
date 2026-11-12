@@ -19,9 +19,19 @@ public final class EasyPlaceExtraProtocolTest {
                 + EasyPlaceQuantityStateTest.run()
                 + EasyPlaceMushroomStateTest.run()
                 + EasyPlaceRailStateTest.run()
+                + EasyPlacePlacementLifecycleTest.run()
+                + EasyPlaceUpdateSuppressionGuardTest.run()
+                + EasyPlaceWallStateTest.run()
+                + EasyPlaceObserverStateTest.run()
                 + EasyPlaceSpecialStateTest.run()
                 + EasyPlaceDirectionalStateTest.run()
-                + EasyPlaceAttachmentStateTest.run();
+                + EasyPlaceAttachmentStateTest.run()
+                + EasyPlaceYPrecisionTest.run()
+                + EasyPlaceRailProtectionTransportTest.run()
+                + EasyPlacePistonStateTest.run()
+                + EasyPlacePistonYPayloadTest.run()
+                + EasyPlaceAuxSplitTest.run()
+                + EasyPlaceHandshakeTest.run();
 
         System.out.println("EasyPlaceExtraProtocolTest passed " + checks + " checks");
     }

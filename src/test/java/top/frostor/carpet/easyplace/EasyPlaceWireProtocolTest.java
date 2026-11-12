@@ -1,5 +1,8 @@
 package top.frostor.carpet.easyplace;
 
+import net.minecraft.core.Direction;
+import net.minecraft.nbt.CompoundTag;
+
 public final class EasyPlaceWireProtocolTest extends EasyPlaceTestSupport {
     private EasyPlaceWireProtocolTest() {
     }
@@ -14,6 +17,80 @@ public final class EasyPlaceWireProtocolTest extends EasyPlaceTestSupport {
         test.check(
                 EasyPlaceExtraPayload.PROTOCOL_VERSION == 1,
                 "public payload API must preserve protocol version 1"
+        );
+        CompoundTag yCapability = EasyPlaceExtraServer.capabilityData(true, "test");
+        test.check(
+                EasyPlaceExtraServer.supportsYPrecision(yCapability),
+                "server capability data must advertise eight-bit Y precision"
+        );
+        CompoundTag disabledYCapability = EasyPlaceExtraServer.capabilityData(false, "test");
+        test.check(
+                !EasyPlaceExtraServer.supportsYPrecision(disabledYCapability),
+                "disabled server capabilities must not advertise eight-bit Y precision"
+        );
+        test.check(
+                (EasyPlaceExtraProtocol.RAIL_UPDATE_SUPPRESSION
+                        & EasyPlaceExtraProtocol.CRAFTER_SLOT_MASK) == 0
+                        && (EasyPlaceExtraProtocol.WALL_UPDATE_SUPPRESSION
+                        & EasyPlaceExtraProtocol.CRAFTER_SLOT_MASK) == 0,
+                "update suppression flags must not overlap crafter slot bits"
+        );
+        int updateFlags = EasyPlaceExtraProtocol.RAIL_UPDATE_SUPPRESSION
+                | EasyPlaceExtraProtocol.WALL_UPDATE_SUPPRESSION
+                | 0x1ab;
+        test.check(
+                EasyPlaceExtraProtocol.requestsRailUpdateSuppression(updateFlags)
+                        && EasyPlaceExtraProtocol.requestsWallUpdateSuppression(updateFlags),
+                "both update suppression flags must survive alongside a crafter mask"
+        );
+        test.check(
+                !EasyPlaceExtraProtocol.requestsRailUpdateSuppression(-1)
+                        && !EasyPlaceExtraProtocol.requestsWallUpdateSuppression(-1),
+                "an absent Z field must not enable either update suppression flag"
+        );
+        int wallMatchMask = (1 << Direction.NORTH.ordinal())
+                | (1 << Direction.UP.ordinal());
+        int wallAuxiliary = EasyPlaceExtraProtocol.WALL_UPDATE_SUPPRESSION
+                | (wallMatchMask << 11);
+        test.check(
+                EasyPlaceExtraProtocol.wallNeighborMatchMask(wallAuxiliary) == wallMatchMask,
+                "wall neighbor match bits must survive the auxiliary field"
+        );
+        test.check(
+                EasyPlaceExtraProtocol.wallNeighborMatchMask(-1) == 0,
+                "an absent Z field must not mark wall neighbors as matching"
+        );
+        int observerAuxiliary = EasyPlaceExtraProtocol.OBSERVER_UPDATE_SUPPRESSION;
+        test.check(
+                EasyPlaceExtraProtocol.requestsObserverUpdateSuppression(observerAuxiliary)
+                        && !EasyPlaceExtraProtocol.requestsObserverUpdateSuppression(-1),
+                "observer suppression must require an explicit positive auxiliary flag"
+        );
+        int tntAuxiliary = EasyPlaceExtraProtocol.TNT_UPDATE_SUPPRESSION;
+        test.check(
+                EasyPlaceExtraProtocol.requestsTntUpdateSuppression(tntAuxiliary)
+                        && !EasyPlaceExtraProtocol.requestsTntUpdateSuppression(-1),
+                "TNT suppression must require an explicit positive auxiliary flag"
+        );
+        int railNeighborMask = 0b1_0001;
+        int railAuxiliary = EasyPlaceExtraProtocol.RAIL_UPDATE_SUPPRESSION
+                | (railNeighborMask
+                << Integer.numberOfTrailingZeros(
+                EasyPlaceExtraProtocol.RAIL_NEIGHBOR_MATCH_BASE
+        ));
+        test.check(
+                EasyPlaceExtraProtocol.railNeighborMatchMask(railAuxiliary) == railNeighborMask
+                        && EasyPlaceExtraProtocol.railNeighborMatchMask(-1) == 0,
+                "rail neighbor bits must survive the auxiliary field"
+        );
+        int detectorRailShape = 0x5;
+        int poweredDetectorRail = detectorRailShape
+                | EasyPlaceExtraProtocol.RAIL_POWERED_MASK;
+        test.check(
+                (poweredDetectorRail & 0x7) == detectorRailShape
+                        && (poweredDetectorRail
+                        & EasyPlaceExtraProtocol.RAIL_POWERED_MASK) != 0,
+                "detector rail power must use a raw bit independent of shape"
         );
         for(int raw = 0; raw < 0b1000_0000; raw++) {
             int extra = EasyPlaceExtraProtocol.toExtraValue(raw);

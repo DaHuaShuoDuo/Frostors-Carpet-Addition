@@ -169,9 +169,10 @@ Carpet 会把枚举候选显示为小写，并在解析输入时先转为大写�
 - FCA 是共享协议 API 的提供方。`EasyPlaceExtraPayload` 和
   `BigEnderChestProtocol.Payload` 由 FCA 定义频道、消息 DTO 和 Codec；TriWasa
   通过 `compileOnly` 依赖这些公开类型，并在 FCA 同进程加载时直接复用。
-- TriWasa 的独立 Payload 只用于客户端未安装 FCA、连接专用服务器时的线兼容回退。
-  FCA 不应注册 TriWasa 的回退 Payload，也不得通过反射在两种 Payload 类之间复制字段；
-  任何新增能力都先扩展 FCA 的公开协议 API，再更新 TriWasa 适配。
+- TriWasa 的独立 Payload 只用于客户端未安装 FCA、连接专用服务器时的线兼容通信；
+  不得据此降级接受缺少当前协议字段的旧版 ACK。FCA 不应注册 TriWasa 的兼容 Payload，
+  也不得通过反射在两种 Payload 类之间复制字段；任何新增能力都先扩展 FCA 的公开协议
+  API，再更新 TriWasa 适配。
 - 协议值只从服务端方块放置上下文中的命中位置解码，最终状态仍须通过 `BlockItem.canPlace`
   校验，不能信任客户端直接写入任意方块状态。
 - 方块状态映射集中在 `easyplace` 包。`EasyPlaceStateSync` 是稳定 facade，实际 owner
@@ -194,12 +195,106 @@ Carpet 会把枚举候选显示为小写，并在解析输入时先转为大写�
   没有显式位时只能走保守的可用邻居推断。箱子同步使用
   `Block.UPDATE_CLIENTS | Block.UPDATE_KNOWN_SHAPE` 做受控状态写入，不要直接复用铁轨
   的全局或定时位置抑制标签。
+- `WallBlock` 的四个 `NONE/LOW/TALL` 横侧面按
+  `NORTH + EAST*3 + SOUTH*9 + WEST*27` 编码进 7 位 raw，合法范围为 `0..80`；
+  辅助 Z 通道的 bit0 表示 `UP`。`WATERLOGGED` 必须保持服务端放置状态，不能编码或强写。
+  墙结构重算由独立 `WALL` family 在 `WallBlock.updateShape` 的 `RETURN` 阶段抑制，
+  保留水 tick 等原版副作用；不得在 `HEAD` 直接取消。
+- 放置期更新抑制 guard 的 family 集合与 wall neighbor match mask 必须存放在每个
+  `PlacementScope` 内；`request(...)`、位置更新和 match mask 更新只能修改栈顶 scope。
+  嵌套 placement 期间外层请求仍然有效，但内层新增的 `RAIL`、`WALL`、`OBSERVER`、
+  `TNT` 请求及 mask 在 `endPlacement()` 后不得泄漏到外层。
+- `BlockItem.place` 的 Easy Place 生命周期必须通过 MixinExtras `@WrapMethod` 和
+  `try/finally` 管理，禁止只依赖 `HEAD`/`RETURN` 注入。异常从
+  `getPlacementState`、`canPlace`、`setBlock`、`onPlace` 或后续放置逻辑抛出时，
+  guard scope 与 item-stack 临时组件仍必须成对清理。
+- 辅助 Z 通道的 bit9 和 bit10 分别表示本次放置请求 `RAIL`、`WALL` 邻域保护，bit11-16
+  表示六个方向中哪些相邻墙与投影预期一致，bit17-21 表示五个方向中哪些相邻铁轨与投影
+  预期一致，bit22 请求 observer 保护，bit23 请求 TNT 保护；低 9 位继续留给 crafter
+  slot mask，bit24 是 `AUXILIARY_SCHEMA` 标记，bit25 空闲，bit26-27 是墙的 auxiliary
+  schema / `UP`。FCA 只能按客户端显式标志 request family；guard 的空间范围由 family
+  定义：`RAIL` 覆盖实际放置位置、四个水平邻居和上方邻居，不包括下方；`WALL` 和 `RAIL`
+  始终保护本次放置位置，邻居位置只在对应 match bit 存在时保护。不得退化为整个 placement
+  调用内的全局方块族抑制，也不得扩展到斜角或两格以外位置。
+- X raw、Z auxiliary 和 Y 精度必须在 `handleUseItemOn` 拿到未修改的
+  `BlockHitResult` 时一次性解码并存入 packet 级快照，随后与 `BlockItem.place` 生命周期
+  关联。禁止从 `BlockPlaceContext.getClickLocation()` / `getClickedPos()` 重新解释：前者
+  可能被 `BlockPlaceContext.at(...)` 用方块中心重建，后者相对 packet `blockPos` 按命中面
+  偏移一格，按朝向不同会丢失 marker、bit9 或邻轨 mask。没有 packet 快照的 fallback
+  路径必须直接丢弃 auxiliary（`-1`），只保留 X/Y，不得用 `getClickLocation()` 反解 Z。
+- Z auxiliary 有**两种布局**，由 HELLO 能力位 `easy_place_relative_aux` 逐玩家选择：
+  - legacy（未声明该能力）：固定原点 `z = aux * 2 + 2`，绝对锚定世界 Z=0；
+  - relative：`z = blockPos.z + 2 + 2*(aux & 0xFFFFFF)`，并把 `AUXILIARY_SCHEMA`(24)、
+    `WALL_AUXILIARY_SCHEMA`(26)、`WALL_UP`(27) 三位搬进 X payload 的 bit8-10。
+  24 位是精确上限：偏移 `2 + 2*payload ≤ 2^25` 且恒为偶数，binary32 在 `[2^24, 2^25]`
+  ULP=2，偶数可精确表示；25 位起开始丢低位，28 位（legacy）会丢低 5 位。
+  服务端按 `supportsRelativeAux(player)` 二选一，禁止同包混解；`joinAuxiliary` /
+  `splitAuxiliaryHigh` 只在编解码边界重排，内存中的 aux 位定义（含 24/26/27）保持不变，
+  guard 与状态适配器不得感知布局差异。
+  presence 判据随布局走：legacy 看 Z 的 `AUXILIARY_SCHEMA`，relative 看 X 的
+  `X_AUX_SCHEMA_BIT`；两种模式都必须剥离 schema 后再交给下游，不得回退到
+  `decodeZ >= 0` 之类的猜测。
+  Y 的 bit0-7 只承载 8-bit 命中高度，bit8-19 承载 12 位 `PISTON_PROTECTION_MASK`，
+  bit20 是 `Y_PISTON_SCHEMA`；Y 不得复用 raw，也不得把活塞掩码放进 X/Z。packet 快照
+  是单包单线程的局部变量，不得改回跨包 context id、pending 队列或按目标位置关联的
+  ContextStore。
+  该 Z 通道契约要求 FCA 与 TriWasa 同版本号配套，混用版本时铁轨/墙/observer/TNT 保护
+  位都会被静默丢弃。
+- 26.2/26.3 放置语义必须统一：两版分别依赖 Litematica 0.28.6 / 0.29.1，且 26.3 的
+  `ServerboundUseItemOnPacket` 是 record，命中位置以相对 `blockPos` 的 float 传输。wire 的
+  X/Y/Z 三个通道只承认 packet `BlockHitResult.blockPos` 这一个锚点；`resolveProtocolTarget`
+  一类的 `protocolPos` 仅用于读投影/世界状态，禁止进入 `encodeX`/`encodeY`。客户端点击
+  支撑方块时，必须在入队前把 X/Y 平移 `packetTarget - encodeAnchor`；Z 仅在 relative
+  布局下平移，legacy 的固定原点 auxiliary 不得移动。服务端只按 `blockPos` 解一次，不得再
+  按命中面、X 轴相邻锚点或奇偶位兜底；`alternateRawValue` 一类候选字段不得回归。该契约
+  由 HELLO 能力位 `easy_place_packet_anchor` 声明，未声明的客户端一律不授予 V2-Extra——
+  宁可回落到原版 easy place，也不能静默解出错误 raw 后放错方块状态。
+- 活塞保护以 Y 的 `Y_PISTON_SCHEMA`（bit20）为唯一判据，服务端解出后剥离，缺标记按
+  空掩码处理。掩码 bit0 是放置目标，bit1-6 按 `Direction.ordinal()` 标记匹配的面邻居，
+  bit7-11 标记五个 QC 二跳目标。`PISTON` family 只覆盖掩码命中的直接位置；QC 位置还
+  必须满足其上方一格为红石导体、与放置点面相邻且朝活塞输出信号，不得全局抑制活塞
+  更新。客户端仅在 `easyPlacePistonProtection` 开启、且服务端同时声明
+  `easy_place_piston_protection` 与 `easy_place_y_precision` 时编码掩码。
+- 相邻墙与投影预期的比较必须忽略 `WATERLOGGED`；其余方块种类、四侧 `WallSide` 和
+  `UP` 任一不符，都必须清除该方向的 wall neighbor match bit。竖向连续墙中的不符墙
+  因此不得因相邻的 Easy Place 墙而获得冻结保护。
+- Observer 只恢复稳定 `FACING`，必须忽略投影 `POWERED` 并强制新放置 observer 为
+  `POWERED=false`。已有 observer 的检测面被 Easy Place 时，仅在变化方向等于
+  `ObserverBlock.FACING` 且位置处于 `OBSERVER` 邻域内，于 `updateShape` 的 `HEAD`
+  返回原状态以阻止排程；不得全局禁用 observer 更新，也不能改用 `RETURN` 抑制。
+- 辅助 Z 通道 bit22 表示 TriWasa `easyPlaceObserverProtection` 请求 observer 保护。
+  FCA 只能在 bit22 存在时 request `OBSERVER`；关闭开关时 TriWasa 不得发送 observer
+  投影状态或该标志，必须回到原版 observer 放置与检测面更新语义。
+- 辅助 Z 通道 bit23 表示 TriWasa `easyPlaceTntProtection` 请求 TNT 保护。FCA 只能在
+  bit23 存在时 request `TNT`，并在 `TntBlock.onPlace` 与 `TntBlock.neighborChanged`
+  的 `HEAD` 取消红石点燃路径；不得拦截 `prime(...)` 本体的手动点火、投射物或爆炸引燃。
+- 铁轨 raw 通道 bit4 表示投影中的 `POWERED`，由 TriWasa 的统一
+  `easyPlaceRailProtection` 控制；另外 raw bit3（动力/激活/探测铁轨）或 bit4（普通
+  铁轨）作为无法发送 Z 字段时的保护兜底标志。Z 通道 bit9 请求统一铁轨保护，bit17-21
+  是邻轨 match mask，顺序固定为 `NORTH,SOUTH,WEST,EAST,UP`。FCA 只有 `RAIL` family，
+  负责形状/PP 更新、邻轨 match mask 和放置位置状态；`RAIL_STATE` family 已移除。
+  `PoweredRailBlock.updateState`、`DetectorRailBlock.checkPressed` 与
+  `RailState.place` 都在 `RAIL` 覆盖时取消。探测铁轨放置后会排程 `checkPressed` tick，
+  该延迟更新由放置位置上短时效、按邻轨 mask 约束且线程安全的抑制窗口覆盖，不允许退化
+  为无限期或按玩家关联的 context 存储。26.x 中动力铁轨和激活铁轨都是
+  `PoweredRailBlock` 的不同方块实例，因此同一 Mixin、`instanceof` 判断和 `POWERED`
+  编解码必须同时覆盖二者；没有独立 `ActivatorRailBlock`。普通铁轨没有红石状态。
+  关闭统一开关时不得发送 bit9、邻轨 match mask、raw 兜底标志或 bit4。
+- TNT 保护请求必须在 `BlockItem.place` 的公共路径中、`getPlacementState` 调用前完成，
+  不能依赖目标 state 或普通 `BlockItem` 专用 Mixin。`StandingAndWallBlockItem` 及其
+  珊瑚扇、墙挂/站立两用物品同样必须启用该次 TNT 邻域保护。
+- TNT 间接保护覆盖本次同步更新中的单级
+  `立即激活元件 origin -> 红石导体中继 -> TNT` 路径。中继必须使
+  `isRedstoneConductor(level, relayPos)` 为真，并且
+  `Level.getSignal(relayPos, directionFromTntToRelay) > 0`；不得白名单红石线或音符盒，
+  因为普通实体方块、红石火把、探测铁轨等也可能参与即时激活。该范围仍不包含多级中继
+  或 placement 返回后的计划 tick。
 - 命中位置中的 V2-Extra 编码会超出原版对方块中心的距离校验。仅对规则已开启且完成
   V2-Extra 握手的玩家放宽该校验，同时保留玩家触及范围和最终 `canPlace` 校验。该
   放宽必须独立生效，不能依赖 `antiCheatDisabled`。
 - HELLO 应答和规则开启时的能力广播必须携带 `protocol_version`、显式能力布尔值以及
-  `capabilities` 列表。客户端可把缺少新字段的 ACK 视为旧版兼容，但服务端不得退化为
-  只发送 `mod_version`。
+  `capabilities` 列表。TriWasa 必须校验 `protocol_version` 和能力布尔值，缺少字段
+  或版本不匹配时不得启用协议；服务端也不得退化为只发送 `mod_version`。
 - 该服务端实现改编自 EarlyCompat，来源为 CC0-1.0；修改协议或状态表时同步维护
   `THIRD_PARTY_NOTICES.md`。不要移植 Litematica、MaLiLib、Fanetlib 或客户端服务。
 

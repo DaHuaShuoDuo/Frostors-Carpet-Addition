@@ -108,8 +108,22 @@ public final class EasyPlaceSpecialStateTest extends EasyPlaceTestSupport {
                 detectorShape.ordinal()
         );
         check(
-                detectorRail != null && detectorRail.getValue(DetectorRailBlock.SHAPE) == detectorShape,
-                "detector rails must restore shape"
+                detectorRail != null
+                        && detectorRail.getValue(DetectorRailBlock.SHAPE) == detectorShape
+                        && !detectorRail.getValue(DetectorRailBlock.POWERED),
+                "detector rails must restore shape without inventing powered state"
+        );
+        BlockState poweredDetectorRail = EasyPlaceStateSync.apply(
+                Blocks.DETECTOR_RAIL,
+                Blocks.DETECTOR_RAIL.defaultBlockState(),
+                null,
+                detectorShape.ordinal() | EasyPlaceExtraProtocol.RAIL_POWERED_MASK
+        );
+        check(
+                poweredDetectorRail != null
+                        && poweredDetectorRail.getValue(DetectorRailBlock.SHAPE) == detectorShape
+                        && poweredDetectorRail.getValue(DetectorRailBlock.POWERED),
+                "powered detector rails must restore powered state and shape"
         );
 
         BlockState lantern = EasyPlaceStateSync.apply(

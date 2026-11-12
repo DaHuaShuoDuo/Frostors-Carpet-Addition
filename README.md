@@ -77,13 +77,91 @@ FCA 的规则由 Carpet 管理，并随世界配置保存：
 允许无侧向支撑放置，并恢复投影中的朝向；天花板悬挂牌同时恢复 `rotation` 与
 `attached`，但仍校验目标可替换、碰撞和通用放置约束。蜡烛同样只在放置阶段要求
 下方支撑，V2-Extra 允许无支撑放置且不改变放置后的 `updateShape` 行为。数量类方块按原版每次增加一级并将投影数量作为上限，每次交互只消耗一个对应物品。
+所有原版 `WallBlock` 变体恢复投影中的四侧 `NONE/LOW/TALL` 连接和 `UP` 柱子状态；
+墙体 `UP` 使用 auxiliary bit26 的 schema 和 bit27 的状态位，服务端继续接受旧 bit0
+布局。`WATERLOGGED` 不进入协议状态，仍以服务端当前放置状态为准。墙方块放置期间会独立抑制
+结构性 `updateShape` 重算，同时保留水方块 tick 等原版副作用。
+任意 V2-Extra 方块放置期间，实际放置位置内的铁轨结构重算会被抑制；四个水平邻居和
+上方邻居中的铁轨只有实际状态与投影预期一致时才保护。墙体始终保护本次放置位置，
+相邻墙同样只有实际状态与投影预期一致时才保护。
+墙状态比较忽略 `WATERLOGGED`，但方块种类、四侧连接或 `UP` 不符会排除该邻居。斜角、
+两格以外位置以及普通非 Easy Place 放置不受影响。
+这两项保护分别由 TriWasa 的统一 `easyPlaceRailProtection` 和
+`easyPlaceWallBlockNoShapeUpdate` 子开关控制，默认开启。
+observer 的投影只恢复 `FACING`，`POWERED` 始终按未激活状态放置。在已有 observer
+的检测面轻松放置方块时，本次变化不会排程 observer 脉冲；其他方向的变化仍保持原版
+检测行为。该保护由 TriWasa 的 `easyPlaceObserverProtection` 子开关控制，默认开启；
+关闭后 observer 放置和检测面更新均回到原版语义。
+TNT 在轻松放置时不会因放置位置已有红石信号而点燃，已有 TNT 也不会因相邻轻松放置
+触发的邻居更新而点燃。保护覆盖 `onPlace` 与 `neighborChanged` 两条红石入口，由 TriWasa
+的 `easyPlaceTntProtection` 子开关控制；手动点火、投射物引燃和其他爆炸仍保持原版行为。
+该请求走所有 `BlockItem` 的公共放置路径，包括珊瑚扇等 `StandingAndWallBlockItem`
+变体。
+若本次放置的立即激活元件与 TNT 通过一个已充能红石导体（包括普通实体方块、音符盒等）
+相接，则 TNT 的第二跳邻居更新也会在本次放置期间被抑制。红石线、红石火把、探测铁轨
+等即时元件都使用同一导体判断；该保护只覆盖同步单级中继，不包含多级链或延迟 tick。
+普通活塞与粘性活塞保留现有朝向恢复，不编码或恢复投影中的 `EXTENDED`。当放置目标
+为投影中未伸出的活塞、六面邻居与投影完全一致，或某个经其上方一格已充能导体中继
+形成第二跳 QC 的活塞与投影完全一致时，FCA 在本次 `BlockItem.place` 生命周期内
+抑制对应活塞的 `setPlacedBy`、`onPlace` 与 `neighborChanged` 激活检查。不匹配的
+活塞仍执行原版更新，放置结束后的普通更新、手动方块事件与真实活塞运动不受影响。
+该保护由 TriWasa 的 `easyPlacePistonProtection` 子开关控制，默认开启；12 位掩码走
+Y 的 bit8-19，不恢复归档分支的跨包 context 架构，也不占用 X/Z 通道。
+投影中已激活的动力铁轨、激活铁轨和探测铁轨由 TriWasa 的统一
+`easyPlaceRailProtection` 子开关保护，默认开启。客户端通过 raw 通道 bit4 保存这三类
+铁轨的初始 `POWERED`，另用 raw bit3（动力/激活/探测铁轨）或 bit4（普通铁轨）作为
+保护兜底标志；统一保护请求与邻轨 match mask 走 Z 通道 bit9 与 bit17-21，顺序固定为
+`NORTH,SOUTH,WEST,EAST,UP`。FCA 只有 `RAIL` family，同时覆盖形状、PP、邻轨匹配和
+放置位置状态；`RAIL_STATE` family 已移除。26.x 中动力铁轨和激活铁轨都是
+`PoweredRailBlock` 的实例，探测铁轨使用独立的 `DetectorRailBlock`。邻轨
+match mask 只比较铁轨种类与形状，不比较红石状态；普通铁轨没有红石状态。探测铁轨放置
+后排程的 `checkPressed` tick 由放置位置上的短时效抑制窗口覆盖，窗口同样受邻轨 mask
+约束，不会无限期冻结铁轨。
 
 服务端状态处理使用显式、初始化后冻结的行为族注册表。稳定的
 `EasyPlaceStateSync.apply(...)` 入口负责查找 owner；具体状态恢复位于
-`easyplace/adapter` 下的 directional、attachment、rail、multiface、quantity、
+`easyplace/adapter` 下的 directional、attachment、rail、wall、observer、multiface、quantity、
 container、sign、redstone 和 special 等适配器，通用纯状态操作集中在
 `EasyPlaceStateSupport`。旧的 `LegacyEasyPlaceStateSync` 单体映射和 fallback
-适配器已经移除。V2-Extra Payload 标记和协议版本仍为 1，其余字段布局未改变。
+适配器已经移除。V2-Extra Payload 标记和协议版本仍为 1；辅助 Z 通道低 9 位继续用于
+crafter slot mask，bit9/bit10 分别表示 rail/wall 更新保护请求，bit11-16 标记匹配的
+相邻墙方向，bit17-21 标记匹配的相邻铁轨方向，bit22 表示 observer 保护请求，bit23
+表示 TNT 保护请求，bit24 是 `AUXILIARY_SCHEMA` 标记，bit25 空闲。
+同一握手新增 `easy_place_y_precision` capability 和 `y_precision_bits=8`，以及
+`easy_place_piston_protection` capability 和 `piston_protection_bits=12`。支持前者的
+客户端把命中高度相对方块底部的 8-bit 定点值放入 Y 的 bit0-7；Y 的 bit8-19 承载
+12 位活塞保护掩码，bit20 是 `Y_PISTON_SCHEMA` 标记，只有掩码非零时才置位。Y 不复用
+raw；掩码为零或能力缺失时 Y 编码与纯精度版本逐位一致。X raw 与 Y 精度一律按 packet
+`BlockHitResult.blockPos` 编码；Z auxiliary 改为**固定原点**
+（世界 Z=0，`z = auxiliary * 2 + 2`），与点击位置、命中面和放置目标完全无关，客户端
+所有编码路径（Litematica 主路径、legacy `WorldUtils`、printer 适配）因此不再需要约定
+同一个 `BlockPos`。Z 的 bit24 是 `AUXILIARY_SCHEMA` 标记，服务端只接受带该标记的 Z 值，
+解出后剥离该位；未编码或缺少标记的 Z 一律按"无 auxiliary"处理。
+命中位置按相对 `blockPos` 的 binary32 float 传输，精确整数上限 2^24；Y payload 最大
+`2 + 2*(2^21-1) = 2^22`，留两位余量，26.2/26.3 均无精度损失。
+FCA 在 `handleUseItemOn` 收到未修改的命中结果时保存整份 packet 级快照，再执行后续目标
+转换和放置，并把该快照与 `BlockItem.place` 生命周期关联；挂墙方块等后续目标变换只使用
+该快照，不从改变后的目标坐标重新解释 X raw 或 Z auxiliary。`BlockPlaceContext` 的
+`getClickedPos()` 相对 packet 位置按命中面偏移一格，`at(...)` 还会用方块中心重建命中
+位置，从转换后的上下文反解会随朝向丢失 marker、bit9 或邻轨 mask。该快照仅存在于单个
+数据包的处理线程内，不使用跨包 context 架构。Z 通道的这一变更要求 FCA 与 TriWasa
+同版本号配套使用。
+26.2/26.3 放置语义统一：两版依赖的 Litematica 不同（0.28.6 / 0.29.1），且 26.3 把
+`ServerboundUseItemOnPacket` 改为 record，命中位置经 `BlockHitResult.STREAM_CODEC` 以
+**相对 `blockPos` 的 float** 传输。wire 的 X/Y/Z 三个通道因此只承认 packet `blockPos`
+这一个锚点：客户端要点击支撑方块时，必须在入队时把 X/Y 平移同一差值，使载荷与 packet
+位置自洽；`BellRules.resolveProtocolTarget` 等解析出的 `protocolPos` 只用于读取投影与
+当前世界状态，不得传给 `encodeX`/`encodeY`。服务端不再按命中面或 X 轴相邻锚点兜底，
+X 在主锚点没有 marker 时一律视为无 raw，避免把错位的包解成一个"看起来合法"的其它
+raw 值。该契约以 HELLO 能力位 `easy_place_packet_anchor` 声明，未声明该能力的客户端
+不会获得 V2-Extra，而是回落到原版 easy place，不会静默放错方块状态。
+
+Z auxiliary 另外提供可选的 **relative 布局**（HELLO 能力位 `easy_place_relative_aux`）：
+低 24 位以 packet `blockPos` 为锚点传输，`AUXILIARY_SCHEMA`、`WALL_AUXILIARY_SCHEMA`、
+`WALL_UP` 三位搬到 X payload 的 bit8-10。24 位是精确上限——偏移 `2 + 2*payload ≤ 2^25`
+且恒为偶数，binary32 在该区间 ULP 为 2，可逐位还原；这正是 legacy 固定原点布局在
+crafter 锁槽等高位掩码上掉低位的根因。未声明该能力的客户端继续使用 legacy 布局，
+两种布局不会混解。
 多面方块的面索引顺序固定为 `DOWN, UP, NORTH, SOUTH, WEST, EAST`，藤蔓从同一顺序
 过滤 `DOWN` 得到 `UP, NORTH, SOUTH, WEST, EAST`。使用历史面顺序构建的客户端或
 服务端必须升级到匹配版本，混用版本时多面方块和藤蔓可能按错误方向解码。旧 `main`

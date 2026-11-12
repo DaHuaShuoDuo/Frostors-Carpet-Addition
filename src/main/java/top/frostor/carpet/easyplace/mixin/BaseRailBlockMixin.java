@@ -11,12 +11,12 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
-import top.frostor.carpet.easyplace.EasyPlaceRailUpdateGuard;
+import top.frostor.carpet.easyplace.EasyPlaceUpdateSuppressionGuard;
 
 @Mixin(BaseRailBlock.class)
 public abstract class BaseRailBlockMixin {
     @Inject(method = "neighborChanged", at = @At("HEAD"), cancellable = true)
-    private void frostorsCarpet$keepEasyPlaceRailNeighborhood(
+    private void frostorsCarpet$preserveRailNeighborhood(
             BlockState state,
             Level level,
             BlockPos pos,
@@ -25,11 +25,16 @@ public abstract class BaseRailBlockMixin {
             boolean movedByPiston,
             CallbackInfo ci
     ) {
-        if(EasyPlaceRailUpdateGuard.shouldSuppressUpdate()) {
-            top.frostor.carpet.FrostorsCarpetAddition.LOGGER.debug(
-                    "[EasyPlace] Suppressed rail neighborChanged at {}",
-                    pos
-            );
+        boolean suppress = EasyPlaceUpdateSuppressionGuard.shouldSuppressRail(level, pos);
+        top.frostor.carpet.FrostorsCarpetAddition.LOGGER.debug(
+                "[EasyPlace-Rail] neighborChanged pos={} neighbor={} piston={} suppress={} guard={}",
+                pos,
+                neighborBlock,
+                movedByPiston,
+                suppress,
+                EasyPlaceUpdateSuppressionGuard.railDiagnostic(pos)
+        );
+        if(suppress) {
             ci.cancel();
         }
     }
@@ -39,14 +44,14 @@ public abstract class BaseRailBlockMixin {
             at = @At("HEAD"),
             cancellable = true
     )
-    private void frostorsCarpet$keepEasyPlaceRailShape(
+    private void frostorsCarpet$preserveRailStateUpdate(
             BlockState state,
             Level level,
             BlockPos pos,
             boolean movedByPiston,
             CallbackInfoReturnable<BlockState> cir
     ) {
-        if(EasyPlaceRailUpdateGuard.shouldSuppressUpdate()) {
+        if(shouldSuppress(level, pos)) {
             top.frostor.carpet.FrostorsCarpetAddition.LOGGER.debug(
                     "[EasyPlace] Suppressed rail updateState at {}",
                     pos
@@ -67,12 +72,16 @@ public abstract class BaseRailBlockMixin {
             boolean forceUpdate,
             CallbackInfoReturnable<BlockState> cir
     ) {
-        if(EasyPlaceRailUpdateGuard.shouldSuppressUpdate()) {
+        if(shouldSuppress(level, pos)) {
             top.frostor.carpet.FrostorsCarpetAddition.LOGGER.debug(
                     "[EasyPlace] Suppressed rail updateDir at {}",
                     pos
             );
             cir.setReturnValue(state);
         }
+    }
+
+    private static boolean shouldSuppress(Level level, BlockPos pos) {
+        return EasyPlaceUpdateSuppressionGuard.shouldSuppressRail(level, pos);
     }
 }

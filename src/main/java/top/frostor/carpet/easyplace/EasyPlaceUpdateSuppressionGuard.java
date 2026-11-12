@@ -1,0 +1,420 @@
+package top.frostor.carpet.easyplace;
+
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.state.BlockState;
+
+import java.util.ArrayDeque;
+import java.util.Deque;
+import java.util.EnumSet;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.BiPredicate;
+import java.util.function.Predicate;
+
+/**
+ * Suppresses structural recalculation for block families during one Easy Place item placement.
+ */
+public final class EasyPlaceUpdateSuppressionGuard {
+    public enum Family {
+        RAIL(EnumSet.of(
+                Direction.NORTH,
+                Direction.SOUTH,
+                Direction.WEST,
+                Direction.EAST,
+                Direction.UP
+        )),
+        WALL(EnumSet.allOf(Direction.class)),
+        OBSERVER(EnumSet.allOf(Direction.class)),
+        TNT(EnumSet.allOf(Direction.class)),
+        PISTON(EnumSet.allOf(Direction.class));
+
+        private final Set<Direction> coveredDirections;
+
+        Family(Set<Direction> coveredDirections) {
+            this.coveredDirections = Set.copyOf(coveredDirections);
+        }
+
+        public boolean covers(BlockPos placementPos, BlockPos pos) {
+            if(pos.equals(placementPos)) {
+                return true;
+            }
+            for(Direction direction : coveredDirections) {
+                if(pos.equals(placementPos.relative(direction))) {
+                    return true;
+                }
+            }
+            return false;
+        }
+    }
+
+    /**
+     * Detector rails schedule a {@code checkPressed} tick after placement; that tick runs after
+     * the ThreadLocal placement scope has ended. A short position-scoped window covers it. This is
+     * a suppression window, not a placement context: no packet correlation, no context id and no
+     * per-player pending queue.
+     */
+    private static final long RAIL_DEFERRED_TICKS = 2L;
+    private static final Map<ResourceKey<Level>, Map<BlockPos, RailWindow>> RAIL_WINDOWS =
+            new ConcurrentHashMap<>();
+    private static final ThreadLocal<Integer> PLACE_DEPTH = ThreadLocal.withInitial(() -> 0);
+    private static final ThreadLocal<Deque<PlacementScope>> PLACEMENT_SCOPES =
+            ThreadLocal.withInitial(ArrayDeque::new);
+    private static final Direction[] RAIL_DIRECTIONS = {
+            Direction.NORTH,
+            Direction.SOUTH,
+            Direction.WEST,
+            Direction.EAST,
+            Direction.UP
+    };
+
+    private EasyPlaceUpdateSuppressionGuard() {
+    }
+
+    public static void beginPlacement(BlockPos placementPos) {
+        int depth = PLACE_DEPTH.get();
+        if(depth == 0) {
+            PLACEMENT_SCOPES.remove();
+        }
+        PLACEMENT_SCOPES.get().push(new PlacementScope(placementPos));
+        PLACE_DEPTH.set(depth + 1);
+    }
+
+    public static void endPlacement() {
+        int depth = PLACE_DEPTH.get() - 1;
+        if(depth <= 0) {
+            PLACE_DEPTH.remove();
+            PLACEMENT_SCOPES.remove();
+        } else {
+            PLACEMENT_SCOPES.get().pop();
+            PLACE_DEPTH.set(depth);
+        }
+    }
+
+    public static void request(Family family) {
+        if(PLACE_DEPTH.get() > 0) {
+            PLACEMENT_SCOPES.get().peek().suppressedFamilies.add(family);
+        }
+    }
+
+    public static void updatePlacementPosition(BlockPos placementPos) {
+        if(PLACE_DEPTH.get() <= 0) {
+            return;
+        }
+        PLACEMENT_SCOPES.get().peek().placementPos = placementPos;
+    }
+
+    public static void requestWallNeighborMatches(int wallNeighborMatchMask) {
+        if(PLACE_DEPTH.get() <= 0) {
+            return;
+        }
+        PLACEMENT_SCOPES.get().peek().wallNeighborMatchMask = wallNeighborMatchMask & 0x3f;
+    }
+
+    public static void requestRailNeighborMatches(int railNeighborMatchMask) {
+        if(PLACE_DEPTH.get() <= 0) {
+            return;
+        }
+        PLACEMENT_SCOPES.get().peek().railNeighborMatchMask = railNeighborMatchMask & 0x1f;
+    }
+
+    /**
+     * Arms the PISTON family for the current placement and stores the client-provided mask.
+     * Only the placement position, matching face neighbours and matching QC second-hop targets
+     * are protected; a zero mask never arms the family.
+     */
+    public static void requestPistonProtection(int pistonProtectionMask) {
+        int mask = pistonProtectionMask & EasyPlaceExtraProtocol.PISTON_PROTECTION_MASK;
+        if(PLACE_DEPTH.get() <= 0 || mask == 0) {
+            return;
+        }
+        PlacementScope scope = PLACEMENT_SCOPES.get().peek();
+        scope.suppressedFamilies.add(Family.PISTON);
+        scope.pistonProtectionMask = mask;
+    }
+
+    /**
+     * Arms the RAIL family for the current placement and registers a short deferred window at the
+     * placement position. Both the synchronous scope and the deferred window use the same
+     * neighbour match mask, so neighbours are never protected unconditionally.
+     */
+    public static void requestRailProtection(Level level, BlockPos placementPos, int mask) {
+        int neighbourMask = mask & 0x1f;
+        if(PLACE_DEPTH.get() > 0) {
+            PlacementScope scope = PLACEMENT_SCOPES.get().peek();
+            scope.suppressedFamilies.add(Family.RAIL);
+            scope.railNeighborMatchMask = neighbourMask;
+        }
+        if(level == null || level.isClientSide()) {
+            return;
+        }
+        armRailWindow(level.dimension(), level.getGameTime(), placementPos, neighbourMask);
+    }
+
+    static void armRailWindow(
+            ResourceKey<Level> dimension,
+            long gameTime,
+            BlockPos placementPos,
+            int mask
+    ) {
+        Map<BlockPos, RailWindow> windows = RAIL_WINDOWS.computeIfAbsent(
+                dimension,
+                ignored -> new ConcurrentHashMap<>()
+        );
+        windows.entrySet().removeIf(entry -> entry.getValue().expiresAt() < gameTime);
+        windows.put(
+                placementPos.immutable(),
+                new RailWindow(gameTime + RAIL_DEFERRED_TICKS, mask & 0x1f)
+        );
+    }
+
+    public static boolean shouldSuppress(Family family, BlockPos pos) {
+        if(PLACE_DEPTH.get() <= 0) {
+            return false;
+        }
+        for(PlacementScope scope : PLACEMENT_SCOPES.get()) {
+            if(!scope.suppressedFamilies.contains(family)) {
+                continue;
+            }
+            if(family == Family.WALL
+                    ? coversWallNeighbors(scope, pos)
+                    : family == Family.RAIL
+                            ? coversRailNeighbors(scope, pos)
+                            : family == Family.PISTON
+                                    ? coversPistonPositions(scope, pos)
+                                    : family.covers(scope.placementPos, pos)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public static boolean shouldSuppressRail(Level level, BlockPos pos) {
+        if(shouldSuppress(Family.RAIL, pos)) {
+            return true;
+        }
+        return level != null
+                && !level.isClientSide()
+                && hasRailWindow(level.dimension(), level.getGameTime(), pos);
+    }
+
+    static boolean hasRailWindow(ResourceKey<Level> dimension, long gameTime, BlockPos pos) {
+        Map<BlockPos, RailWindow> windows = RAIL_WINDOWS.get(dimension);
+        if(windows == null || windows.isEmpty()) {
+            return false;
+        }
+        for(Map.Entry<BlockPos, RailWindow> entry : windows.entrySet()) {
+            RailWindow window = entry.getValue();
+            if(window.expiresAt() < gameTime) {
+                continue;
+            }
+            if(coversRailNeighbors(entry.getKey(), window.neighborMask(), pos)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public static void clearRailProtection() {
+        RAIL_WINDOWS.clear();
+    }
+
+    static void clearRailProtection(ResourceKey<Level> dimension) {
+        RAIL_WINDOWS.remove(dimension);
+    }
+
+    public static String railDiagnostic(BlockPos pos) {
+        if(PLACE_DEPTH.get() <= 0) {
+            return "inactive";
+        }
+        StringBuilder result = new StringBuilder();
+        for(PlacementScope scope : PLACEMENT_SCOPES.get()) {
+            if(!scope.suppressedFamilies.contains(Family.RAIL)) {
+                continue;
+            }
+            if(result.length() > 0) {
+                result.append("; ");
+            }
+            result.append("placement=")
+                    .append(scope.placementPos)
+                    .append(", mask=0x")
+                    .append(Integer.toHexString(scope.railNeighborMatchMask))
+                    .append(", covers=")
+                    .append(coversRailNeighbors(scope, pos));
+        }
+        return result.length() == 0 ? "no-rail-request" : result.toString();
+    }
+
+    public static boolean shouldSuppressTnt(Level level, BlockPos pos) {
+        if(PLACE_DEPTH.get() <= 0) {
+            return false;
+        }
+        for(PlacementScope scope : PLACEMENT_SCOPES.get()) {
+            if(!scope.suppressedFamilies.contains(Family.TNT)) {
+                continue;
+            }
+            if(Family.TNT.covers(scope.placementPos, pos)) {
+                return true;
+            }
+            if(hasPoweredConductorRelay(
+                    scope.placementPos,
+                    pos,
+                    relayPos -> {
+                        BlockState relayState = level.getBlockState(relayPos);
+                        return relayState.isRedstoneConductor(level, relayPos);
+                    },
+                    (relayPos, tntToRelay) -> level.getSignal(relayPos, tntToRelay) > 0
+            )) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Piston activation checks run in setPlacedBy / onPlace / neighborChanged. Direct positions
+     * are gated by the client mask; QC second-hop positions are additionally gated by a powered,
+     * face-adjacent conductor directly above the piston.
+     */
+    public static boolean shouldSuppressPiston(Level level, BlockPos pos) {
+        if(PLACE_DEPTH.get() <= 0) {
+            return false;
+        }
+        for(PlacementScope scope : PLACEMENT_SCOPES.get()) {
+            if(!scope.suppressedFamilies.contains(Family.PISTON)) {
+                continue;
+            }
+            if(coversPistonDirectPositions(scope, pos)) {
+                return true;
+            }
+            int qcTargetMatchBit = EasyPlaceExtraProtocol.pistonQcTargetMatchBit(
+                    scope.placementPos,
+                    pos
+            );
+            if(qcTargetMatchBit != 0
+                    && (scope.pistonProtectionMask & qcTargetMatchBit) != 0
+                    && hasPoweredQcRelay(
+                            scope.placementPos,
+                            pos,
+                            relayPos -> {
+                                BlockState relayState = level.getBlockState(relayPos);
+                                return relayState.isRedstoneConductor(level, relayPos);
+                            },
+                            relayPos -> level.getSignal(relayPos, Direction.UP) > 0
+                    )) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    static boolean hasPoweredQcRelay(
+            BlockPos placementPos,
+            BlockPos pistonPos,
+            Predicate<BlockPos> isRedstoneConductor,
+            Predicate<BlockPos> hasSignalTowardPiston
+    ) {
+        BlockPos relayPos = pistonPos.above();
+        if(placementPos.equals(relayPos) || !isFaceAdjacent(placementPos, relayPos)) {
+            return false;
+        }
+        return isRedstoneConductor.test(relayPos)
+                && hasSignalTowardPiston.test(relayPos);
+    }
+
+    private static boolean isFaceAdjacent(BlockPos first, BlockPos second) {
+        for(Direction direction : Direction.values()) {
+            if(second.equals(first.relative(direction))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    static boolean hasPoweredConductorRelay(
+            BlockPos placementPos,
+            BlockPos tntPos,
+            Predicate<BlockPos> isRedstoneConductor,
+            BiPredicate<BlockPos, Direction> hasSignalTowardTnt
+    ) {
+        for(Direction originToRelay : Direction.values()) {
+            BlockPos relayPos = placementPos.relative(originToRelay);
+            if(relayPos.equals(tntPos) || !isRedstoneConductor.test(relayPos)) {
+                continue;
+            }
+            for(Direction relayToTnt : Direction.values()) {
+                if(!tntPos.equals(relayPos.relative(relayToTnt))) {
+                    continue;
+                }
+                if(hasSignalTowardTnt.test(relayPos, relayToTnt.getOpposite())) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private static boolean coversWallNeighbors(PlacementScope scope, BlockPos pos) {
+        if(pos.equals(scope.placementPos)) {
+            return true;
+        }
+        for(Direction direction : Direction.values()) {
+            if(pos.equals(scope.placementPos.relative(direction))) {
+                return (scope.wallNeighborMatchMask & (1 << direction.ordinal())) != 0;
+            }
+        }
+        return false;
+    }
+
+    private static boolean coversRailNeighbors(PlacementScope scope, BlockPos pos) {
+        return coversRailNeighbors(scope.placementPos, scope.railNeighborMatchMask, pos);
+    }
+
+    private static boolean coversRailNeighbors(BlockPos placementPos, int mask, BlockPos pos) {
+        if(pos.equals(placementPos)) {
+            return true;
+        }
+        for(int index = 0; index < RAIL_DIRECTIONS.length; index++) {
+            Direction direction = RAIL_DIRECTIONS[index];
+            if(pos.equals(placementPos.relative(direction))) {
+                return (mask & (1 << index)) != 0;
+            }
+        }
+        return false;
+    }
+
+    private static boolean coversPistonPositions(PlacementScope scope, BlockPos pos) {
+        return coversPistonDirectPositions(scope, pos);
+    }
+
+    private static boolean coversPistonDirectPositions(PlacementScope scope, BlockPos pos) {
+        int mask = scope.pistonProtectionMask;
+        if(pos.equals(scope.placementPos)) {
+            return (mask & EasyPlaceExtraProtocol.PISTON_TARGET_MATCH) != 0;
+        }
+        for(Direction direction : Direction.values()) {
+            if(pos.equals(scope.placementPos.relative(direction))) {
+                return (mask & (1 << (direction.ordinal() + 1))) != 0;
+            }
+        }
+        return false;
+    }
+
+    private record RailWindow(long expiresAt, int neighborMask) {
+    }
+
+    private static final class PlacementScope {
+        private final EnumSet<Family> suppressedFamilies = EnumSet.noneOf(Family.class);
+        private BlockPos placementPos;
+        private int wallNeighborMatchMask;
+        private int railNeighborMatchMask;
+        private int pistonProtectionMask;
+
+        private PlacementScope(BlockPos placementPos) {
+            this.placementPos = placementPos;
+        }
+    }
+}

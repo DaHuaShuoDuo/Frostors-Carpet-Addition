@@ -9,6 +9,7 @@ public record EasyPlaceRestoreContext(
         Block block,
         BlockState placementState,
         @Nullable BlockPlaceContext placeContext,
-        int rawValue
+        int rawValue,
+        int auxiliaryValue
 ) {
 }

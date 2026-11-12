@@ -36,12 +36,16 @@ public final class EasyPlaceItemStackSync {
         }
     }
 
+    static boolean isPlacementActive() {
+        return PLACE_DEPTH.get() > 0;
+    }
+
     public static void applyCrafterSlots(Block block, ItemStack stack, int disabledMask) {
         if(PLACE_DEPTH.get() <= 0
                 || !(block instanceof CrafterBlock)
                 || stack.getItem() != Items.CRAFTER
                 || disabledMask < 0
-                || (disabledMask & 0x1ff) == 0) return;
+                || (disabledMask & EasyPlaceExtraProtocol.CRAFTER_SLOT_MASK) == 0) return;
 
         @SuppressWarnings("unchecked")
         TypedEntityData<BlockEntityType<?>> existing = (TypedEntityData<BlockEntityType<?>>)
@@ -70,7 +74,7 @@ public final class EasyPlaceItemStackSync {
     }
 
     static int[] decodeSlots(int disabledMask) {
-        int[] slots = new int[Integer.bitCount(disabledMask & 0x1ff)];
+        int[] slots = new int[Integer.bitCount(disabledMask & EasyPlaceExtraProtocol.CRAFTER_SLOT_MASK)];
         int index = 0;
         for(int slot = 0; slot < SLOT_COUNT; slot++) {
             if((disabledMask & (1 << slot)) != 0) {

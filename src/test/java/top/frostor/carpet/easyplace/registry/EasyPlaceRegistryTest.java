@@ -94,6 +94,7 @@ public final class EasyPlaceRegistryTest {
                 Blocks.STONE_SLAB,
                 Blocks.STONE_SLAB.defaultBlockState(),
                 null,
+                0,
                 0
         );
     }

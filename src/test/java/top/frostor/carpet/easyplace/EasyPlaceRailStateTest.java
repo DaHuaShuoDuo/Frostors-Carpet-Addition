@@ -12,34 +12,38 @@ public final class EasyPlaceRailStateTest extends EasyPlaceTestSupport {
 
     public static int run() {
         EasyPlaceRailStateTest test = new EasyPlaceRailStateTest();
-        test.checkRailUpdateGuardScope();
+        test.checkProtectionFlags();
         test.checkRailStateRestoration();
+        test.checkActivatorRailStateRestoration();
         return test.checks();
     }
 
-    private void checkRailUpdateGuardScope() {
-        EasyPlaceRailUpdateGuard.beginPlacement();
-        try {
-            check(!EasyPlaceRailUpdateGuard.shouldSuppressUpdate(), "rail suppression must start inactive");
-            EasyPlaceRailUpdateGuard.requestSuppression();
-            check(
-                    EasyPlaceRailUpdateGuard.shouldSuppressUpdate(),
-                    "rail suppression must cover any rail update during the guarded placement"
-            );
-        } finally {
-            EasyPlaceRailUpdateGuard.endPlacement();
-        }
-        check(!EasyPlaceRailUpdateGuard.shouldSuppressUpdate(), "rail suppression must end with placement");
-
-        EasyPlaceRailUpdateGuard.beginPlacement();
-        try {
-            check(
-                    !EasyPlaceRailUpdateGuard.shouldSuppressUpdate(),
-                    "a new rail placement must not inherit a previous suppression flag"
-            );
-        } finally {
-            EasyPlaceRailUpdateGuard.endPlacement();
-        }
+    private void checkProtectionFlags() {
+        check(
+                EasyPlaceExtraProtocol.requestsRailUpdateSuppression(
+                        Blocks.RAIL,
+                        EasyPlaceExtraProtocol.RAIL_PROTECTION_FLAG_REGULAR
+                ),
+                "regular rail protection must be recoverable from raw"
+        );
+        check(
+                EasyPlaceExtraProtocol.requestsRailUpdateSuppression(
+                        Blocks.POWERED_RAIL,
+                        EasyPlaceExtraProtocol.RAIL_PROTECTION_FLAG_POWERED
+                ),
+                "powered rail protection must be recoverable from raw"
+        );
+        check(
+                EasyPlaceExtraProtocol.requestsRailUpdateSuppression(
+                        Blocks.DETECTOR_RAIL,
+                        EasyPlaceExtraProtocol.RAIL_PROTECTION_FLAG_POWERED
+                ),
+                "detector rail protection must be recoverable from raw"
+        );
+        check(
+                !EasyPlaceExtraProtocol.requestsRailUpdateSuppression(Blocks.RAIL, 0),
+                "rail protection must not be inferred without a raw request flag"
+        );
     }
 
     private void checkRailStateRestoration() {
@@ -61,12 +65,39 @@ public final class EasyPlaceRailStateTest extends EasyPlaceTestSupport {
                 Blocks.POWERED_RAIL,
                 Blocks.POWERED_RAIL.defaultBlockState(),
                 null,
-                poweredRailShape.ordinal() | 0x8
+                poweredRailShape.ordinal()
+                        | 0x8
+                        | EasyPlaceExtraProtocol.RAIL_POWERED_MASK
         );
         check(
                 restoredPoweredRail != null
-                        && restoredPoweredRail.getValue(PoweredRailBlock.SHAPE) == poweredRailShape,
-                "powered rails must preserve shape while ignoring the no-update wire bit"
+                        && restoredPoweredRail.getValue(PoweredRailBlock.SHAPE) == poweredRailShape
+                        && restoredPoweredRail.getValue(PoweredRailBlock.POWERED),
+                "powered rails must preserve shape and redstone state"
+        );
+    }
+
+    private void checkActivatorRailStateRestoration() {
+        check(
+                Blocks.ACTIVATOR_RAIL instanceof PoweredRailBlock,
+                "activator rails must use the shared PoweredRailBlock implementation"
+        );
+
+        RailShape activatorRailShape = RailShape.EAST_WEST;
+        BlockState restoredActivatorRail = EasyPlaceStateSync.apply(
+                Blocks.ACTIVATOR_RAIL,
+                Blocks.ACTIVATOR_RAIL.defaultBlockState(),
+                null,
+                activatorRailShape.ordinal()
+                        | 0x8
+                        | EasyPlaceExtraProtocol.RAIL_POWERED_MASK
+        );
+        check(
+                restoredActivatorRail != null
+                        && restoredActivatorRail.getValue(PoweredRailBlock.SHAPE)
+                        == activatorRailShape
+                        && restoredActivatorRail.getValue(PoweredRailBlock.POWERED),
+                "activator rails must preserve shape and redstone state"
         );
     }
 }

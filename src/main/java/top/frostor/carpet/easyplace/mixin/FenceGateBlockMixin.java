@@ -34,7 +34,10 @@ public abstract class FenceGateBlockMixin {
             return;
         }
 
-        int protocolValue = EasyPlaceExtraProtocol.decode(hitResult.getLocation(), pos);
+        int protocolValue = EasyPlaceExtraProtocol.decode(
+                hitResult.getLocation(),
+                hitResult.getBlockPos()
+        );
         if(!EasyPlaceExtraProtocol.isExtra(protocolValue)) {
             return;
         }

@@ -6,10 +6,16 @@
     "BaseRailBlockMixin",
     "FenceGateBlockMixin",
     "BlockItemMixin",
+    "DetectorRailBlockMixin",
+    "ObserverBlockMixin",
+    "PistonBaseBlockMixin",
     "RailStateMixin",
     "ServerGamePacketListenerImplMixin",
     "StandingAndWallBlockItemMixin",
-    "WallHangingSignBlockMixin"
+    "TntBlockMixin",
+    "UseOnContextMixin",
+    "WallHangingSignBlockMixin",
+    "WallBlockMixin"
   ],
   "injectors": {
     "defaultRequire": 1
