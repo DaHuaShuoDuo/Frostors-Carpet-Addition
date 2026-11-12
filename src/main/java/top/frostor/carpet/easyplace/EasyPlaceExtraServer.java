@@ -69,6 +69,12 @@ public final class EasyPlaceExtraServer {
         ServerLifecycleEvents.SERVER_STOPPING.register(server -> {
             EasyPlaceUpdateSuppressionGuard.clearRailProtection();
             EasyPlacePacketRequest.end();
+            // A stopped server may be the same JVM as the next one (integrated server restart,
+            // test harness); leftover UUIDs would let a player be treated as already negotiated
+            // before its new HELLO arrives, and would keep the previous auxiliary layout.
+            VALID_HELLO_PLAYERS.clear();
+            Y_PRECISION_PLAYERS.clear();
+            RELATIVE_AUX_PLAYERS.clear();
         });
     }
 

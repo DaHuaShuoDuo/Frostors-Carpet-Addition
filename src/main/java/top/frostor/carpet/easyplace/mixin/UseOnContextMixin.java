@@ -23,6 +23,9 @@ public abstract class UseOnContextMixin {
         }
         EasyPlacePacketRequest.Snapshot packetRequest = EasyPlacePacketRequest.current();
         if(packetRequest != null && packetRequest.yPrecisionValue() >= 0) {
+            // BlockPlaceContext.getClickedPos() already resolves to the placement target for both
+            // replaceable and non-replaceable clicks, and the encoder anchors its Y payload at
+            // that same target, so this is the correct base for the restored height.
             return new Vec3(
                     location.x,
                     context.getClickedPos().getY()

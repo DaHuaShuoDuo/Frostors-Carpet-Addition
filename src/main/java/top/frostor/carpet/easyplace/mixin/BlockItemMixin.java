@@ -192,7 +192,7 @@ public abstract class BlockItemMixin {
         if(rail && preserveRail) {
             int railNeighborMatchMask =
                     EasyPlaceExtraProtocol.railNeighborMatchMask(auxiliaryValue);
-            top.frostor.carpet.FrostorsCarpetAddition.LOGGER.info(
+            top.frostor.carpet.FrostorsCarpetAddition.LOGGER.debug(
                     "[EasyPlace-Rail] request target={} raw=0x{} auxiliary=0x{} neighborMask=0x{}",
                     context.getClickedPos(),
                     Integer.toHexString(rawValue),

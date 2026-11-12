@@ -15,8 +15,9 @@ public final class EasyPlaceAuxSplitTest extends EasyPlaceTestSupport {
     private static final BlockPos[] POSITIONS = {
             new BlockPos(0, 64, 0),
             new BlockPos(-17, 70, -1),
-            new BlockPos(4, 64, 30000001),
-            new BlockPos(4, 64, -29999999),
+            // WorldBorder.MAX_CENTER_COORDINATE: block coordinates never exceed +-29,999,984.
+            new BlockPos(4, 64, 29999984),
+            new BlockPos(4, 64, -29999984),
             new BlockPos(4, 64, 16777215),
             new BlockPos(4, 64, 16777216)
     };
