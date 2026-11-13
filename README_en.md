@@ -319,6 +319,24 @@ Every PR runs change classification and `CI Gate`. The full two-version build
 runs only when source, resources, version properties, Gradle, Wrapper, or
 workflow files change.
 
+### Releasing
+
+GitHub Releases are the release entry point. After publishing a release tagged
+`v<mod_version>`, the `Publish Release` workflow verifies that the tag matches
+`mod_version` in `gradle.properties`, rebuilds and tests both `26.2` and `26.3`,
+and publishes each JAR to Modrinth and CurseForge. Platform versions use
+`<mod_version>+<Minecraft version>`, such as `0.2.1-beta.1+26.3`; prerelease
+tags map to the alpha or beta channel.
+
+Before the first release, create the Modrinth and CurseForge projects and add
+these GitHub repository settings:
+
+- Actions variables: `MODRINTH_PROJECT_ID`, `CURSEFORGE_PROJECT_ID`
+- Actions secrets: `MODRINTH_TOKEN`, `CURSEFORGE_TOKEN`
+
+Tokens are never committed. To retry an existing release, use
+`Actions > Publish Release > Run workflow` with its complete tag.
+
 ## License and Third-Party Sources
 
 FCA uses the [MIT License](https://github.com/DaHuaShuoDuo/Frostors-Carpet-Addition/blob/main/LICENSE).

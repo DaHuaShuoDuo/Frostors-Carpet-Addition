@@ -239,6 +239,22 @@ $env:JAVA_HOME = '<JDK 25 installation>'
 PR 始终运行变更分类和 `CI Gate`；只有源码、资源、版本属性、Gradle、Wrapper 或
 workflow 变化时才执行双版本完整构建。
 
+### 发布
+
+发布以 GitHub Release 为入口。创建并发布标签为 `v<mod_version>` 的 Release 后，
+`Publish Release` 工作流会校验标签与 `gradle.properties` 中的 `mod_version` 一致，
+重新构建并测试 `26.2`、`26.3` 两个版本，然后分别发布到 Modrinth 和 CurseForge。
+平台版本号使用 `<mod_version>+<Minecraft 版本>`，例如 `0.2.1-beta.1+26.3`；
+预发布标签映射为 alpha 或 beta 通道。
+
+首次启用前需要创建对应的 Modrinth 与 CurseForge 项目，并在 GitHub 仓库设置中配置：
+
+- Actions variables：`MODRINTH_PROJECT_ID`、`CURSEFORGE_PROJECT_ID`
+- Actions secrets：`MODRINTH_TOKEN`、`CURSEFORGE_TOKEN`
+
+令牌不会写入仓库。需要重试已有 Release 时，可从
+`Actions > Publish Release > Run workflow` 输入该 Release 的完整标签。
+
 ## 许可证与第三方来源
 
 FCA 使用 [MIT License](https://github.com/DaHuaShuoDuo/Frostors-Carpet-Addition/blob/main/LICENSE)。
