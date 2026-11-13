@@ -20,8 +20,8 @@ the client does not need to install FCA.
 
 | Minecraft | Fabric Loader | Fabric API | Carpet |
 | --- | --- | --- | --- |
-| 26.2 | >= 0.19.3 | >= 0.152.1 | >= 26.2 < 26.3 |
-| 26.3 | >= 0.19.5 | >= 0.160.5 | >= 26.3 < 26.4 |
+| 26.2 | >= 0.19.3 | >= 0.145.4 | >= 26.2 < 26.3 |
+| 26.3 | >= 0.19.5 | >= 0.153.1 | >= 26.3 < 26.4 |
 
 FCA requires Java 25. Install the FCA build matching your Minecraft version.
 
