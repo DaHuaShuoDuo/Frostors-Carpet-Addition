@@ -319,11 +319,17 @@ Carpet 会把枚举候选显示为小写，并在解析输入时先转为大写�
 
   | Minecraft | Fabric Loader | Fabric API | Carpet |
   | --- | --- | --- | --- |
-  | 26.2 | >= 0.19.3 | >= 0.152.1 | >= 26.2 < 26.3 |
-  | 26.3 | >= 0.19.5 | >= 0.160.5 | >= 26.3 < 26.4 |
+  | 26.2 | >= 0.19.3 | >= 0.145.4 | >= 26.2 < 26.3 |
+  | 26.3 | >= 0.19.5 | >= 0.153.1 | >= 26.3 < 26.4 |
 
 - 根 `gradle.properties` 管共享属性（模组版本、group、产物前缀、Loom 版本）；
   Minecraft、Loader、Fabric API 和兼容范围由各版本属性文件定义。
+- 版本矩阵中的 Fabric API 下限是"用该版本实际编译通过的最低版本"，不是
+  `fabric_api_version` 编译基线。下调下限时，用
+  `./gradlew -Pfabric_api_version=<版本>+<MC> :<MC>:compileJava` 或直接改
+  `versions/<版本>/gradle.properties` 编译一次验证；`-P` 会同时作用于所有子项目，
+  多版本工作区里改单版本属性文件更可靠。编译基线保持不动，避免通过新 API 悄悄抬高
+  实际需求。
 - `libs/fabric-carpet-<Minecraft 版本>.jar` 只作为 `compileOnly` 编译依赖。Carpet
   必须是运行期 `depends`，但绝不能被打进模组 JAR，也不要复制或反编译其源码到项目。
 - 增加或移除支持版本时，要同时处理 `settings.gradle`、版本属性、对应 Carpet 编译依赖、

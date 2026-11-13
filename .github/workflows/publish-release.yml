@@ -229,7 +229,7 @@ jobs:
           printf '%s\n' "$notes" > .ci/release-notes.md
 
       - name: Publish to Modrinth and CurseForge
-        uses: Kira-Antipov/mc-publish@c23376546a97f5ba7984e94445da359459b14419
+        uses: Kira-NT/mc-publish@c23376546a97f5ba7984e94445da359459b14419
         with:
           modrinth-id: ${{ vars.MODRINTH_PROJECT_ID }}
           modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
